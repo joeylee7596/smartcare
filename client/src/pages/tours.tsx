@@ -11,7 +11,7 @@ import { MapPin, RotateCw, Clock, Users, Route, Brain, Filter, Search } from "lu
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, useDroppable, DraggableAttributes, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -39,25 +39,31 @@ const center = {
   lng: 13.404954,
 };
 
-interface SortablePatientItemProps {
+interface DraggablePatientProps {
   patient: Patient;
+  isDragging?: boolean;
 }
 
-function SortablePatientItem({ patient }: SortablePatientItemProps) {
+function DraggablePatient({ patient, isDragging }: DraggablePatientProps) {
   const {
     attributes,
     listeners,
     setNodeRef,
     transform,
     transition,
-    isDragging,
-  } = useSortable({ id: patient.id });
+  } = useSortable({
+    id: patient.id,
+    data: {
+      type: 'patient',
+      patient,
+    },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 100 : 1,
     opacity: isDragging ? 0.5 : 1,
+    cursor: 'move',
   };
 
   return (
@@ -66,7 +72,7 @@ function SortablePatientItem({ patient }: SortablePatientItemProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200 cursor-move"
+      className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
     >
       <div className="flex items-center justify-between">
         <div>
@@ -85,26 +91,31 @@ interface DroppableTourProps {
 }
 
 function DroppableTour({ tour, children }: DroppableTourProps) {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: tour.id.toString(),
   });
 
   return (
-    <div ref={setNodeRef} className="mb-4">
+    <div 
+      ref={setNodeRef}
+      className={`mb-4 transition-colors duration-200 ${isOver ? 'bg-primary/5 rounded-lg' : ''}`}
+    >
       {children}
     </div>
   );
 }
 
 function NewTourDropZone() {
-  const { setNodeRef } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: "new-tour",
   });
 
   return (
     <div
       ref={setNodeRef}
-      className="mt-4 p-4 rounded-lg border-2 border-dashed border-border/40 bg-muted/20 text-center transition-colors duration-200 hover:bg-muted/30"
+      className={`mt-4 p-4 rounded-lg border-2 border-dashed border-border/40 
+        ${isOver ? 'bg-primary/10' : 'bg-muted/20'} 
+        text-center transition-colors duration-200 hover:bg-muted/30`}
     >
       <p className="text-sm text-muted-foreground">
         Patient hier ablegen für neue Tour
@@ -122,6 +133,7 @@ export default function Tours() {
     scheduled: false,
     completed: false,
   });
+  const [activeId, setActiveId] = useState<number | null>(null);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
@@ -175,8 +187,14 @@ export default function Tours() {
     })
   );
 
+  const handleDragStart = (event: DragEndEvent) => {
+    const { active } = event;
+    setActiveId(active.id as number);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
 
     if (!over) return;
 
@@ -185,7 +203,7 @@ export default function Tours() {
     if (over.id === "new-tour") {
       // Create new tour
       const newTour: InsertTour = {
-        date: new Date().toISOString(),
+        date: new Date(),
         caregiverId: 1, // TODO: Get from auth context
         patientIds: [draggedPatientId],
         status: "scheduled",
@@ -202,6 +220,8 @@ export default function Tours() {
       updateTourMutation.mutate({ id: tourId, patientIds: updatedPatientIds });
     }
   };
+
+  const draggedPatient = activeId ? patients.find(p => p.id === activeId) : null;
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
@@ -222,7 +242,11 @@ export default function Tours() {
             </Button>
           </div>
 
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext 
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
             <div className="grid grid-cols-[350px,1fr,350px] gap-6">
               {/* Left Column - Patient List */}
               <Card className="shadow-lg">
@@ -274,11 +298,13 @@ export default function Tours() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[calc(100vh-350px)]">
-                    <SortableContext items={filteredPatients} strategy={verticalListSortingStrategy}>
-                      {filteredPatients.map((patient) => (
-                        <SortablePatientItem key={patient.id} patient={patient} />
-                      ))}
-                    </SortableContext>
+                    {filteredPatients.map((patient) => (
+                      <DraggablePatient 
+                        key={patient.id} 
+                        patient={patient}
+                        isDragging={patient.id === activeId}
+                      />
+                    ))}
                   </ScrollArea>
                 </CardContent>
               </Card>
@@ -356,6 +382,12 @@ export default function Tours() {
                 </CardContent>
               </Card>
             </div>
+
+            <DragOverlay>
+              {draggedPatient ? (
+                <DraggablePatient patient={draggedPatient} isDragging />
+              ) : null}
+            </DragOverlay>
           </DndContext>
         </main>
       </div>
