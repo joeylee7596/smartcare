@@ -68,13 +68,15 @@ export function setupWebSocket(server: Server) {
             }
             break;
 
-          case 'TOUR_UPDATE':
-            // Broadcast tour updates to all connected clients
+          case 'DOC_STATUS_UPDATE':
+            // Broadcast documentation status updates to all connected clients
             wss.clients.forEach(client => {
               if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
-                  type: 'TOUR_UPDATED',
-                  tour: data.tour
+                  type: 'DOC_STATUS_UPDATED',
+                  docId: data.docId,
+                  status: data.status,
+                  reviewNotes: data.reviewNotes
                 }));
               }
             });

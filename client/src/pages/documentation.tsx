@@ -8,7 +8,7 @@ import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc, DocumentationStatus } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Mic, Brain, Check, Clock, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -23,6 +23,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useAuth } from "@/hooks/use-auth";
+import { useWebSocket, sendMessage } from "@/lib/websocket"; // Assuming these functions exist
 
 export default function Documentation() {
   const { toast } = useToast();
@@ -66,6 +67,29 @@ export default function Documentation() {
     },
   });
 
+  // Subscribe to WebSocket updates
+  useEffect(() => {
+    const { subscribe } = useWebSocket();
+
+    const unsubscribe = subscribe((message) => {
+      if (message.type === 'DOC_STATUS_UPDATED') {
+        // Invalidate the docs query to refresh the data
+        queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+
+        // Show a toast notification
+        toast({
+          title: "Dokumentation aktualisiert",
+          description: "Der Status einer Dokumentation wurde geändert.",
+        });
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [toast]);
+
+
   const handleDragStart = (event: DragStartEvent) => {
     setDraggedItem(event.active.id as number);
   };
@@ -77,9 +101,17 @@ export default function Documentation() {
       const newStatus = over.id as string;
       const docId = active.id as number;
 
+      // Update the status locally through mutation
       updateDocStatusMutation.mutate({
         id: docId,
         status: newStatus,
+      });
+
+      // Notify other clients through WebSocket
+      sendMessage({
+        type: 'DOC_STATUS_UPDATE',
+        docId,
+        status: newStatus
       });
     }
 
@@ -207,20 +239,40 @@ export default function Documentation() {
                 <ScrollArea className="h-[calc(100vh-250px)]">
                   <div className="space-y-4 pr-4">
                     {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
-                      <Card key={doc.id} className="relative">
+                      <Card
+                        key={doc.id}
+                        className="relative cursor-move"
+                        draggable
+                        data-id={doc.id}
+                        data-status={doc.status}
+                      >
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base flex items-center justify-between">
-                            <span>Patient #{doc.patientId}</span>
-                            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                            <span>{patients.find(p => p.id === doc.patientId)?.name || `Patient #${doc.patientId}`}</span>
+                            {doc.status === DocumentationStatus.COMPLETED ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : doc.status === DocumentationStatus.REVIEW ? (
+                              <RefreshCw className="h-4 w-4 text-amber-600" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-blue-600" />
+                            )}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Erstellt am</span>
-                              <span>{formatDate(doc.date)}</span>
+                              <span className="text-muted-foreground">
+                                {doc.status === DocumentationStatus.COMPLETED ? 'Abgeschlossen am' : 'Erstellt am'}
+                              </span>
+                              <span>{formatDate(doc.reviewDate || doc.date)}</span>
                             </div>
                             <p className="text-sm line-clamp-3">{doc.content}</p>
+                            {doc.reviewNotes && (
+                              <div className="mt-2 p-2 bg-muted rounded-sm">
+                                <p className="text-xs text-muted-foreground">Anmerkungen:</p>
+                                <p className="text-sm">{doc.reviewNotes}</p>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -243,20 +295,40 @@ export default function Documentation() {
                 <ScrollArea className="h-[calc(100vh-250px)]">
                   <div className="space-y-4 pr-4">
                     {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
-                      <Card key={doc.id} className="relative">
+                      <Card
+                        key={doc.id}
+                        className="relative cursor-move"
+                        draggable
+                        data-id={doc.id}
+                        data-status={doc.status}
+                      >
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base flex items-center justify-between">
-                            <span>Patient #{doc.patientId}</span>
-                            <Check className="h-4 w-4 text-green-600" />
+                            <span>{patients.find(p => p.id === doc.patientId)?.name || `Patient #${doc.patientId}`}</span>
+                            {doc.status === DocumentationStatus.COMPLETED ? (
+                              <Check className="h-4 w-4 text-green-600" />
+                            ) : doc.status === DocumentationStatus.REVIEW ? (
+                              <RefreshCw className="h-4 w-4 text-amber-600" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-blue-600" />
+                            )}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Abgeschlossen am</span>
+                              <span className="text-muted-foreground">
+                                {doc.status === DocumentationStatus.COMPLETED ? 'Abgeschlossen am' : 'Erstellt am'}
+                              </span>
                               <span>{formatDate(doc.reviewDate || doc.date)}</span>
                             </div>
                             <p className="text-sm line-clamp-3">{doc.content}</p>
+                            {doc.reviewNotes && (
+                              <div className="mt-2 p-2 bg-muted rounded-sm">
+                                <p className="text-xs text-muted-foreground">Anmerkungen:</p>
+                                <p className="text-sm">{doc.reviewNotes}</p>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>

@@ -64,6 +64,13 @@ export function useWebSocket() {
       const message = JSON.parse(event.data);
       handler(message);
     };
+
+    // Return cleanup function
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.onmessage = null;
+      }
+    };
   }, []);
 
   return { sendMessage, subscribe };
