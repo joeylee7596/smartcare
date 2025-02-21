@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Mic, StopCircle, Brain } from "lucide-react";
+import { Mic, StopCircle, Brain, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { Textarea } from "@/components/ui/textarea";
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
@@ -21,7 +22,10 @@ declare global {
 export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [previewText, setPreviewText] = useState<string>("");
+  const [editableText, setEditableText] = useState<string>("");
+  const [finalDocumentation, setFinalDocumentation] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [isProcessing, setIsProcessing] = useState(false);
   const { sendMessage, subscribe } = useWebSocket();
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
 
@@ -29,10 +33,12 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
     return subscribe((message) => {
       switch (message.type) {
         case 'TRANSCRIPTION_COMPLETE':
-          setPreviewText(message.documentation);
+          setIsProcessing(false);
+          setFinalDocumentation(message.documentation);
           onTranscriptionComplete(message.documentation);
           break;
         case 'TRANSCRIPTION_ERROR':
+          setIsProcessing(false);
           setError(message.error);
           break;
       }
@@ -43,6 +49,8 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
     try {
       setError("");
       setPreviewText("");
+      setEditableText("");
+      setFinalDocumentation("");
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -64,10 +72,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           .join(' ');
 
         setPreviewText(transcript);
-        sendMessage({
-          type: 'VOICE_TRANSCRIPTION',
-          audioContent: transcript
-        });
+        setEditableText(transcript);
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -113,6 +118,14 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
     setIsRecording(false);
   };
 
+  const handleConfirm = () => {
+    setIsProcessing(true);
+    sendMessage({
+      type: 'VOICE_TRANSCRIPTION',
+      audioContent: editableText
+    });
+  };
+
   return (
     <Card className={cn("relative overflow-hidden", className)}>
       <CardContent className="p-4 space-y-4">
@@ -138,14 +151,15 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             variant="outline"
             className="w-full"
             onClick={startRecording}
+            disabled={isProcessing}
           >
             <Mic className="mr-2 h-4 w-4" />
             Sprachaufnahme starten
           </Button>
         )}
 
-        {(isRecording || previewText || error) && (
-          <div className="space-y-2 animate-in fade-in-50">
+        {(isRecording || editableText || error || finalDocumentation) && (
+          <div className="space-y-4 animate-in fade-in-50">
             {isRecording && (
               <>
                 <div className="flex items-center justify-between text-sm text-primary">
@@ -157,6 +171,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                 <Progress value={100} className="h-2" />
               </>
             )}
+
             {error && (
               <div className="p-3 bg-red-50 rounded-lg border border-red-100">
                 <p className="text-sm text-red-700">
@@ -164,11 +179,35 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                 </p>
               </div>
             )}
-            {previewText && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium mb-1">Erkannter Text:</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {previewText}
+
+            {editableText && !finalDocumentation && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Erkannter Text:</p>
+                <Textarea
+                  value={editableText}
+                  onChange={(e) => setEditableText(e.target.value)}
+                  className="min-h-[100px]"
+                  placeholder="Text bearbeiten..."
+                />
+                <Button 
+                  className="w-full" 
+                  onClick={handleConfirm}
+                  disabled={isProcessing}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  {isProcessing ? "Verarbeite..." : "Text bestätigen"}
+                </Button>
+              </div>
+            )}
+
+            {finalDocumentation && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-4 w-4 text-blue-700" />
+                  <p className="text-sm font-medium text-blue-700">KI-Dokumentation:</p>
+                </div>
+                <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                  {finalDocumentation}
                 </p>
               </div>
             )}
