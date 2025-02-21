@@ -26,15 +26,16 @@ import {
 } from "@dnd-kit/core";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { sendMessage } from "@/lib/websocket";
 
-function StatusColumn({ 
-  title, 
-  count, 
-  status, 
-  children 
-}: { 
-  title: string; 
-  count: number; 
+function StatusColumn({
+  title,
+  count,
+  status,
+  children
+}: {
+  title: string;
+  count: number;
   status: string;
   children: React.ReactNode;
 }) {
@@ -203,6 +204,12 @@ export default function Documentation() {
       updateDocStatusMutation.mutate({
         id: docId,
         status: newStatus,
+      });
+
+      sendMessage({
+        type: 'DOC_STATUS_UPDATE',
+        docId,
+        status: newStatus
       });
     }
 

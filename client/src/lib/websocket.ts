@@ -1,69 +1,73 @@
 import { toast } from '@/hooks/use-toast';
-import { useWebSocket } from '@/hooks/use-websocket';
 
-type WebSocketMessage = {
+export type WebSocketMessage = {
   type: string;
   [key: string]: any;
 };
 
-let wsInstance: WebSocket | null = null;
+class WebSocketManager {
+  private static instance: WebSocket | null = null;
+  private static messageHandlers: Set<(message: WebSocketMessage) => void> = new Set();
 
-function getWebSocket() {
-  if (!wsInstance) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    wsInstance = new WebSocket(wsUrl);
+  static getInstance(): WebSocket | null {
+    if (!this.instance) {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        this.instance = new WebSocket(wsUrl);
 
-    wsInstance.onclose = () => {
-      console.log('WebSocket disconnected');
-      wsInstance = null;
-      // Attempt to reconnect after 2 seconds
-      setTimeout(getWebSocket, 2000);
-    };
+        this.instance.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            this.messageHandlers.forEach(handler => handler(message));
+          } catch (error) {
+            console.error('Failed to parse WebSocket message:', error);
+          }
+        };
 
-    wsInstance.onerror = (error) => {
-      console.error('WebSocket error:', error);
+        this.instance.onclose = () => {
+          console.log('WebSocket disconnected');
+          this.instance = null;
+          // Attempt to reconnect after 2 seconds
+          setTimeout(() => this.getInstance(), 2000);
+        };
+
+        this.instance.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          toast({
+            title: "Verbindungsfehler",
+            description: "Die Verbindung zum Server wurde unterbrochen. Versuche neu zu verbinden...",
+            variant: "destructive",
+          });
+        };
+      } catch (error) {
+        console.error('Failed to create WebSocket:', error);
+        return null;
+      }
+    }
+    return this.instance;
+  }
+
+  static sendMessage(message: WebSocketMessage): void {
+    const ws = this.getInstance();
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    } else {
       toast({
-        title: "Verbindungsfehler",
-        description: "Die Verbindung zum Server wurde unterbrochen. Versuche neu zu verbinden...",
+        title: "Fehler",
+        description: "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.",
         variant: "destructive",
       });
+    }
+  }
+
+  static subscribe(handler: (message: WebSocketMessage) => void): () => void {
+    this.messageHandlers.add(handler);
+    return () => {
+      this.messageHandlers.delete(handler);
     };
   }
-
-  return wsInstance;
 }
 
-export function sendMessage(message: WebSocketMessage) {
-  const ws = getWebSocket();
-  if (ws?.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(message));
-  } else {
-    toast({
-      title: "Fehler",
-      description: "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.",
-      variant: "destructive",
-    });
-  }
-}
-
-export function useWebSocket() {
-  return {
-    sendMessage,
-    subscribe: (handler: (message: WebSocketMessage) => void) => {
-      const ws = getWebSocket();
-      if (!ws) return;
-
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        handler(message);
-      };
-
-      return () => {
-        if (ws) {
-          ws.onmessage = null;
-        }
-      };
-    }
-  };
-}
+export const sendMessage = WebSocketManager.sendMessage.bind(WebSocketManager);
+export const subscribe = WebSocketManager.subscribe.bind(WebSocketManager);
