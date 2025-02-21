@@ -7,11 +7,14 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Mic, Type, Sparkles, Clock } from "lucide-react";
+import { Mic, Type, Sparkles, Clock, Brain } from "lucide-react";
 import { useState } from "react";
+import { VoiceRecorder } from "@/components/documentation/voice-recorder";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Documentation() {
-  const [isRecording, setIsRecording] = useState(false);
+  const { toast } = useToast();
+  const [activePatientId, setActivePatientId] = useState<number | null>(null);
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
@@ -29,6 +32,15 @@ export default function Documentation() {
     return "Routinecheck durchgeführt, keine Besonderheiten";
   };
 
+  const handleTranscriptionComplete = (text: string) => {
+    toast({
+      title: "Dokumentation erstellt",
+      description: "Die KI hat Ihre Sprachaufnahme erfolgreich verarbeitet.",
+    });
+    // Here we would typically save the documentation via API
+    console.log("Transcribed text:", text);
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -36,21 +48,12 @@ export default function Documentation() {
         <Header />
         <main className="p-8">
           <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Dokumentation</h1>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsRecording(!isRecording)} 
-                className={isRecording ? "bg-red-50 text-red-600" : ""}>
-                <Mic className="mr-2 h-4 w-4" />
-                {isRecording ? "Aufnahme beenden" : "Sprachaufnahme"}
-              </Button>
-              <Button variant="outline">
-                <Type className="mr-2 h-4 w-4" />
-                Text eingeben
-              </Button>
-              <Button>
-                <Sparkles className="mr-2 h-4 w-4" />
-                KI-Vorschläge
-              </Button>
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Dokumentation</h1>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Brain className="h-4 w-4 text-primary" />
+                <span>KI-gestützte Dokumentation & Analyse</span>
+              </div>
             </div>
           </div>
 
@@ -73,6 +76,22 @@ export default function Documentation() {
                   </CardHeader>
                   <CardContent>
                     <ScrollArea className="h-[300px]">
+                      {activePatientId === patient.id ? (
+                        <VoiceRecorder
+                          onTranscriptionComplete={handleTranscriptionComplete}
+                          className="mb-4"
+                        />
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full mb-4"
+                          onClick={() => setActivePatientId(patient.id)}
+                        >
+                          <Mic className="mr-2 h-4 w-4" />
+                          Sprachaufnahme
+                        </Button>
+                      )}
+
                       <div className="space-y-4">
                         {/* AI Suggestion Card */}
                         <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
