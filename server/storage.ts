@@ -50,7 +50,7 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     this.sessionStore = new PostgresStore({
-      pool: pool, // Changed from db to pool
+      pool: pool,
       createTableIfMissing: true,
     });
   }
@@ -67,7 +67,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [created] = await db.insert(users).values([user]).returning();
+    const [created] = await db.insert(users).values({
+      ...user,
+      preferences: {
+        aiAssistEnabled: true,
+        voiceInputEnabled: true,
+      }
+    }).returning();
     return created;
   }
 
@@ -82,14 +88,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPatient(patient: InsertPatient): Promise<Patient> {
-    const [created] = await db.insert(patients).values([patient]).returning();
+    const [created] = await db.insert(patients).values({
+      ...patient,
+      medications: patient.medications || [],
+    }).returning();
     return created;
   }
 
-  async updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient> {
+  async updatePatient(id: number, updates: Partial<InsertPatient>): Promise<Patient> {
     const [updated] = await db
       .update(patients)
-      .set(patient)
+      .set({
+        ...updates,
+        medications: updates.medications || undefined,
+      })
       .where(eq(patients.id, id))
       .returning();
     return updated;
@@ -110,30 +122,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTour(tour: InsertTour): Promise<Tour> {
-    // Ensure date is properly formatted for PostgreSQL
     const formattedTour = {
       ...tour,
       date: new Date(tour.date),
       actualStartTime: tour.actualStartTime ? new Date(tour.actualStartTime) : null,
       actualEndTime: tour.actualEndTime ? new Date(tour.actualEndTime) : null,
+      patientIds: Array.isArray(tour.patientIds) ? tour.patientIds : [],
     };
 
     const [created] = await db.insert(tours).values([formattedTour]).returning();
     return created;
   }
 
-  async updateTour(id: number, tour: Partial<InsertTour>): Promise<Tour> {
-    // Format dates if they exist in the update
-    const formattedTour = {
-      ...tour,
-      date: tour.date ? new Date(tour.date) : undefined,
-      actualStartTime: tour.actualStartTime ? new Date(tour.actualStartTime) : undefined,
-      actualEndTime: tour.actualEndTime ? new Date(tour.actualEndTime) : undefined,
+  async updateTour(id: number, updates: Partial<InsertTour>): Promise<Tour> {
+    const formattedUpdates = {
+      ...updates,
+      date: updates.date ? new Date(updates.date) : undefined,
+      actualStartTime: updates.actualStartTime ? new Date(updates.actualStartTime) : undefined,
+      actualEndTime: updates.actualEndTime ? new Date(updates.actualEndTime) : undefined,
+      patientIds: updates.patientIds ? Array.isArray(updates.patientIds) ? updates.patientIds : [] : undefined,
     };
 
     const [updated] = await db
       .update(tours)
-      .set(formattedTour)
+      .set(formattedUpdates)
       .where(eq(tours.id, id))
       .returning();
     return updated;
@@ -178,7 +190,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWorkflowTemplate(workflow: InsertWorkflow): Promise<WorkflowTemplate> {
-    const [created] = await db.insert(workflowTemplates).values([workflow]).returning();
+    const [created] = await db.insert(workflowTemplates).values({
+      ...workflow,
+      steps: Array.isArray(workflow.steps) ? workflow.steps : [],
+    }).returning();
     return created;
   }
 
@@ -191,7 +206,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBilling(billing: InsertBilling): Promise<InsuranceBilling> {
-    const [created] = await db.insert(insuranceBilling).values([billing]).returning();
+    const [created] = await db.insert(insuranceBilling).values({
+      ...billing,
+      services: Array.isArray(billing.services) ? billing.services : [],
+    }).returning();
     return created;
   }
 

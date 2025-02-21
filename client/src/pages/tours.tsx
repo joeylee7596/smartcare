@@ -132,11 +132,13 @@ export default function Tours() {
           const waypoints = tour.optimizedRoute?.waypoints || [];
           if (waypoints.length === 0) return null;
           const lastWaypoint = waypoints[waypoints.length - 1];
-          const endTime = new Date(lastWaypoint.estimatedTime);
-          endTime.setMinutes(endTime.getMinutes() + lastWaypoint.visitDuration + lastWaypoint.travelTimeToNext);
+          const endTime = lastWaypoint ? new Date(lastWaypoint.estimatedTime) : null;
+          if (endTime && lastWaypoint) {
+            endTime.setMinutes(endTime.getMinutes() + lastWaypoint.visitDuration + lastWaypoint.travelTimeToNext);
+          }
           return endTime;
         })
-        .filter(Boolean)
+        .filter((date): date is Date => date !== null)
         .sort((a, b) => b.getTime() - a.getTime())[0];
 
       // Set start time to either 9 AM or after the latest tour
@@ -152,7 +154,7 @@ export default function Tours() {
       };
 
       const newTour: InsertTour = {
-        date: startTime.toISOString(),
+        date: startTime,
         caregiverId: 1,
         patientIds: [patientId],
         status: "scheduled",
