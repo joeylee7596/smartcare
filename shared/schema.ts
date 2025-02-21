@@ -40,7 +40,15 @@ export const tours = pgTable("tours", {
   patientIds: json("patient_ids").$type<number[]>().notNull(),
   status: text("status").notNull().default("scheduled"),
   optimizedRoute: json("optimized_route").$type<{
-    waypoints: { lat: number; lng: number; patientId: number }[];
+    waypoints: {
+      patientId: number;
+      lat: number;
+      lng: number;
+      estimatedTime: string;
+      visitDuration: number;
+      travelTimeToNext: number;
+      distanceToNext: number;
+    }[];
     totalDistance: number;
     estimatedDuration: number;
   }>(),
@@ -97,7 +105,7 @@ export const insuranceBilling = pgTable("insurance_billing", {
 export const insertUserSchema = createInsertSchema(users);
 export const insertPatientSchema = createInsertSchema(patients);
 export const insertTourSchema = createInsertSchema(tours).extend({
-  date: z.string().or(z.date()).transform(val => 
+  date: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
   ),
 });

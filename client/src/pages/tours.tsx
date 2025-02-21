@@ -125,7 +125,23 @@ export default function Tours() {
   const createTourMutation = useMutation({
     mutationFn: async (patientId: number) => {
       const tourDate = new Date(selectedDate);
-      tourDate.setHours(9, 0, 0, 0);
+      tourDate.setHours(9, 0, 0, 0); // Start at 9 AM
+
+      // Simulate an intelligent route with variable travel times
+      function calculateTravelTime(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+        // Simulate different travel times based on "distance"
+        const dx = Math.abs(fromLat - toLat);
+        const dy = Math.abs(fromLng - toLng);
+        const distance = Math.sqrt(dx * dx + dy * dy) * 111; // Rough km conversion
+        return Math.round(distance * 2); // 2 minutes per km
+      }
+
+      const patientLocations = {
+        [patientId]: {
+          lat: 52.520008 + (Math.random() * 0.1 - 0.05), // Simulate different locations
+          lng: 13.404954 + (Math.random() * 0.1 - 0.05)
+        }
+      };
 
       const newTour: InsertTour = {
         date: tourDate.toISOString(),
@@ -135,8 +151,12 @@ export default function Tours() {
         optimizedRoute: {
           waypoints: [{
             patientId: patientId,
-            lat: 52.520008,
-            lng: 13.404954
+            lat: patientLocations[patientId].lat,
+            lng: patientLocations[patientId].lng,
+            estimatedTime: tourDate.toISOString(),
+            visitDuration: 30,
+            travelTimeToNext: 0,
+            distanceToNext: 0
           }],
           totalDistance: 0,
           estimatedDuration: 30
@@ -170,7 +190,6 @@ export default function Tours() {
   const updateTourMutation = useMutation({
     mutationFn: async ({ id, patientIds }: { id: number; patientIds: number[] }) => {
       if (patientIds.length === 0) {
-        // If no patients left, delete the tour completely
         const response = await apiRequest("DELETE", `/api/tours/${id}`);
         if (!response.ok) {
           throw new Error('Failed to delete tour');
@@ -178,31 +197,68 @@ export default function Tours() {
         return null;
       }
 
-      // Calculate sequential times based on patient order
+      // Generate simulated locations for each patient
+      const patientLocations = patientIds.reduce((acc, patientId) => ({
+        ...acc,
+        [patientId]: {
+          lat: 52.520008 + (Math.random() * 0.1 - 0.05),
+          lng: 13.404954 + (Math.random() * 0.1 - 0.05)
+        }
+      }), {});
+
+      function calculateTravelTime(fromLat: number, fromLng: number, toLat: number, toLng: number) {
+        const dx = Math.abs(fromLat - toLat);
+        const dy = Math.abs(fromLng - toLng);
+        const distance = Math.sqrt(dx * dx + dy * dy) * 111; // Rough km conversion
+        return Math.round(distance * 2); // 2 minutes per km
+      }
+
       const baseTime = new Date(selectedDate);
       baseTime.setHours(9, 0, 0, 0); // Start at 9 AM
 
+      let currentTime = new Date(baseTime);
+      let totalDistance = 0;
+      let totalDuration = 0;
+
+      const waypoints = patientIds.map((patientId, index) => {
+        const visitDuration = 30; // Default visit duration
+        const currentLocation = patientLocations[patientId];
+        const nextLocation = index < patientIds.length - 1 ? patientLocations[patientIds[index + 1]] : null;
+
+        let travelTimeToNext = 0;
+        let distanceToNext = 0;
+
+        if (nextLocation) {
+          travelTimeToNext = calculateTravelTime(
+            currentLocation.lat, currentLocation.lng,
+            nextLocation.lat, nextLocation.lng
+          );
+          distanceToNext = Math.round(travelTimeToNext / 2); // Rough distance estimation
+          totalDistance += distanceToNext;
+        }
+
+        const waypoint = {
+          patientId,
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+          estimatedTime: currentTime.toISOString(),
+          visitDuration,
+          travelTimeToNext,
+          distanceToNext
+        };
+
+        // Update time for next waypoint
+        currentTime = new Date(currentTime);
+        currentTime.setMinutes(currentTime.getMinutes() + visitDuration + travelTimeToNext);
+        totalDuration += visitDuration + travelTimeToNext;
+
+        return waypoint;
+      });
+
       const optimizedRoute = {
-        waypoints: patientIds.map((patientId, index) => {
-          const patient = patients.find(p => p.id === patientId);
-          const visitDuration = 30; // Default visit duration
-          const travelTime = 15; // Default travel time between patients
-
-          const startTime = new Date(baseTime);
-          startTime.setMinutes(startTime.getMinutes() + (index * (visitDuration + travelTime)));
-
-          return {
-            patientId,
-            lat: 52.520008,
-            lng: 13.404954,
-            estimatedTime: startTime.toISOString(),
-            visitDuration,
-            travelTimeToNext: index < patientIds.length - 1 ? travelTime : 0,
-            distanceToNext: 2.5
-          };
-        }),
-        totalDistance: (patientIds.length - 1) * 2.5,
-        estimatedDuration: patientIds.length * 45 // 30 min visit + 15 min travel
+        waypoints,
+        totalDistance,
+        estimatedDuration: totalDuration
       };
 
       const response = await apiRequest("PATCH", `/api/tours/${id}`, { 
