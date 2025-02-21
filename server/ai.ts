@@ -20,7 +20,7 @@ function validateApiKey() {
   }
 }
 
-// Simulate immediate response for better UX while API processes
+// Optimize workflow with realistic simulation
 export async function optimizeWorkflow(patientData: any[]): Promise<{
   waypoints: Array<{
     patientId: number;
@@ -39,8 +39,11 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
     // Add artificial delay to simulate complex processing
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Generate realistic waypoints with smart timing and positioning
-    const waypoints = patientData.map((patient, index) => {
+    // Initialize waypoints array first
+    let waypoints: any[] = [];
+
+    // Generate waypoints with smart timing and positioning
+    patientData.forEach((patient, index) => {
       // Calculate visit duration based on care level
       const baseVisitDuration = 15;
       const careLevelFactor = patient.careLevel || 2;
@@ -56,18 +59,19 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
 
       // Calculate time based on previous visits
       const baseStartTime = 8; // Start at 8:00
-      const previousDurations = waypoints?.slice(0, index).reduce((sum, wp) => 
-        sum + wp.visitDuration + wp.travelTimeToNext, 0) || 0;
+      const previousDurations = waypoints.reduce((sum, wp) => 
+        sum + wp.visitDuration + (wp.travelTimeToNext || 0), 0);
       const estimatedTime = baseStartTime + (previousDurations / 60);
 
-      return {
+      // Add waypoint
+      waypoints.push({
         patientId: patient.id,
         estimatedTime,
         visitDuration,
         travelTimeToNext: index < patientData.length - 1 ? 10 + Math.floor(Math.random() * 10) : 0,
         distanceToNext: index < patientData.length - 1 ? 1.5 + Math.random() * 2 : 0,
         coordinates: { lat, lng }
-      };
+      });
     });
 
     // Calculate totals
