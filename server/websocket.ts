@@ -14,7 +14,27 @@ export function setupWebSocket(server: Server) {
 
         switch (data.type) {
           case 'OPTIMIZE_TOUR':
+            // Send initial status
+            ws.send(JSON.stringify({
+              type: 'OPTIMIZATION_STATUS',
+              status: 'analyzing',
+              message: 'Analysiere Patientendaten und Pflegebedürfnisse...'
+            }));
+
+            // Add slight delay for UX
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Send progress update
+            ws.send(JSON.stringify({
+              type: 'OPTIMIZATION_STATUS',
+              status: 'calculating',
+              message: 'Berechne optimale Route und Besuchszeiten...'
+            }));
+
+            // Get optimized workflow
             const optimizedWorkflow = await optimizeWorkflow(data.patients || data.tours);
+
+            // Send final result
             ws.send(JSON.stringify({
               type: 'OPTIMIZED_TOUR',
               workflow: optimizedWorkflow

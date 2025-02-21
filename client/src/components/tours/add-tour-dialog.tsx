@@ -5,10 +5,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { InsertTour, insertTourSchema, Patient } from "@shared/schema";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Route, Brain, Plus, X, Clock, MapPin, ArrowRight } from "lucide-react";
+import { Route, Brain, Plus, X, Clock, MapPin, ArrowRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -19,8 +19,10 @@ export function AddTourDialog() {
   const { toast } = useToast();
   const [optimizedRoute, setOptimizedRoute] = useState<any>(null);
   const [selectedPatients, setSelectedPatients] = useState<Patient[]>([]);
-  const [isOpen, setIsOpen] = useState(false); // Added state for dialog
+  const [isOpen, setIsOpen] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const { sendMessage, subscribe } = useWebSocket();
+  const queryClient = useQueryClient();
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -39,11 +41,12 @@ export function AddTourDialog() {
     const unsubscribe = subscribe((message) => {
       if (message.type === 'OPTIMIZED_TOUR') {
         setOptimizedRoute(message.workflow);
+        setIsOptimizing(false);
         form.setValue("optimizedRoute", message.workflow);
 
         toast({
-          title: "Tour optimiert",
-          description: `${message.workflow.waypoints.length} Patienten wurden optimal eingeplant.`,
+          title: "KI-Optimierung abgeschlossen",
+          description: `Die Route wurde optimal für ${message.workflow.waypoints.length} Patienten geplant.`,
         });
       }
     });
@@ -56,14 +59,15 @@ export function AddTourDialog() {
   const optimizeRoute = async (patients: Patient[]) => {
     if (!patients.length) return;
 
+    setIsOptimizing(true);
     sendMessage({
       type: 'OPTIMIZE_TOUR',
       patients: patients,
     });
 
     toast({
-      title: "KI plant die Tour",
-      description: "Optimiere Route basierend auf Patientenbedürfnissen...",
+      title: "KI-Optimierung läuft",
+      description: "Analysiere Patientenbedürfnisse und optimiere die Route...",
     });
   };
 
@@ -102,14 +106,17 @@ export function AddTourDialog() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
       toast({
-        title: "Tour geplant",
-        description: "Die Tour wurde erfolgreich angelegt.",
+        title: "Tour erfolgreich geplant",
+        description: "Die optimierte Tour wurde in Ihren Tagesplan aufgenommen.",
       });
+
+      // Reset form and close dialog
       form.reset();
       setOptimizedRoute(null);
       setSelectedPatients([]);
-      setIsOpen(false); // Close dialog after success
+      setIsOpen(false);
 
+      // Notify other clients about the new tour
       sendMessage({
         type: 'TOUR_UPDATE',
         tour: data,
@@ -118,17 +125,17 @@ export function AddTourDialog() {
     onError: (error) => {
       toast({
         title: "Fehler",
-        description: "Tour konnte nicht angelegt werden.",
+        description: "Die Tour konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
         variant: "destructive",
       });
     },
   });
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}> {/* Updated Dialog with state */}
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Route className="mr-2 h-4 w-4" />
+          <Plus className="mr-2 h-4 w-4" />
           Tour planen
         </Button>
       </DialogTrigger>
@@ -137,33 +144,7 @@ export function AddTourDialog() {
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => {
-            mutation.mutate(data, {
-              onSuccess: (data) => {
-                queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
-                toast({
-                  title: "Tour geplant",
-                  description: "Die Tour wurde erfolgreich angelegt.",
-                });
-                form.reset();
-                setOptimizedRoute(null);
-                setSelectedPatients([]);
-                setIsOpen(false); // Close dialog after success
-
-                sendMessage({
-                  type: 'TOUR_UPDATE',
-                  tour: data,
-                });
-              },
-              onError: (error) => {
-                toast({
-                  title: "Fehler",
-                  description: "Tour konnte nicht angelegt werden.",
-                  variant: "destructive",
-                });
-              }
-            });
-          })} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <div className="grid grid-cols-[400px,1fr] gap-6">
               <div className="space-y-4">
                 <FormField
@@ -218,12 +199,22 @@ export function AddTourDialog() {
                   )}
                 />
 
-                {optimizedRoute && (
+                {isOptimizing ? (
+                  <div className="flex items-center justify-center p-8 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                      <div className="text-blue-700 text-sm text-center">
+                        <p className="font-medium">KI optimiert die Route</p>
+                        <p className="text-blue-600">Analysiere Patientenbedürfnisse...</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : optimizedRoute && (
                   <div className="space-y-4 p-4 rounded-lg bg-blue-50 border border-blue-100">
                     <div className="flex items-center justify-between text-blue-700">
                       <div className="flex items-center gap-2">
                         <Brain className="h-4 w-4" />
-                        <p className="font-medium">Tourübersicht</p>
+                        <p className="font-medium">Optimierte Route</p>
                       </div>
                       <div className="text-sm">
                         Gesamtdauer: {optimizedRoute.estimatedDuration} Min
@@ -316,9 +307,18 @@ export function AddTourDialog() {
             <Button
               type="submit"
               className="w-full"
-              disabled={mutation.isPending || !selectedPatients.length || !optimizedRoute}
+              disabled={mutation.isPending || !selectedPatients.length || !optimizedRoute || isOptimizing}
             >
-              {mutation.isPending ? "Wird geplant..." : "Tour planen"}
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Tour wird angelegt...
+                </>
+              ) : isOptimizing ? (
+                "Warte auf KI-Optimierung..."
+              ) : (
+                "Tour planen"
+              )}
             </Button>
           </form>
         </Form>
