@@ -611,7 +611,7 @@ export default function Tours() {
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         />
-                        {dateFilteredTours.map((tour) => (
+                        {employeeTours.map((tour) => (
                           tour.optimizedRoute?.waypoints.map((waypoint, index) => (
                             <Marker
                               key={`${tour.id}-${index}`}
@@ -647,7 +647,7 @@ export default function Tours() {
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
-                    {dateFilteredTours.map((tour) => (
+                    {employeeTours.map((tour) => (
                       tour.optimizedRoute?.waypoints.map((waypoint, index) => (
                         <Marker
                           key={`${tour.id}-${index}`}
@@ -674,7 +674,7 @@ export default function Tours() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">
-                    {selectedEmployee 
+                    {selectedEmployee
                       ? `Zeitplan: ${employees.find(e => e.id === selectedEmployee)?.name}`
                       : "Zeitplan: Alle Mitarbeiter"}
                   </CardTitle>
@@ -712,7 +712,7 @@ export default function Tours() {
                       <Clock className="mx-auto h-12 w-12 mb-3 opacity-50" />
                       <p>Keine Touren für {selectedEmployee ? "diesen Mitarbeiter" : "diesen Tag"} geplant</p>
                       <p className="text-sm">
-                        {selectedEmployee 
+                        {selectedEmployee
                           ? "Fügen Sie Patienten hinzu, um eine neue Tour zu erstellen"
                           : "Wählen Sie einen Mitarbeiter aus und fügen Sie Patienten hinzu"}
                       </p>
