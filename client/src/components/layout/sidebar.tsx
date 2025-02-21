@@ -43,11 +43,12 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "transition-all duration-300 flex flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 rounded-r-2xl shadow-xl mr-4 relative",
+        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#0B1120] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-16 items-center px-4 border-b border-white/10 bg-gradient-to-r from-blue-900/80 to-transparent backdrop-blur-sm">
+      {/* Header with gradient overlay */}
+      <div className="flex h-16 items-center px-4 bg-gradient-to-r from-[#0B1120]/80 to-transparent">
         {!isCollapsed && (
           <h2 className="text-lg font-semibold text-white/90">
             SmartCare
@@ -57,7 +58,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           className={cn(
-            "ml-auto text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300",
+            "ml-auto text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300",
             isCollapsed && "rotate-180"
           )}
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -70,7 +71,7 @@ export function Sidebar() {
         <div className="space-y-6 p-2">
           {!isCollapsed && (
             <div className="px-2 py-2">
-              <h3 className="text-xs uppercase text-white/60 tracking-wider">
+              <h3 className="text-xs uppercase text-white/50 tracking-wider">
                 Schnellzugriff
               </h3>
               <div className="mt-2 space-y-1">
@@ -80,7 +81,7 @@ export function Sidebar() {
                     <Link key={action.href} href={action.href}>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 group"
                       >
                         <Icon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                         {action.name}
@@ -95,7 +96,7 @@ export function Sidebar() {
           <div className="px-2 py-2">
             <h3 className={cn(
               "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-white/60 tracking-wider"
+              isCollapsed ? "sr-only" : "text-xs uppercase text-white/50 tracking-wider"
             )}>
               Navigation
             </h3>
@@ -108,7 +109,7 @@ export function Sidebar() {
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
                         "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href && "bg-white/10 text-white shadow-lg",
+                        location === item.href ? "bg-white/10 text-white" : "hover:bg-white/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
@@ -126,7 +127,7 @@ export function Sidebar() {
           <div className="px-2 py-2">
             <h3 className={cn(
               "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-white/60 tracking-wider"
+              isCollapsed ? "sr-only" : "text-xs uppercase text-white/50 tracking-wider"
             )}>
               System
             </h3>
@@ -139,7 +140,7 @@ export function Sidebar() {
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
                         "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href && "bg-white/10 text-white shadow-lg",
+                        location === item.href ? "bg-white/10 text-white" : "hover:bg-white/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
