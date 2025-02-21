@@ -15,8 +15,30 @@ function validateApiKey() {
   if (!apiKey) {
     throw new Error('Mistral API key is not configured');
   }
-  if (!apiKey.startsWith('sk-')) {
-    throw new Error('Invalid Mistral API key format. Key should start with "sk-"');
+}
+
+// Test function to verify Mistral connection
+export async function testMistralConnection(): Promise<boolean> {
+  try {
+    validateApiKey();
+
+    const response = await mistralAxios.post('/chat/completions', {
+      model: "mistral-small",
+      messages: [
+        {
+          role: "user",
+          content: "Test connection. Reply with: Connection successful."
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 20
+    });
+
+    console.log("Mistral test response:", response.data);
+    return response.data?.choices?.[0]?.message?.content?.includes("Connection successful") || false;
+  } catch (error: any) {
+    console.error("Mistral connection test failed:", error.response?.data || error.message);
+    return false;
   }
 }
 

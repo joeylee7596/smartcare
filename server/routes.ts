@@ -4,9 +4,29 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertPatientSchema, insertTourSchema, insertDocSchema } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
+import { testMistralConnection } from "./ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Test endpoint for Mistral AI
+  app.get("/api/test-mistral", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const isConnected = await testMistralConnection();
+      if (isConnected) {
+        res.json({ status: "success", message: "Mistral AI connection successful" });
+      } else {
+        res.status(500).json({ status: "error", message: "Mistral AI connection failed" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ 
+        status: "error", 
+        message: error.message,
+        details: error.response?.data || error.message 
+      });
+    }
+  });
 
   // Patients
   app.get("/api/patients", async (req, res) => {
