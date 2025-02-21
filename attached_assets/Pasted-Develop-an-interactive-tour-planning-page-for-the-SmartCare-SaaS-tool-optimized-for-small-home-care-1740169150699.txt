@@ -1,0 +1,13 @@
+Develop an interactive tour planning page for the SmartCare SaaS tool, optimized for small home care services and nursing homes. The page must have three main sections in a single responsive view: a left sidebar for filtering and listing daily patient visits, a central map for route planning and optimization, and a right panel displaying a vertical timeline of scheduled visits.
+
+The left sidebar should include a search field, filter checkboxes (by patient name, urgency, location, and care type), and a list of patient visits showing name, address, scheduled time, care task, and assigned caregiver, with options to mark a visit as completed or add notes.
+
+The central map should integrate a mapping API (Google Maps or OpenStreetMap) to display planned visits with color-coded routes based on priority and urgency. Users must be able to drag and drop stops to adjust routes, and the system should automatically recalculate travel times using real-time traffic data and AI-generated optimal routing suggestions.
+
+The right panel should present a vertical timeline (similar to a calendar view) showing each caregiver’s schedule with time blocks for visits. Each block must display patient details, estimated duration, and status, with drag-and-drop functionality to reschedule visits. The system should automatically update times and offer AI-driven alternative slots in case of delays.
+
+When a patient entry is clicked, an overlay should open with detailed information including medical history, medication, previous visit notes, and AI-generated alerts for missing or inconsistent data.
+
+Ensure the UI/UX is minimal, intuitive, and requires no more than two clicks to access any core function. The design must be fully responsive for desktops, tablets, and smartphones, incorporate offline capabilities with automatic data synchronization, and adhere to DSGVO guidelines.
+
+Use clear, precise instructions to build this interface with built-in AI functions for route optimization, scheduling adjustments, and automated daily summary reports for billing.
