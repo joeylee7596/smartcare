@@ -5,7 +5,7 @@ const mistralAxios = axios.create({
   baseURL: 'https://api.mistral.ai/v1',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY?.trim()}`, // Ensure key is trimmed
+    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY?.trim()}`,
   },
 });
 
@@ -14,6 +14,58 @@ function validateApiKey() {
   const apiKey = process.env.MISTRAL_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('Mistral API key is not configured');
+  }
+}
+
+export async function optimizeWorkflow(patientData: any[]): Promise<{
+  waypoints: Array<{ patientId: number; estimatedTime: number }>;
+  totalDistance: number;
+  estimatedDuration: number;
+}> {
+  try {
+    validateApiKey();
+
+    const response = await mistralAxios.post('/chat/completions', {
+      model: "mistral-small",
+      messages: [
+        {
+          role: "system",
+          content: `You are a healthcare tour planning expert. Create an optimal care schedule based on:
+1. Patient care requirements (morning/evening preferences)
+2. Medical condition priorities
+3. Geographic proximity
+4. Required care duration
+
+Return a JSON response with:
+- waypoints: array of objects with patientId and estimatedTime
+- totalDistance: estimated total travel distance in km
+- estimatedDuration: total duration including care time in minutes`
+        },
+        {
+          role: "user",
+          content: JSON.stringify(patientData)
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1000
+    });
+
+    if (!response.data?.choices?.[0]?.message?.content) {
+      throw new Error("Invalid response format from Mistral AI");
+    }
+
+    const aiResponse = JSON.parse(response.data.choices[0].message.content);
+    return {
+      waypoints: aiResponse.waypoints || [],
+      totalDistance: aiResponse.totalDistance || 0,
+      estimatedDuration: aiResponse.estimatedDuration || 0
+    };
+  } catch (error: any) {
+    console.error("Mistral AI API error:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      throw new Error("Authentication failed. Please check your Mistral API key.");
+    }
+    throw new Error(`Failed to optimize workflow: ${error.response?.data?.message || error.message}`);
   }
 }
 
@@ -73,49 +125,6 @@ export async function generateDocumentation(audioContent: string): Promise<strin
       throw new Error("Authentication failed. Please check your Mistral API key.");
     }
     throw new Error(`Failed to generate documentation: ${error.response?.data?.message || error.message}`);
-  }
-}
-
-export async function optimizeWorkflow(patientData: any[]): Promise<{
-  waypoints: Array<{ patientId: number; estimatedTime: number }>;
-  totalDistance: number;
-  estimatedDuration: number;
-}> {
-  try {
-    validateApiKey();
-
-    const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-small",
-      messages: [
-        {
-          role: "system",
-          content: "You are a healthcare workflow optimization expert. Create an efficient care schedule based on patient needs. Output should be in JSON format with waypoints (array of objects with patientId and estimatedTime), totalDistance, and estimatedDuration."
-        },
-        {
-          role: "user",
-          content: JSON.stringify(patientData)
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 1000
-    });
-
-    if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error("Invalid response format from Mistral AI");
-    }
-
-    const aiResponse = JSON.parse(response.data.choices[0].message.content);
-    return {
-      waypoints: aiResponse.waypoints || [],
-      totalDistance: aiResponse.totalDistance || 0,
-      estimatedDuration: aiResponse.estimatedDuration || 0
-    };
-  } catch (error: any) {
-    console.error("Mistral AI API error:", error.response?.data || error.message);
-    if (error.response?.status === 401) {
-      throw new Error("Authentication failed. Please check your Mistral API key.");
-    }
-    throw new Error(`Failed to optimize workflow: ${error.response?.data?.message || error.message}`);
   }
 }
 
