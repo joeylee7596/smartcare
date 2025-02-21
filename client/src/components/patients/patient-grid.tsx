@@ -1,12 +1,37 @@
 import { Patient } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Heart, Phone, MapPin, FileText, Activity } from "lucide-react";
+import { 
+  Clock, 
+  Heart, 
+  Phone, 
+  MapPin, 
+  FileText, 
+  Activity,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Brain,
+  Calendar,
+  AlertTriangle
+} from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { EditPatientDialog } from "./edit-patient-dialog";
 
 interface PatientGridProps {
   patients: Patient[];
@@ -14,6 +39,65 @@ interface PatientGridProps {
 
 export function PatientGrid({ patients }: PatientGridProps) {
   const { toast } = useToast();
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showAIInsights, setShowAIInsights] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState<string>("");
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/patients/${id}`);
+      if (!response.ok) {
+        throw new Error("Fehler beim Löschen des Patienten");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({
+        title: "Patient gelöscht",
+        description: "Der Patient wurde erfolgreich gelöscht.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Der Patient konnte nicht gelöscht werden.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getAIInsights = async (patient: Patient) => {
+    setAiLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/ai/patient-insights", {
+        patientData: {
+          name: patient.name,
+          careLevel: patient.careLevel,
+          medications: patient.medications,
+          conditions: patient.conditions,
+          lastVisit: patient.lastVisit,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Fehler beim Laden der KI-Erkenntnisse");
+      }
+
+      const data = await response.json();
+      setAiInsights(data.insights);
+      setShowAIInsights(true);
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "KI-Erkenntnisse konnten nicht geladen werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -31,112 +115,187 @@ export function PatientGrid({ patients }: PatientGridProps) {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div 
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-        variants={container}
-        initial="hidden"
-        animate="show"
-      >
-        {patients.map((patient) => (
-          <motion.div 
-            key={patient.id} 
-            variants={item}
-            whileHover={{ 
-              scale: 1.02,
-              rotateY: 5,
-              translateZ: 20
-            }}
-            style={{ 
-              perspective: "1000px",
-              transformStyle: "preserve-3d"
-            }}
-          >
-            <Card className="group relative overflow-hidden backdrop-blur-sm bg-white/80 dark:bg-gray-950/80 border-opacity-50 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
-              <CardHeader className="pb-4">
-                <CardTitle className="flex justify-between items-center">
-                  <span className="text-lg font-bold">{patient.name}</span>
-                  <div 
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary transform transition-transform group-hover:scale-105"
-                  >
-                    <Activity className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      Pflegegrad {patient.careLevel}
-                    </span>
+    <>
+      <AnimatePresence>
+        <motion.div 
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
+          variants={container}
+          initial="hidden"
+          animate="show"
+        >
+          {patients.map((patient) => (
+            <motion.div 
+              key={patient.id} 
+              variants={item}
+              className="group"
+            >
+              <Card className="relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl font-bold">{patient.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={patient.careLevel >= 4 ? "destructive" : 
+                                 patient.careLevel >= 3 ? "warning" : "default"}
+                          className="text-xs"
+                        >
+                          Pflegegrad {patient.careLevel}
+                        </Badge>
+                        {patient.conditions?.includes("Demenz") && (
+                          <Badge variant="outline" className="text-xs">
+                            <Brain className="w-3 h-3 mr-1" />
+                            Demenz
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedPatient(patient);
+                            setShowEditDialog(true);
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Bearbeiten
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedPatient(patient);
+                            getAIInsights(patient);
+                          }}
+                          disabled={aiLoading}
+                        >
+                          <Brain className="mr-2 h-4 w-4" />
+                          KI-Analyse
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => deleteMutation.mutate(patient.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Löschen
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </CardTitle>
-              </CardHeader>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <motion.div 
-                    className="flex items-center text-sm p-3 rounded-lg bg-muted/50 backdrop-blur-sm transition-all duration-300 group-hover:bg-muted/70"
-                    whileHover={{ x: 5 }}
-                  >
-                    <MapPin className="h-4 w-4 mr-3 text-primary" />
-                    <span className="flex-1">{patient.address}</span>
-                  </motion.div>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{patient.address}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{patient.emergencyContact}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Heart className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{patient.insuranceProvider}</span>
+                      </div>
+                      {patient.lastVisit && (
+                        <div className="flex items-center space-x-2 text-sm">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="truncate">
+                            {format(new Date(patient.lastVisit), "dd.MM.yyyy")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
 
-                  <motion.div 
-                    className="flex items-center text-sm p-3 rounded-lg bg-muted/50 backdrop-blur-sm transition-all duration-300 group-hover:bg-muted/70"
-                    whileHover={{ x: 5 }}
-                  >
-                    <Phone className="h-4 w-4 mr-3 text-primary" />
-                    <span className="flex-1">{patient.emergencyContact}</span>
-                  </motion.div>
+                    {patient.medications && patient.medications.length > 0 && (
+                      <div className="pt-2">
+                        <div className="text-sm font-medium mb-1">Medikamente</div>
+                        <div className="flex flex-wrap gap-1">
+                          {patient.medications.map((med, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {med}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                  <motion.div 
-                    className="flex items-center text-sm p-3 rounded-lg bg-muted/50 backdrop-blur-sm transition-all duration-300 group-hover:bg-muted/70"
-                    whileHover={{ x: 5 }}
-                  >
-                    <Heart className="h-4 w-4 mr-3 text-primary" />
-                    <span className="flex-1">{patient.insuranceProvider}</span>
-                  </motion.div>
-                </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          window.location.href = `/documentation?patient=${patient.id}`;
+                        }}
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        Dokumentation
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => {
+                          window.location.href = `/tours?patient=${patient.id}`;
+                        }}
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        Termine
+                      </Button>
+                    </div>
 
-                <div className="pt-4 border-t border-border/50">
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 backdrop-blur-sm bg-white/50 dark:bg-gray-950/50 hover:bg-primary/5"
-                      onClick={() => {
-                        window.location.href = `/documentation?patient=${patient.id}`;
-                      }}
-                    >
-                      <FileText className="h-4 w-4 mr-2 text-primary" />
-                      Dokumentation
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 backdrop-blur-sm bg-white/50 dark:bg-gray-950/50 hover:bg-primary/5"
-                      onClick={() => {
-                        window.location.href = `/tours/new?patient=${patient.id}`;
-                      }}
-                    >
-                      <Clock className="h-4 w-4 mr-2 text-primary" />
-                      Termine
-                    </Button>
+                    {patient.urgentNote && (
+                      <div className="mt-2 p-2 bg-destructive/10 rounded-md flex items-center gap-2 text-sm text-destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        {patient.urgentNote}
+                      </div>
+                    )}
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
+      </AnimatePresence>
 
-                {patient.lastVisit && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg backdrop-blur-sm"
-                  >
-                    Letzter Besuch: {format(new Date(patient.lastVisit), "dd. MMMM yyyy", { locale: de })}
-                  </motion.div>
+      {selectedPatient && (
+        <>
+          <EditPatientDialog
+            patient={selectedPatient}
+            open={showEditDialog}
+            onOpenChange={setShowEditDialog}
+          />
+
+          <Dialog open={showAIInsights} onOpenChange={setShowAIInsights}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>KI-Analyse: {selectedPatient.name}</DialogTitle>
+                <DialogDescription>
+                  Automatisch generierte Erkenntnisse basierend auf den Patientendaten
+                </DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="h-[400px] w-full pr-4">
+                {aiLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 text-sm whitespace-pre-wrap">
+                    {aiInsights}
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </motion.div>
-    </AnimatePresence>
+              </ScrollArea>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+    </>
   );
 }
