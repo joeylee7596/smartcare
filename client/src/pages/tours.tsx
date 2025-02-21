@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Tour, Patient, type InsertTour } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { MapPin, RotateCw, Clock, Calendar, Search, Plus, X, Maximize2 } from "lucide-react";
+import { MapPin, RotateCw, Clock, Calendar, Search, Plus, X, Maximize2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -430,7 +430,34 @@ export default function Tours() {
             {/* Right Column - Timeline */}
             <Card className="shadow-lg">
               <CardHeader>
-                <CardTitle className="text-base">Zeitplan</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Zeitplan</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      // Get all tour IDs for the selected date
+                      const tourIds = dateFilteredTours.map(tour => tour.id);
+
+                      // Delete each tour
+                      tourIds.forEach(id => {
+                        updateTourMutation.mutate({
+                          id,
+                          patientIds: []
+                        });
+                      });
+
+                      toast({
+                        title: "Zeitplan gelöscht",
+                        description: "Alle Touren für diesen Tag wurden entfernt.",
+                      });
+                    }}
+                    disabled={dateFilteredTours.length === 0}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[calc(100vh-350px)]">

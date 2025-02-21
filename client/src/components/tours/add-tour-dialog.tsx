@@ -85,10 +85,14 @@ export function AddTourDialog() {
     const newPatients = selectedPatients.filter(p => p.id !== patientId);
     setSelectedPatients(newPatients);
     form.setValue("patientIds", newPatients.map(p => p.id));
-    if (newPatients.length > 0) {
-      optimizeRoute(newPatients);
-    } else {
+
+    // Clear optimized route if no patients are left
+    if (newPatients.length === 0) {
       setOptimizedRoute(null);
+      form.setValue("optimizedRoute", null);
+    } else {
+      // Recalculate route for remaining patients
+      optimizeRoute(newPatients);
     }
   };
 
