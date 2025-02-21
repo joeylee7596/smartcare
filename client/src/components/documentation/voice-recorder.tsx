@@ -97,24 +97,36 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       setTranscriptionProgress(10);
       setPreviewText("Starte Verarbeitung...");
 
-      // Fetch the audio blob
+      // Fetch the audio blob and convert it to text
       const response = await fetch(blobUrl);
       const audioBlob = await response.blob();
 
-      // Create a new array buffer from the blob
-      const arrayBuffer = await audioBlob.arrayBuffer();
+      // Convert audio to text using Web Speech API
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'de-DE';
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-      // Convert array buffer to base64
-      const base64String = btoa(
-        new Uint8Array(arrayBuffer)
-          .reduce((data, byte) => data + String.fromCharCode(byte), '')
-      );
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join(' ');
 
-      // Send the base64 encoded audio
-      sendMessage({
-        type: 'VOICE_TRANSCRIPTION',
-        audioContent: base64String,
-      });
+        // Send the transcript to the backend
+        sendMessage({
+          type: 'VOICE_TRANSCRIPTION',
+          audioContent: transcript
+        });
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsTranscribing(false);
+        setTranscriptionProgress(0);
+        setPreviewText("Fehler bei der Spracherkennung");
+      };
+
+      recognition.start();
 
     } catch (error) {
       console.error("Error processing recording:", error);

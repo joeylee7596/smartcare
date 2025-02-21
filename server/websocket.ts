@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
-import { generateDocumentation, optimizeWorkflow } from './ai';
+import { generateDocumentation } from './ai';
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ server, path: '/ws' });
@@ -13,71 +13,13 @@ export function setupWebSocket(server: Server) {
         const data = JSON.parse(message.toString());
 
         switch (data.type) {
-          case 'OPTIMIZE_TOUR':
-            // Send initial status
-            ws.send(JSON.stringify({
-              type: 'OPTIMIZATION_STATUS',
-              status: 'analyzing',
-              message: 'Analysiere Patientendaten und Pflegebedürfnisse...'
-            }));
-
-            // Add slight delay for UX
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // Send progress update
-            ws.send(JSON.stringify({
-              type: 'OPTIMIZATION_STATUS',
-              status: 'calculating',
-              message: 'Berechne optimale Route und Besuchszeiten...'
-            }));
-
-            // Get optimized workflow
-            const optimizedWorkflow = await optimizeWorkflow(data.patients || data.tours);
-
-            // Send final result
-            ws.send(JSON.stringify({
-              type: 'OPTIMIZED_TOUR',
-              workflow: optimizedWorkflow
-            }));
-            break;
-
           case 'VOICE_TRANSCRIPTION':
             try {
-              // Initial progress update
-              ws.send(JSON.stringify({
-                type: 'TRANSCRIPTION_PROGRESS',
-                status: 'started',
-                progress: 10,
-                message: 'Starte Transkription...'
-              }));
-
-              // Try to decode the base64 audio data
-              let decodedText;
-              try {
-                const buffer = Buffer.from(data.audioContent, 'base64');
-                decodedText = buffer.toString('utf-8');
-                console.log('Decoded audio text:', decodedText);
-              } catch (error) {
-                console.error('Error decoding audio:', error);
-                throw new Error('Fehler beim Dekodieren der Audioaufnahme');
-              }
-
-              // Progress update
-              ws.send(JSON.stringify({
-                type: 'TRANSCRIPTION_PROGRESS',
-                status: 'processing',
-                progress: 50,
-                message: 'Verarbeite Aufnahme...'
-              }));
-
-              // Generate documentation from the spoken text
-              const documentation = await generateDocumentation(decodedText);
-
-              // Send final transcription
+              // Send back the transcribed text immediately
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
-                documentation: documentation,
-                originalText: decodedText
+                documentation: data.audioContent,
+                originalText: data.audioContent
               }));
             } catch (error) {
               console.error('Transcription error:', error);
