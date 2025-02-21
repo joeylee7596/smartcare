@@ -33,11 +33,13 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   useEffect(() => {
     return subscribe((message) => {
+      console.log('WebSocket message received:', message); // Debug-Log
       switch (message.type) {
         case 'TRANSCRIPTION_COMPLETE':
+          console.log('Transcription complete, documentation:', message.documentation); // Debug-Log
           setIsProcessing(false);
-          setAiGeneratedText(message.documentation);
           setShowConfirmation(true);
+          setAiGeneratedText(message.documentation);
           if (recognitionRef.current) {
             recognitionRef.current.stop();
           }
@@ -56,6 +58,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       setPreviewText("");
       setEditableText("");
       setAiGeneratedText("");
+      setShowConfirmation(false);
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -125,6 +128,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   const handleConfirm = () => {
     setIsProcessing(true);
+    console.log('Sending text for AI processing:', editableText); // Debug-Log
     sendMessage({
       type: 'VOICE_TRANSCRIPTION',
       audioContent: editableText
@@ -132,6 +136,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   };
 
   const handleDocumentationConfirm = (text: string, sendToReview: boolean) => {
+    console.log('Documentation confirmed:', text, 'Send to review:', sendToReview); // Debug-Log
     onTranscriptionComplete(text, sendToReview);
   };
 
