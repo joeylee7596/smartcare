@@ -169,14 +169,40 @@ export default function Tours() {
 
   const updateTourMutation = useMutation({
     mutationFn: async ({ id, patientIds }: { id: number; patientIds: number[] }) => {
+      if (patientIds.length === 0) {
+        // If no patients left, delete the tour completely
+        const response = await apiRequest("DELETE", `/api/tours/${id}`);
+        if (!response.ok) {
+          throw new Error('Failed to delete tour');
+        }
+        return null;
+      }
+
+      // Calculate sequential times based on patient order
+      const baseTime = new Date(selectedDate);
+      baseTime.setHours(9, 0, 0, 0); // Start at 9 AM
+
       const optimizedRoute = {
-        waypoints: patientIds.map(patientId => ({
-          patientId,
-          lat: 52.520008,
-          lng: 13.404954
-        })),
-        totalDistance: 0,
-        estimatedDuration: patientIds.length * 30
+        waypoints: patientIds.map((patientId, index) => {
+          const patient = patients.find(p => p.id === patientId);
+          const visitDuration = 30; // Default visit duration
+          const travelTime = 15; // Default travel time between patients
+
+          const startTime = new Date(baseTime);
+          startTime.setMinutes(startTime.getMinutes() + (index * (visitDuration + travelTime)));
+
+          return {
+            patientId,
+            lat: 52.520008,
+            lng: 13.404954,
+            estimatedTime: startTime.toISOString(),
+            visitDuration,
+            travelTimeToNext: index < patientIds.length - 1 ? travelTime : 0,
+            distanceToNext: 2.5
+          };
+        }),
+        totalDistance: (patientIds.length - 1) * 2.5,
+        estimatedDuration: patientIds.length * 45 // 30 min visit + 15 min travel
       };
 
       const response = await apiRequest("PATCH", `/api/tours/${id}`, { 

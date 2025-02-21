@@ -104,7 +104,41 @@ export function AddTourDialog() {
 
   const mutation = useMutation({
     mutationFn: async (data: InsertTour) => {
-      const res = await apiRequest("POST", "/api/tours", data);
+      // Calculate sequential times for the new tour
+      const baseTime = new Date(data.date);
+      baseTime.setHours(9, 0, 0, 0); // Start at 9 AM
+
+      const optimizedRoute = {
+        waypoints: data.patientIds.map((patientId, index) => {
+          const visitDuration = 30; // Default visit duration
+          const travelTime = 15; // Default travel time between patients
+
+          const startTime = new Date(baseTime);
+          startTime.setMinutes(startTime.getMinutes() + (index * (visitDuration + travelTime)));
+
+          return {
+            patientId,
+            lat: 52.520008,
+            lng: 13.404954,
+            estimatedTime: startTime.toISOString(),
+            visitDuration,
+            travelTimeToNext: index < data.patientIds.length - 1 ? travelTime : 0,
+            distanceToNext: 2.5
+          };
+        }),
+        totalDistance: (data.patientIds.length - 1) * 2.5,
+        estimatedDuration: data.patientIds.length * 45 // 30 min visit + 15 min travel
+      };
+
+      const tourData = {
+        ...data,
+        optimizedRoute
+      };
+
+      const res = await apiRequest("POST", "/api/tours", tourData);
+      if (!res.ok) {
+        throw new Error('Failed to create tour');
+      }
       return res.json();
     },
     onSuccess: (data) => {
