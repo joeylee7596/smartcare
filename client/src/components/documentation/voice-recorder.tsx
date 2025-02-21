@@ -25,8 +25,9 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewText, setPreviewText] = useState<string>("");
-  const [spokenText, setSpokenText] = useState<string>("");
+  const [error, setError] = useState<string>("");
   const { sendMessage, subscribe } = useWebSocket();
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
 
   useEffect(() => {
     return subscribe((message) => {
@@ -35,74 +36,22 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           setIsTranscribing(false);
           setTranscriptionProgress(100);
           setPreviewText(message.documentation);
-          setSpokenText(message.originalText || "");
           onTranscriptionComplete(message.documentation);
-          break;
-        case 'TRANSCRIPTION_PROGRESS':
-          setTranscriptionProgress(message.progress || 0);
-          if (message.message) {
-            setPreviewText(message.message);
-          }
           break;
         case 'TRANSCRIPTION_ERROR':
           setIsTranscribing(false);
           setTranscriptionProgress(0);
-          setPreviewText(`Fehler: ${message.error}`);
+          setError(message.error);
           break;
       }
     });
   }, [subscribe, onTranscriptionComplete]);
 
-  const {
-    status,
-    startRecording,
-    stopRecording,
-    mediaBlobUrl,
-  } = useReactMediaRecorder({
-    audio: true,
-    onStop: async (blobUrl: string) => {
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        setRecordingInterval(null);
-      }
-      await processRecording(blobUrl);
-    },
-  });
-
-  const handleStartRecording = () => {
-    setRecordingDuration(0);
-    setPreviewText("");
-    setSpokenText("");
-    startRecording();
-    const interval = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-    setRecordingInterval(interval);
-  };
-
-  const handleStopRecording = () => {
-    if (recordingInterval) {
-      clearInterval(recordingInterval);
-      setRecordingInterval(null);
-    }
-    stopRecording();
-  };
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const processRecording = async (blobUrl: string) => {
+  const setupRecognition = () => {
     try {
-      setIsTranscribing(true);
-      setTranscriptionProgress(10);
-      setPreviewText("Starte Verarbeitung...");
-
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        throw new Error("Speech recognition is not supported in this browser");
+        throw new Error("Spracherkennung wird in diesem Browser nicht unterstützt");
       }
 
       const recognition = new SpeechRecognition();
@@ -115,6 +64,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           .map(result => result[0].transcript)
           .join(' ');
 
+        setPreviewText(transcript);
         sendMessage({
           type: 'VOICE_TRANSCRIPTION',
           audioContent: transcript
@@ -123,19 +73,89 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
+        let errorMessage = "Fehler bei der Spracherkennung";
+
+        switch (event.error) {
+          case 'no-speech':
+            errorMessage = "Keine Sprache erkannt. Bitte sprechen Sie deutlich.";
+            break;
+          case 'audio-capture':
+            errorMessage = "Kein Mikrofon gefunden oder Zugriff verweigert.";
+            break;
+          case 'not-allowed':
+            errorMessage = "Zugriff auf das Mikrofon wurde verweigert.";
+            break;
+          case 'network':
+            errorMessage = "Netzwerkfehler bei der Spracherkennung.";
+            break;
+        }
+
+        setError(errorMessage);
         setIsTranscribing(false);
         setTranscriptionProgress(0);
-        setPreviewText("Fehler bei der Spracherkennung");
       };
 
-      recognition.start();
-
+      setRecognition(recognition);
+      return recognition;
     } catch (error) {
-      console.error("Error processing recording:", error);
-      setIsTranscribing(false);
-      setTranscriptionProgress(0);
-      setPreviewText("Fehler bei der Verarbeitung der Aufnahme");
+      setError("Spracherkennung konnte nicht initialisiert werden");
+      return null;
     }
+  };
+
+  const {
+    status,
+    startRecording,
+    stopRecording,
+  } = useReactMediaRecorder({
+    audio: true,
+    onStop: () => {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+      if (recognition) {
+        recognition.stop();
+      }
+    },
+  });
+
+  const handleStartRecording = () => {
+    setError("");
+    setRecordingDuration(0);
+    setPreviewText("");
+
+    const newRecognition = setupRecognition();
+    if (!newRecognition) {
+      return;
+    }
+
+    setIsTranscribing(true);
+    startRecording();
+    newRecognition.start();
+
+    const interval = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
+    }, 1000);
+    setRecordingInterval(interval);
+  };
+
+  const handleStopRecording = () => {
+    if (recordingInterval) {
+      clearInterval(recordingInterval);
+      setRecordingInterval(null);
+    }
+    if (recognition) {
+      recognition.stop();
+    }
+    stopRecording();
+    setIsTranscribing(false);
+  };
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -171,31 +191,29 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           </Button>
         )}
 
-        {(isTranscribing || previewText || spokenText) && (
+        {(isTranscribing || previewText || error) && (
           <div className="space-y-2 animate-in fade-in-50">
             {isTranscribing && (
               <>
                 <div className="flex items-center justify-between text-sm text-primary">
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 animate-pulse" />
-                    <span>Verarbeite Aufnahme...</span>
+                    <span>Spracherkennung aktiv...</span>
                   </div>
-                  <span>{transcriptionProgress}%</span>
                 </div>
                 <Progress value={transcriptionProgress} className="h-2" />
               </>
             )}
-            {spokenText && (
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-sm text-blue-700 font-medium mb-1">Aufgenommener Text:</p>
-                <p className="text-sm text-blue-900 whitespace-pre-wrap">
-                  {spokenText}
+            {error && (
+              <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+                <p className="text-sm text-red-700">
+                  {error}
                 </p>
               </div>
             )}
             {previewText && (
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium mb-1">Dokumentation:</p>
+                <p className="text-sm font-medium mb-1">Erkannter Text:</p>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {previewText}
                 </p>
