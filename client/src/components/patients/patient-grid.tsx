@@ -2,8 +2,6 @@ import { Patient } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  Clock, 
-  Heart, 
   Phone, 
   MapPin, 
   FileText, 
@@ -13,10 +11,10 @@ import {
   Trash2,
   Brain,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Heart
 } from "lucide-react";
 import { format } from "date-fns";
-import { de } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -32,6 +30,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EditPatientDialog } from "./edit-patient-dialog";
+import { useLocation } from "wouter";
 
 interface PatientGridProps {
   patients: Patient[];
@@ -39,6 +38,7 @@ interface PatientGridProps {
 
 export function PatientGrid({ patients }: PatientGridProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
@@ -76,7 +76,6 @@ export function PatientGrid({ patients }: PatientGridProps) {
           name: patient.name,
           careLevel: patient.careLevel,
           medications: patient.medications,
-          conditions: patient.conditions,
           lastVisit: patient.lastVisit,
         },
       });
@@ -137,17 +136,11 @@ export function PatientGrid({ patients }: PatientGridProps) {
                       <div className="flex items-center gap-2">
                         <Badge 
                           variant={patient.careLevel >= 4 ? "destructive" : 
-                                 patient.careLevel >= 3 ? "warning" : "default"}
+                                 patient.careLevel >= 3 ? "secondary" : "default"}
                           className="text-xs"
                         >
                           Pflegegrad {patient.careLevel}
                         </Badge>
-                        {patient.conditions?.includes("Demenz") && (
-                          <Badge variant="outline" className="text-xs">
-                            <Brain className="w-3 h-3 mr-1" />
-                            Demenz
-                          </Badge>
-                        )}
                       </div>
                     </div>
                     <DropdownMenu>
@@ -213,27 +206,12 @@ export function PatientGrid({ patients }: PatientGridProps) {
                       )}
                     </div>
 
-                    {patient.medications && patient.medications.length > 0 && (
-                      <div className="pt-2">
-                        <div className="text-sm font-medium mb-1">Medikamente</div>
-                        <div className="flex flex-wrap gap-1">
-                          {patient.medications.map((med, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {med}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     <div className="flex gap-2 pt-2">
                       <Button 
                         variant="outline" 
                         size="sm" 
                         className="flex-1"
-                        onClick={() => {
-                          window.location.href = `/documentation?patient=${patient.id}`;
-                        }}
+                        onClick={() => setLocation(`/documentation/${patient.id}`)}
                       >
                         <FileText className="h-4 w-4 mr-2" />
                         Dokumentation
@@ -242,19 +220,17 @@ export function PatientGrid({ patients }: PatientGridProps) {
                         variant="outline" 
                         size="sm" 
                         className="flex-1"
-                        onClick={() => {
-                          window.location.href = `/tours?patient=${patient.id}`;
-                        }}
+                        onClick={() => setLocation(`/tours/${patient.id}`)}
                       >
-                        <Clock className="h-4 w-4 mr-2" />
+                        <Calendar className="h-4 w-4 mr-2" />
                         Termine
                       </Button>
                     </div>
 
-                    {patient.urgentNote && (
-                      <div className="mt-2 p-2 bg-destructive/10 rounded-md flex items-center gap-2 text-sm text-destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        {patient.urgentNote}
+                    {patient.notes && (
+                      <div className="mt-2 p-2 bg-muted rounded-md flex items-center gap-2 text-sm">
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        {patient.notes}
                       </div>
                     )}
                   </div>
