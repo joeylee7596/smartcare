@@ -1,17 +1,31 @@
 import axios from 'axios';
 
+// Create axios instance for Mistral AI
 const mistralAxios = axios.create({
   baseURL: 'https://api.mistral.ai/v1',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
+    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY?.trim()}`, // Ensure key is trimmed
   },
 });
 
+// Validate API key presence
+function validateApiKey() {
+  const apiKey = process.env.MISTRAL_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('Mistral API key is not configured');
+  }
+  if (!apiKey.startsWith('sk-')) {
+    throw new Error('Invalid Mistral API key format. Key should start with "sk-"');
+  }
+}
+
 export async function generateDocumentation(audioContent: string): Promise<string> {
   try {
+    validateApiKey();
+
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-tiny", // Using their base model for testing
+      model: "mistral-small",
       messages: [
         {
           role: "system",
@@ -33,6 +47,9 @@ export async function generateDocumentation(audioContent: string): Promise<strin
     return response.data.choices[0].message.content;
   } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      throw new Error("Authentication failed. Please check your Mistral API key.");
+    }
     throw new Error(`Failed to generate documentation: ${error.response?.data?.message || error.message}`);
   }
 }
@@ -43,8 +60,10 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
   estimatedDuration: number;
 }> {
   try {
+    validateApiKey();
+
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-tiny",
+      model: "mistral-small",
       messages: [
         {
           role: "system",
@@ -71,6 +90,9 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
     };
   } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      throw new Error("Authentication failed. Please check your Mistral API key.");
+    }
     throw new Error(`Failed to optimize workflow: ${error.response?.data?.message || error.message}`);
   }
 }
@@ -81,8 +103,10 @@ export async function generateAISuggestion(context: {
   lastVisit?: string;
 }): Promise<string> {
   try {
+    validateApiKey();
+
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-tiny",
+      model: "mistral-small",
       messages: [
         {
           role: "system",
@@ -104,6 +128,9 @@ export async function generateAISuggestion(context: {
     return response.data.choices[0].message.content;
   } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
+    if (error.response?.status === 401) {
+      throw new Error("Authentication failed. Please check your Mistral API key.");
+    }
     throw new Error(`Failed to generate AI suggestion: ${error.response?.data?.message || error.message}`);
   }
 }
