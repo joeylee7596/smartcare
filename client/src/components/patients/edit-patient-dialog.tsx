@@ -41,6 +41,7 @@ interface EditPatientDialogProps {
 const editPatientSchema = insertPatientSchema.extend({
   id: insertPatientSchema.shape.id,
   notes: insertPatientSchema.shape.notes,
+  lastVisit: insertPatientSchema.shape.lastVisit,
 });
 
 export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDialogProps) {
@@ -56,15 +57,25 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
 
   const updateMutation = useMutation({
     mutationFn: async (values: Patient) => {
-      const response = await apiRequest("PATCH", `/api/patients/${patient.id}`, values);
+      const response = await apiRequest("PATCH", `/api/patients/${patient.id}`, {
+        ...values,
+        medications: values.medications || [],
+      });
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Fehler beim Aktualisieren des Patienten");
       }
-      return response.json();
+
+      const updatedPatient = await response.json();
+      return updatedPatient;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+    onSuccess: (updatedPatient) => {
+      queryClient.setQueryData(["/api/patients"], (oldData: Patient[] | undefined) => {
+        if (!oldData) return [updatedPatient];
+        return oldData.map(p => p.id === updatedPatient.id ? updatedPatient : p);
+      });
+
       toast({
         title: "Patient aktualisiert",
         description: "Die Änderungen wurden erfolgreich gespeichert.",
@@ -101,7 +112,7 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data))} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => updateMutation.mutate(data as Patient))} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -244,7 +255,7 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
                 <FormItem>
                   <FormLabel>Wichtige Hinweise</FormLabel>
                   <FormControl>
-                    <Textarea {...field} />
+                    <Textarea {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
