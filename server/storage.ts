@@ -1,138 +1,176 @@
-import { User, Patient, Tour, Documentation, InsertUser, InsertPatient, InsertTour, InsertDoc } from "@shared/schema";
+import {
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling,
+  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling,
+  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, type InsertBilling
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresStore = connectPg(session);
 
 export interface IStorage {
   // Auth
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   // Patients
   getPatients(): Promise<Patient[]>;
   getPatient(id: number): Promise<Patient | undefined>;
   createPatient(patient: InsertPatient): Promise<Patient>;
   updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient>;
   deletePatient(id: number): Promise<void>;
-  
+
   // Tours
   getTours(): Promise<Tour[]>;
   getTour(id: number): Promise<Tour | undefined>;
   createTour(tour: InsertTour): Promise<Tour>;
   updateTour(id: number, tour: Partial<InsertTour>): Promise<Tour>;
   deleteTour(id: number): Promise<void>;
-  
+
   // Documentation
   getDocs(patientId: number): Promise<Documentation[]>;
   createDoc(doc: InsertDoc): Promise<Documentation>;
-  
+
+  // New methods for advanced features
+  getWorkflowTemplates(): Promise<WorkflowTemplate[]>;
+  createWorkflowTemplate(workflow: InsertWorkflow): Promise<WorkflowTemplate>;
+  getBillings(patientId: number): Promise<InsuranceBilling[]>;
+  createBilling(billing: InsertBilling): Promise<InsuranceBilling>;
+  updateBillingStatus(id: number, status: string): Promise<InsuranceBilling>;
+
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private patients: Map<number, Patient>;
-  private tours: Map<number, Tour>;
-  private docs: Map<number, Documentation>;
-  private currentId: { [key: string]: number };
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.patients = new Map();
-    this.tours = new Map();
-    this.docs = new Map();
-    this.currentId = { users: 1, patients: 1, tours: 1, docs: 1 };
-    this.sessionStore = new MemoryStore({ checkPeriod: 86400000 });
+    this.sessionStore = new PostgresStore({
+      pool: db,
+      createTableIfMissing: true,
+    });
   }
 
   // Auth methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId.users++;
-    const user = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createUser(user: InsertUser): Promise<User> {
+    const [created] = await db.insert(users).values(user).returning();
+    return created;
   }
 
   // Patient methods
   async getPatients(): Promise<Patient[]> {
-    return Array.from(this.patients.values());
+    return db.select().from(patients).orderBy(desc(patients.lastVisit));
   }
 
   async getPatient(id: number): Promise<Patient | undefined> {
-    return this.patients.get(id);
+    const [patient] = await db.select().from(patients).where(eq(patients.id, id));
+    return patient;
   }
 
   async createPatient(patient: InsertPatient): Promise<Patient> {
-    const id = this.currentId.patients++;
-    const newPatient = { ...patient, id };
-    this.patients.set(id, newPatient);
-    return newPatient;
+    const [created] = await db.insert(patients).values(patient).returning();
+    return created;
   }
 
   async updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient> {
-    const existing = await this.getPatient(id);
-    if (!existing) throw new Error("Patient not found");
-    const updated = { ...existing, ...patient };
-    this.patients.set(id, updated);
+    const [updated] = await db
+      .update(patients)
+      .set(patient)
+      .where(eq(patients.id, id))
+      .returning();
     return updated;
   }
 
   async deletePatient(id: number): Promise<void> {
-    this.patients.delete(id);
+    await db.delete(patients).where(eq(patients.id, id));
   }
 
   // Tour methods
   async getTours(): Promise<Tour[]> {
-    return Array.from(this.tours.values());
+    return db.select().from(tours).orderBy(desc(tours.date));
   }
 
   async getTour(id: number): Promise<Tour | undefined> {
-    return this.tours.get(id);
+    const [tour] = await db.select().from(tours).where(eq(tours.id, id));
+    return tour;
   }
 
   async createTour(tour: InsertTour): Promise<Tour> {
-    const id = this.currentId.tours++;
-    const newTour = { ...tour, id };
-    this.tours.set(id, newTour);
-    return newTour;
+    const [created] = await db.insert(tours).values(tour).returning();
+    return created;
   }
 
   async updateTour(id: number, tour: Partial<InsertTour>): Promise<Tour> {
-    const existing = await this.getTour(id);
-    if (!existing) throw new Error("Tour not found");
-    const updated = { ...existing, ...tour };
-    this.tours.set(id, updated);
+    const [updated] = await db
+      .update(tours)
+      .set(tour)
+      .where(eq(tours.id, id))
+      .returning();
     return updated;
   }
 
   async deleteTour(id: number): Promise<void> {
-    this.tours.delete(id);
+    await db.delete(tours).where(eq(tours.id, id));
   }
 
   // Documentation methods
   async getDocs(patientId: number): Promise<Documentation[]> {
-    return Array.from(this.docs.values()).filter(doc => doc.patientId === patientId);
+    return db
+      .select()
+      .from(documentation)
+      .where(eq(documentation.patientId, patientId))
+      .orderBy(desc(documentation.date));
   }
 
   async createDoc(doc: InsertDoc): Promise<Documentation> {
-    const id = this.currentId.docs++;
-    const newDoc = { ...doc, id };
-    this.docs.set(id, newDoc);
-    return newDoc;
+    const [created] = await db.insert(documentation).values(doc).returning();
+    return created;
+  }
+
+  // New methods implementation
+  async getWorkflowTemplates(): Promise<WorkflowTemplate[]> {
+    return db.select().from(workflowTemplates);
+  }
+
+  async createWorkflowTemplate(workflow: InsertWorkflow): Promise<WorkflowTemplate> {
+    const [created] = await db.insert(workflowTemplates).values(workflow).returning();
+    return created;
+  }
+
+  async getBillings(patientId: number): Promise<InsuranceBilling[]> {
+    return db
+      .select()
+      .from(insuranceBilling)
+      .where(eq(insuranceBilling.patientId, patientId))
+      .orderBy(desc(insuranceBilling.date));
+  }
+
+  async createBilling(billing: InsertBilling): Promise<InsuranceBilling> {
+    const [created] = await db.insert(insuranceBilling).values(billing).returning();
+    return created;
+  }
+
+  async updateBillingStatus(id: number, status: string): Promise<InsuranceBilling> {
+    const [updated] = await db
+      .update(insuranceBilling)
+      .set({ status })
+      .where(eq(insuranceBilling.id, id))
+      .returning();
+    return updated;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
