@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertPatientSchema, insertTourSchema, insertDocSchema } from "@shared/schema";
+import { setupWebSocket } from "./websocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -66,10 +67,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Documentation
-  app.get("/api/patients/:id/docs", async (req, res) => {
+  app.get("/api/docs", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const patientId = parseInt(req.params.id);
-    const docs = await storage.getDocs(patientId);
+    const docs = await storage.getDocs(req.query.patientId as string);
     res.json(docs);
   });
 
@@ -82,5 +82,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  setupWebSocket(httpServer);
   return httpServer;
 }

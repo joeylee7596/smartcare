@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useReactMediaRecorder } from "react-media-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Mic, StopCircle, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string) => void;
@@ -16,6 +17,21 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [previewText, setPreviewText] = useState<string>("");
+  const { sendMessage, subscribe } = useWebSocket();
+
+  useEffect(() => {
+    subscribe((message) => {
+      if (message.type === 'TRANSCRIPTION_RESULT') {
+        setIsTranscribing(false);
+        setTranscriptionProgress(100);
+        onTranscriptionComplete(message.documentation);
+      } else if (message.type === 'TRANSCRIPTION_PROGRESS') {
+        setPreviewText(message.preview || "");
+        setTranscriptionProgress(Math.min(95, transcriptionProgress + 5));
+      }
+    });
+  }, [subscribe, onTranscriptionComplete, transcriptionProgress]);
 
   const {
     status,
@@ -35,6 +51,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   const handleStartRecording = () => {
     setRecordingDuration(0);
+    setPreviewText("");
     startRecording();
     const interval = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -61,45 +78,24 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       setIsTranscribing(true);
       setTranscriptionProgress(0);
 
-      // Simulate AI processing with progress updates
-      const interval = setInterval(() => {
-        setTranscriptionProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            return 100;
-          }
-          return prev + 2;
-        });
-      }, 100);
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
 
-      // Simulate AI processing time
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      reader.onload = () => {
+        const base64Audio = reader.result?.toString().split(',')[1];
+        if (base64Audio) {
+          sendMessage({
+            type: 'VOICE_TRANSCRIPTION',
+            audioContent: base64Audio,
+          });
+        }
+      };
 
-      // Example transcribed text with smart formatting
-      const transcribedText = `Patientenbesuch durchgeführt am ${new Date().toLocaleDateString('de-DE')}:
+      reader.readAsDataURL(blob);
 
-Vitalzeichen:
-- Blutdruck: Normal
-- Puls: Regelmäßig
-- Temperatur: Normal
-
-Medikation:
-- Planmäßig verabreicht
-- Keine Nebenwirkungen beobachtet
-
-Allgemeinzustand:
-- Patient ist stabil
-- Gute Stimmung
-- Mobilität unverändert
-
-Besonderheiten:
-- Keine besonderen Vorkommnisse
-- Nächster Besuch wie geplant`;
-
-      onTranscriptionComplete(transcribedText);
     } catch (error) {
       console.error("Error processing recording:", error);
-    } finally {
       setIsTranscribing(false);
       setTranscriptionProgress(0);
     }
@@ -117,6 +113,11 @@ Besonderheiten:
               </div>
               <span className="text-sm font-medium">{formatDuration(recordingDuration)}</span>
             </div>
+            {previewText && (
+              <div className="p-3 bg-gray-50 rounded-lg text-sm">
+                <p className="text-muted-foreground">{previewText}</p>
+              </div>
+            )}
             <Button
               variant="destructive"
               className="w-full"

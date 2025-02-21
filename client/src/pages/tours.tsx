@@ -11,12 +11,19 @@ import { Tour, WorkflowTemplate } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { MapPin, RotateCw, Clock, Users, Route, Brain, Sparkles } from "lucide-react";
 import { AddTourDialog } from "@/components/tours/add-tour-dialog";
+import { motion, AnimatePresence } from "framer-motion";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Tours() {
   const [date, setDate] = useState<Date>(new Date());
+  const { toast } = useToast();
+  const { sendMessage, subscribe } = useWebSocket();
+
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
   });
+
   const { data: workflows = [] } = useQuery<WorkflowTemplate[]>({
     queryKey: ["/api/workflows"],
   });
@@ -26,40 +33,23 @@ export default function Tours() {
   );
 
   const optimizeRoute = () => {
-    console.log("Optimizing routes with AI...");
-  };
+    if (!todaysTours.length) {
+      toast({
+        title: "Keine Touren vorhanden",
+        description: "Erstellen Sie zuerst eine Tour für die KI-Optimierung.",
+      });
+      return;
+    }
 
-  const defaultWorkflow = {
-    id: 1,
-    name: "Standard Pflegetour",
-    description: "Standardisierter Ablauf für Pflegebesuche",
-    steps: [
-      {
-        order: 1,
-        action: "Vitalzeichenkontrolle",
-        duration: 10,
-        required: true,
-      },
-      {
-        order: 2,
-        action: "Medikamentengabe",
-        duration: 15,
-        required: true,
-      },
-      {
-        order: 3,
-        action: "Grundpflege",
-        duration: 30,
-        required: true,
-      },
-      {
-        order: 4,
-        action: "Dokumentation",
-        duration: 10,
-        required: true,
-      },
-    ],
-    aiOptimized: true,
+    toast({
+      title: "KI-Optimierung gestartet",
+      description: "Die Routen werden optimiert...",
+    });
+
+    sendMessage({
+      type: 'OPTIMIZE_TOUR',
+      tours: todaysTours,
+    });
   };
 
   // Get dates with tours for calendar highlighting
@@ -93,15 +83,16 @@ export default function Tours() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-[300px,1fr,300px]">
+            {/* Left Column - Calendar and Stats */}
             <div className="space-y-6">
-              <Card className="shadow-lg">
+              <Card className="shadow-lg overflow-hidden">
                 <CardContent className="p-4">
                   <Calendar
                     mode="single"
                     selected={date}
                     onSelect={(date) => date && setDate(date)}
                     locale={de}
-                    className="rounded-md border"
+                    className="rounded-md"
                     modifiers={{
                       hasTour: (date) => datesWithTours[format(date, "yyyy-MM-dd")] || false,
                     }}
@@ -121,117 +112,164 @@ export default function Tours() {
                   <CardTitle className="text-sm font-medium">Statistiken</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                  <motion.div 
+                    className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
+                    whileHover={{ x: 5 }}
+                  >
                     <span className="text-sm text-muted-foreground">Touren heute</span>
                     <span className="font-medium">{todaysTours.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                  </motion.div>
+                  <motion.div 
+                    className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
+                    whileHover={{ x: 5 }}
+                  >
                     <span className="text-sm text-muted-foreground">Patienten</span>
                     <span className="font-medium">
                       {todaysTours.reduce((acc, tour) => acc + tour.patientIds.length, 0)}
                     </span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                  </motion.div>
+                  <motion.div 
+                    className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
+                    whileHover={{ x: 5 }}
+                  >
                     <span className="text-sm text-muted-foreground">Zeitaufwand</span>
-                    <span className="font-medium">4.5h</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
-                    <span className="text-sm text-muted-foreground">KI-Optimierungen</span>
-                    <span className="font-medium text-primary">3 Vorschläge</span>
-                  </div>
+                    <span className="font-medium">
+                      {todaysTours.reduce((acc, tour) => acc + (tour.optimizedRoute?.estimatedDuration || 0), 0)} min
+                    </span>
+                  </motion.div>
                 </CardContent>
               </Card>
             </div>
 
+            {/* Middle Column - Tour List */}
             <Card className="row-span-2 shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">
                     Touren am {format(date, "dd. MMMM yyyy", { locale: de })}
                   </h2>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                     <RotateCw className="mr-2 h-4 w-4" />
                     Aktualisieren
                   </Button>
                 </div>
 
-                {todaysTours.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Route className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      Keine Touren für diesen Tag geplant
-                    </p>
-                    <Button variant="outline" className="mt-4">
-                      Tour planen
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {todaysTours.map((tour) => (
-                      <div
-                        key={tour.id}
-                        className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 transition-colors shadow-sm hover:shadow-md"
-                      >
-                        <div className="p-2 rounded-full bg-primary/10">
-                          <Clock className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium truncate">
-                              Tour #{tour.id}
-                            </p>
-                            <span className="text-sm text-muted-foreground">
-                              {format(new Date(tour.date), "HH:mm")}
-                            </span>
+                <AnimatePresence>
+                  {todaysTours.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-center py-12"
+                    >
+                      <Route className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                      <p className="text-muted-foreground">
+                        Keine Touren für diesen Tag geplant
+                      </p>
+                      <Button variant="outline" className="mt-4">
+                        Tour planen
+                      </Button>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      className="space-y-4"
+                      initial="hidden"
+                      animate="show"
+                      variants={{
+                        hidden: { opacity: 0 },
+                        show: {
+                          opacity: 1,
+                          transition: {
+                            staggerChildren: 0.1
+                          }
+                        }
+                      }}
+                    >
+                      {todaysTours.map((tour) => (
+                        <motion.div
+                          key={tour.id}
+                          variants={{
+                            hidden: { opacity: 0, y: 20 },
+                            show: { opacity: 1, y: 0 }
+                          }}
+                          className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 transition-colors shadow-sm hover:shadow-md"
+                        >
+                          <div className="p-2 rounded-full bg-primary/10">
+                            <Clock className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                            <div className="flex items-center">
-                              <Users className="h-4 w-4 mr-1" />
-                              {tour.patientIds.length} Patienten
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium truncate">
+                                Tour #{tour.id}
+                              </p>
+                              <span className="text-sm text-muted-foreground">
+                                {format(new Date(tour.date), "HH:mm")}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                              <div className="flex items-center">
+                                <Users className="h-4 w-4 mr-1" />
+                                {tour.patientIds.length} Patienten
+                              </div>
+                              {tour.optimizedRoute && (
+                                <>
+                                  <div className="flex items-center">
+                                    <MapPin className="h-4 w-4 mr-1" />
+                                    {tour.optimizedRoute.totalDistance.toFixed(1)} km
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Clock className="h-4 w-4 mr-1" />
+                                    ~{tour.optimizedRoute.estimatedDuration} min
+                                  </div>
+                                </>
+                              )}
                             </div>
                             {tour.optimizedRoute && (
-                              <>
-                                <div className="flex items-center">
-                                  <MapPin className="h-4 w-4 mr-1" />
-                                  {tour.optimizedRoute.totalDistance.toFixed(1)} km
+                              <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100"
+                              >
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Route className="h-4 w-4 text-blue-600" />
+                                  <span className="text-sm font-medium text-blue-700">
+                                    Optimierte Route
+                                  </span>
                                 </div>
-                                <div className="flex items-center">
-                                  <Clock className="h-4 w-4 mr-1" />
-                                  ~{tour.optimizedRoute.estimatedDuration} min
+                                <div className="space-y-2">
+                                  {tour.optimizedRoute.waypoints.map((waypoint, index) => (
+                                    <div key={index} className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm">
+                                        {index + 1}
+                                      </div>
+                                      <span className="text-sm text-blue-600">
+                                        Patient #{waypoint.patientId}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
-                              </>
+                              </motion.div>
                             )}
                           </div>
-                          {tour.optimizedRoute && (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Route className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm font-medium text-blue-700">Optimierte Route</span>
-                              </div>
-                              <div className="space-y-2">
-                                {tour.optimizedRoute.waypoints.map((waypoint, index) => (
-                                  <div key={index} className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm">
-                                      {index + 1}
-                                    </div>
-                                    <span className="text-sm text-blue-600">Patient #{waypoint.patientId}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <Button variant="outline" size="sm" className="hover:bg-primary/5">Details</Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="hover:bg-primary/5"
+                          >
+                            Details
+                          </Button>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </CardContent>
             </Card>
 
+            {/* Right Column - Workflow */}
             <div className="space-y-6">
               <SmartWorkflow
-                workflow={defaultWorkflow}
+                workflow={workflows[0]}
                 tour={todaysTours[0]}
                 onOptimize={optimizeRoute}
               />

@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Mic, Type, Sparkles, Clock, Brain } from "lucide-react";
+import { Mic, Sparkles, Clock, Brain } from "lucide-react";
 import { useState } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
@@ -34,7 +34,7 @@ export default function Documentation() {
     return acc;
   }, {} as Record<number, Doc[]>);
 
-  // Simulated AI suggestions based on time and context
+  // AI suggestions based on time and context
   const getAISuggestions = (patientId: number, time: Date) => {
     const hour = time.getHours();
     if (hour >= 6 && hour < 10) {
@@ -48,11 +48,11 @@ export default function Documentation() {
   };
 
   const createDocMutation = useMutation({
-    mutationFn: async (data: { content: string; patientId: number }) => {
+    mutationFn: async (data: { content: string; patientId: number; type?: string }) => {
       const res = await apiRequest("POST", "/api/docs", {
         ...data,
         date: new Date().toISOString(),
-        type: "Sprachaufnahme",
+        type: data.type || "Sprachaufnahme",
         aiGenerated: false,
         verified: false,
       });
@@ -64,6 +64,7 @@ export default function Documentation() {
         title: "Dokumentation erstellt",
         description: "Die Dokumentation wurde erfolgreich gespeichert.",
       });
+      setActivePatientId(null);
     },
   });
 
@@ -73,21 +74,24 @@ export default function Documentation() {
     createDocMutation.mutate({
       content: text,
       patientId: activePatientId,
+      type: "Sprachaufnahme",
     });
   };
 
-  const handleAISuggestion = (patientId: number, suggestion: string) => {
+  const handleAISuggestion = (patientId: number) => {
+    const suggestion = getAISuggestions(patientId, new Date());
     createDocMutation.mutate({
       content: suggestion,
       patientId,
+      type: "KI-Vorschlag",
     });
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (date: string) => {
     try {
-      return format(new Date(dateString), "dd.MM.yyyy HH:mm", { locale: de });
+      return format(new Date(date), "dd.MM.yyyy HH:mm", { locale: de });
     } catch (error) {
-      console.error("Invalid date:", dateString);
+      console.error("Invalid date:", date);
       return "Ungültiges Datum";
     }
   };
@@ -152,31 +156,30 @@ export default function Documentation() {
                           variant="ghost" 
                           size="sm" 
                           className="mt-2 text-xs text-blue-700"
-                          onClick={() => handleAISuggestion(
-                            patient.id,
-                            getAISuggestions(patient.id, new Date())
-                          )}
+                          onClick={() => handleAISuggestion(patient.id)}
                         >
                           Übernehmen
                         </Button>
                       </div>
 
-                      {(docsByPatient[patient.id] || []).map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="p-4 border rounded-lg space-y-2 hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                              {doc.type}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {formatDate(doc.date)}
-                            </span>
+                      {(docsByPatient[patient.id] || [])
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="p-4 border rounded-lg space-y-2 hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium">
+                                {doc.type}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatDate(doc.date)}
+                              </span>
+                            </div>
+                            <p className="text-sm">{doc.content}</p>
                           </div>
-                          <p className="text-sm">{doc.content}</p>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </ScrollArea>
                 </CardContent>
