@@ -4,20 +4,20 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertPatientSchema, insertTourSchema, insertDocSchema } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
-import { testMistralConnection } from "./ai";
+import { testAIConnection } from "./ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // Test endpoint for Mistral AI
-  app.get("/api/test-mistral", async (req, res) => {
+  // Test endpoint for Gemini AI
+  app.get("/api/test-ai", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const isConnected = await testMistralConnection();
+      const isConnected = await testAIConnection();
       if (isConnected) {
-        res.json({ status: "success", message: "Mistral AI connection successful" });
+        res.json({ status: "success", message: "Gemini AI connection successful" });
       } else {
-        res.status(500).json({ status: "error", message: "Mistral AI connection failed" });
+        res.status(500).json({ status: "error", message: "Gemini AI connection failed" });
       }
     } catch (error: any) {
       res.status(500).json({ 

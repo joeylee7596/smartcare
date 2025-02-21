@@ -1,22 +1,13 @@
-import axios from 'axios';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Create axios instance for Mistral AI
-const mistralAxios = axios.create({
-  baseURL: 'https://api.mistral.ai/v1',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
-  },
-});
+// Initialize Gemini
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Validate API key presence and format
+// Validate API key presence
 function validateApiKey() {
-  const apiKey = process.env.MISTRAL_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('Mistral API key is not configured');
-  }
-  if (!apiKey.startsWith('ag')) {
-    throw new Error('Invalid Mistral API key format. Key should start with "ag"');
+    throw new Error('Gemini API key is not configured');
   }
 }
 
@@ -37,9 +28,9 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
     validateApiKey();
 
     // Add artificial delay to simulate complex processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Initialize waypoints array first
+    // Initialize waypoints array
     let waypoints: any[] = [];
 
     // Generate waypoints with smart timing and positioning
@@ -78,31 +69,17 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
     const totalDistance = waypoints.reduce((sum, wp) => sum + wp.distanceToNext, 0);
     const totalDuration = waypoints.reduce((sum, wp) => sum + wp.visitDuration + wp.travelTimeToNext, 0);
 
-    // Start actual API call in background for next optimization
-    mistralAxios.post('/chat/completions', {
-      model: "mistral-small",
-      messages: [
-        {
-          role: "system",
-          content: `Als KI-Experte für Pflegetouren-Optimierung, erstellen Sie einen effizienten Zeitplan basierend auf:
-1. Pflegebedürfnisse der Patienten
+    // Start actual API call in background for future optimizations
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    model.generateContent(`Optimiere diese Tour basierend auf:
+1. Pflegebedürfnisse der Patienten (${patientData.map(p => `Patient ${p.id}: Level ${p.careLevel}`).join(', ')})
 2. Geografische Nähe
 3. Bevorzugte Besuchszeiten
 4. Erforderliche Pflegedauer
 
-Output im JSON Format mit:
-- waypoints: Array von Objekten mit patientId und estimatedTime
-- totalDistance: Geschätzte Gesamtdistanz in km
-- estimatedDuration: Gesamtdauer inkl. Pflegezeit in Minuten`
-        },
-        {
-          role: "user",
-          content: JSON.stringify(patientData)
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 1000
-    }).catch(console.error); // Log errors but don't wait
+Aktuelle Route:
+${waypoints.map((wp, i) => `${i+1}. Patient ${wp.patientId}: ${wp.visitDuration}min Pflege`).join('\n')}
+`).catch(console.error); // Log errors but don't wait
 
     return {
       waypoints,
@@ -110,31 +87,21 @@ Output im JSON Format mit:
       estimatedDuration: totalDuration
     };
   } catch (error: any) {
-    console.error("Mistral AI API error:", error.response?.data || error.message);
+    console.error("Gemini API error:", error.response?.data || error.message);
     throw new Error(`Fehler bei der Tourenoptimierung: ${error.response?.data?.message || error.message}`);
   }
 }
 
-// Test function to verify Mistral connection
-export async function testMistralConnection(): Promise<boolean> {
+// Test function to verify Gemini connection
+export async function testAIConnection(): Promise<boolean> {
   try {
     validateApiKey();
-
-    const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-small",
-      messages: [
-        {
-          role: "user",
-          content: "Test connection. Reply with: Connection successful."
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 20
-    });
-
-    return response.data?.choices?.[0]?.message?.content?.includes("Connection successful") || false;
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent("Test connection. Reply with: Connection successful.");
+    const response = await result.response;
+    return response.text().includes("Connection successful");
   } catch (error: any) {
-    console.error("Mistral connection test failed:", error.response?.data || error.message);
+    console.error("Gemini connection test failed:", error.response?.data || error.message);
     return false;
   }
 }
@@ -142,32 +109,24 @@ export async function testMistralConnection(): Promise<boolean> {
 export async function generateDocumentation(audioContent: string): Promise<string> {
   try {
     validateApiKey();
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-small",
-      messages: [
-        {
-          role: "system",
-          content: "Sie sind ein Experte für Pflegedokumentation. Formatieren Sie die Eingabe in eine strukturierte medizinische Notiz mit Abschnitten für Vitalzeichen, Medikamente, Allgemeinzustand und besondere Hinweise. Verwenden Sie eine klare, professionelle Sprache."
-        },
-        {
-          role: "user",
-          content: audioContent
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 800
-    });
+    const prompt = `Formatiere die folgende Spracheingabe in eine strukturierte medizinische Notiz.
+Verwende folgende Abschnitte:
+- Vitalzeichen
+- Medikamente
+- Allgemeinzustand
+- Besondere Hinweise
 
-    if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error("Ungültiges Antwortformat von Mistral AI");
-    }
+Eingabe: ${audioContent}`;
 
-    return response.data.choices[0].message.content;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
   } catch (error: any) {
-    console.error("Mistral AI API error:", error.response?.data || error.message);
+    console.error("Gemini API error:", error.response?.data || error.message);
     if (error.response?.status === 401) {
-      throw new Error("Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Ihren Mistral API-Schlüssel.");
+      throw new Error("Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Ihren Gemini API-Schlüssel.");
     }
     throw new Error(`Fehler bei der Dokumentationserstellung: ${error.response?.data?.message || error.message}`);
   }
@@ -180,32 +139,24 @@ export async function generateAISuggestion(context: {
 }): Promise<string> {
   try {
     validateApiKey();
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-small",
-      messages: [
-        {
-          role: "system",
-          content: "Sie sind ein Assistent für Pflegedokumentation. Schlagen Sie basierend auf der Tageszeit und der Patientenhistorie eine passende Dokumentation vor."
-        },
-        {
-          role: "user",
-          content: JSON.stringify(context)
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 500
-    });
+    const result = await model.generateContent(`Basierend auf folgenden Informationen, schlage eine passende Dokumentation vor:
+- Aktuelle Zeit: ${context.currentTime}
+- Letzter Besuch: ${context.lastVisit || 'Keine Information'}
+- Patientenhistorie: ${JSON.stringify(context.patientHistory)}
 
-    if (!response.data?.choices?.[0]?.message?.content) {
-      throw new Error("Ungültiges Antwortformat von Mistral AI");
-    }
+Berücksichtige:
+1. Tageszeit-spezifische Aktivitäten
+2. Veränderungen seit dem letzten Besuch
+3. Besondere Bedürfnisse des Patienten`);
 
-    return response.data.choices[0].message.content;
+    const response = await result.response;
+    return response.text();
   } catch (error: any) {
-    console.error("Mistral AI API error:", error.response?.data || error.message);
+    console.error("Gemini API error:", error.response?.data || error.message);
     if (error.response?.status === 401) {
-      throw new Error("Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Ihren Mistral API-Schlüssel.");
+      throw new Error("Authentifizierung fehlgeschlagen. Bitte überprüfen Sie Ihren Gemini API-Schlüssel.");
     }
     throw new Error(`Fehler bei der KI-Vorschlagsgenerierung: ${error.response?.data?.message || error.message}`);
   }
