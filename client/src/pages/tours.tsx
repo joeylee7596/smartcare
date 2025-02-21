@@ -2,7 +2,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format, startOfDay, endOfDay, parseISO, addMinutes } from "date-fns";
+import { format, startOfDay, endOfDay, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import { Tour, Patient, type InsertTour } from "@shared/schema";
@@ -23,37 +23,6 @@ import type { LatLngExpression } from 'leaflet';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PatientDetailsDialog } from "@/components/patients/patient-details-dialog";
-
-// Berlin coordinates bounds for random distribution
-const BERLIN_BOUNDS = {
-  north: 52.6755,
-  south: 52.3382,
-  east: 13.7611,
-  west: 13.0879
-};
-
-// Generate a random coordinate within Berlin bounds
-function getRandomBerlinLocation(): LatLngExpression {
-  const lat = BERLIN_BOUNDS.south + Math.random() * (BERLIN_BOUNDS.north - BERLIN_BOUNDS.south);
-  const lng = BERLIN_BOUNDS.west + Math.random() * (BERLIN_BOUNDS.east - BERLIN_BOUNDS.west);
-  return [lat, lng];
-}
-
-// Calculate time needed for patient based on care level
-function getPatientCareTime(careLevel: number): number {
-  const baseTime = 30; // Base time in minutes
-  return baseTime + (careLevel - 1) * 10; // Add 10 minutes per care level
-}
-
-// Calculate travel time between two points (simplified)
-function calculateTravelTime(from: LatLngExpression, to: LatLngExpression): number {
-  const [lat1, lng1] = from;
-  const [lat2, lng2] = to;
-
-  // Simple distance-based calculation (very rough estimate)
-  const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng2, 2)) * 111; // km
-  return Math.round(distance * 2); // Assume 30 km/h average speed
-}
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -155,48 +124,22 @@ export default function Tours() {
 
   const createTourMutation = useMutation({
     mutationFn: async (patientId: number) => {
-      const patient = patients.find(p => p.id === patientId);
-      if (!patient) throw new Error('Patient not found');
-
-      // Start time calculation
       const tourDate = new Date(selectedDate);
-      const existingTours = dateFilteredTours.sort((a, b) =>
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      // Find the latest end time of existing tours or start at 8 AM
-      let startTime = new Date(tourDate.setHours(8, 0, 0, 0));
-      if (existingTours.length > 0) {
-        const lastTour = existingTours[existingTours.length - 1];
-        if (lastTour.optimizedRoute) {
-          startTime = new Date(lastTour.date);
-          startTime = addMinutes(startTime, lastTour.optimizedRoute.estimatedDuration);
-        }
-      }
-
-      // Generate random coordinates for the new patient if not already assigned
-      const patientLocation = getRandomBerlinLocation();
-
-      // Calculate estimated duration
-      const careTime = getPatientCareTime(patient.careLevel);
-      const travelTime = calculateTravelTime(
-        [52.520008, 13.404954], // Starting from Berlin center
-        patientLocation
-      );
+      tourDate.setHours(9, 0, 0, 0);
 
       const newTour: InsertTour = {
-        date: startTime.toISOString(),
+        date: tourDate.toISOString(),
         caregiverId: 1,
         patientIds: [patientId],
         status: "scheduled",
         optimizedRoute: {
           waypoints: [{
             patientId: patientId,
-            lat: patientLocation[0],
-            lng: patientLocation[1]
+            lat: 52.520008,
+            lng: 13.404954
           }],
           totalDistance: 0,
-          estimatedDuration: careTime + travelTime
+          estimatedDuration: 30
         }
       };
 
@@ -226,104 +169,25 @@ export default function Tours() {
 
   const updateTourMutation = useMutation({
     mutationFn: async ({ id, patientIds }: { id: number; patientIds: number[] }) => {
-      const tour = tours.find(t => t.id === id);
-      if (!tour) throw new Error('Tour not found');
-
-      // Keep only waypoints for remaining patients
-      const remainingWaypoints = tour.optimizedRoute?.waypoints.filter(
-        wp => patientIds.includes(wp.patientId)
-      ) || [];
-
-      // Calculate total duration for remaining patients
-      let totalDuration = 0;
-      remainingWaypoints.forEach((waypoint, index) => {
-        const patient = patients.find(p => p.id === waypoint.patientId);
-        if (!patient) return;
-
-        // Add care time
-        totalDuration += getPatientCareTime(patient.careLevel);
-
-        // Add travel time if there's a next waypoint
-        if (index < remainingWaypoints.length - 1) {
-          const nextWaypoint = remainingWaypoints[index + 1];
-          totalDuration += calculateTravelTime(
-            [waypoint.lat, waypoint.lng],
-            [nextWaypoint.lat, nextWaypoint.lng]
-          );
-        }
-      });
-
-      // Get all tours for the current day and sort them by time
-      const dayTours = dateFilteredTours.sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      // Find index of current tour
-      const currentTourIndex = dayTours.findIndex(t => t.id === id);
-
-      // If this is not the first tour, start after the previous tour
-      let startTime: Date;
-      if (currentTourIndex > 0) {
-        const previousTour = dayTours[currentTourIndex - 1];
-        startTime = new Date(previousTour.date);
-        startTime = addMinutes(startTime, previousTour.optimizedRoute?.estimatedDuration || 0);
-      } else {
-        // If it's the first tour, start at 8 AM
-        startTime = new Date(selectedDate);
-        startTime.setHours(8, 0, 0, 0);
-      }
-
       const optimizedRoute = {
-        waypoints: remainingWaypoints,
+        waypoints: patientIds.map(patientId => ({
+          patientId,
+          lat: 52.520008,
+          lng: 13.404954
+        })),
         totalDistance: 0,
-        estimatedDuration: totalDuration
+        estimatedDuration: patientIds.length * 30
       };
 
-      // Update current tour
       const response = await apiRequest("PATCH", `/api/tours/${id}`, { 
         patientIds, 
-        optimizedRoute,
-        date: startTime.toISOString()
+        optimizedRoute 
       });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to update tour');
       }
-
-      // After updating current tour, update all subsequent tours
-      const subsequentTours = dayTours.slice(currentTourIndex + 1);
-      let currentTime = new Date(startTime);
-      currentTime = addMinutes(currentTime, totalDuration);
-
-      try {
-        for (const nextTour of subsequentTours) {
-          // Calculate travel time from last waypoint of current tour to first waypoint of next tour
-          let additionalTravelTime = 0;
-          if (remainingWaypoints.length > 0 && nextTour.optimizedRoute?.waypoints.length > 0) {
-            const lastWaypoint = remainingWaypoints[remainingWaypoints.length - 1];
-            const nextFirstWaypoint = nextTour.optimizedRoute.waypoints[0];
-            additionalTravelTime = calculateTravelTime(
-              [lastWaypoint.lat, lastWaypoint.lng],
-              [nextFirstWaypoint.lat, nextFirstWaypoint.lng]
-            );
-          }
-
-          // Add travel time to the start time
-          currentTime = addMinutes(currentTime, additionalTravelTime);
-
-          await apiRequest("PATCH", `/api/tours/${nextTour.id}`, {
-            date: currentTime.toISOString()
-          });
-
-          // Prepare for next tour
-          currentTime = addMinutes(currentTime, nextTour.optimizedRoute?.estimatedDuration || 0);
-        }
-      } catch (error) {
-        console.error('Error updating subsequent tours:', error);
-        throw new Error('Failed to update tour schedule');
-      }
-
       return response.json();
     },
     onSuccess: () => {
