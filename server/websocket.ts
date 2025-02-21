@@ -51,7 +51,7 @@ export function setupWebSocket(server: Server) {
                 message: 'Starte Transkription...'
               }));
 
-              // Process transcription
+              // Progress update
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_PROGRESS',
                 status: 'processing',
@@ -59,13 +59,18 @@ export function setupWebSocket(server: Server) {
                 message: 'Verarbeite Aufnahme...'
               }));
 
-              const documentation = await generateDocumentation(data.audioContent);
+              // Convert base64 to text (assuming it's already transcribed text)
+              const spokenText = Buffer.from(data.audioContent, 'base64').toString('utf-8');
+              console.log('Received spoken text:', spokenText);
+
+              // Generate documentation from the spoken text
+              const documentation = await generateDocumentation(spokenText);
 
               // Send final transcription
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
-                documentation,
-                originalText: data.audioContent // Send original spoken text back
+                documentation: documentation,
+                originalText: spokenText
               }));
             } catch (error) {
               console.error('Transcription error:', error);

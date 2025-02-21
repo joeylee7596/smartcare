@@ -18,6 +18,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
   const [previewText, setPreviewText] = useState<string>("");
+  const [spokenText, setSpokenText] = useState<string>("");
   const { sendMessage, subscribe } = useWebSocket();
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           setIsTranscribing(false);
           setTranscriptionProgress(100);
           setPreviewText(message.documentation);
+          setSpokenText(message.originalText || "");
           onTranscriptionComplete(message.documentation);
           break;
         case 'TRANSCRIPTION_PROGRESS':
@@ -67,6 +69,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const handleStartRecording = () => {
     setRecordingDuration(0);
     setPreviewText("");
+    setSpokenText("");
     startRecording();
     const interval = setInterval(() => {
       setRecordingDuration(prev => prev + 1);
@@ -96,19 +99,15 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
       const response = await fetch(blobUrl);
       const blob = await response.blob();
-      const reader = new FileReader();
 
-      reader.onload = () => {
-        const base64Audio = reader.result?.toString().split(',')[1];
-        if (base64Audio) {
-          sendMessage({
-            type: 'VOICE_TRANSCRIPTION',
-            audioContent: base64Audio,
-          });
-        }
-      };
+      // Convert blob to text directly
+      const text = await blob.text();
+      console.log("Recorded text:", text);
 
-      reader.readAsDataURL(blob);
+      sendMessage({
+        type: 'VOICE_TRANSCRIPTION',
+        audioContent: btoa(text), // Convert text to base64
+      });
 
     } catch (error) {
       console.error("Error processing recording:", error);
@@ -151,7 +150,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           </Button>
         )}
 
-        {(isTranscribing || previewText) && (
+        {(isTranscribing || previewText || spokenText) && (
           <div className="space-y-2 animate-in fade-in-50">
             {isTranscribing && (
               <>
@@ -164,6 +163,14 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                 </div>
                 <Progress value={transcriptionProgress} className="h-2" />
               </>
+            )}
+            {spokenText && (
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <p className="text-sm text-blue-700 font-medium mb-1">Gesprochener Text:</p>
+                <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                  {spokenText}
+                </p>
+              </div>
             )}
             {previewText && (
               <div className="p-3 bg-gray-50 rounded-lg">
