@@ -1,21 +1,24 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
-import { Tour, Patient } from "@shared/schema";
+import { Tour, Patient, type InsertTour } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { MapPin, RotateCw, Clock, Users, Route, Brain, Filter, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { DndContext, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import "leaflet/dist/leaflet.css";
 import { Icon } from 'leaflet';
+import { CSS } from "@dnd-kit/utilities";
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -35,7 +38,48 @@ const center = {
   lng: 13.404954,
 };
 
+interface SortablePatientItemProps {
+  patient: Patient;
+}
+
+function SortablePatientItem({ patient }: SortablePatientItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: patient.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200 cursor-move"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-medium">{patient.name}</h3>
+          <p className="text-sm text-muted-foreground">{patient.address}</p>
+        </div>
+        <MapPin className="h-4 w-4 text-muted-foreground" />
+      </div>
+    </div>
+  );
+}
+
 export default function Tours() {
+  const { toast } = useToast();
   const [date, setDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilters, setSelectedFilters] = useState({
@@ -50,6 +94,34 @@ export default function Tours() {
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
+  });
+
+  const createTourMutation = useMutation({
+    mutationFn: async (newTour: InsertTour) => {
+      const res = await apiRequest("POST", "/api/tours", newTour);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
+      toast({
+        title: "Tour erstellt",
+        description: "Die Tour wurde erfolgreich erstellt.",
+      });
+    },
+  });
+
+  const updateTourMutation = useMutation({
+    mutationFn: async ({ id, patientIds }: { id: number; patientIds: number[] }) => {
+      const res = await apiRequest("PATCH", `/api/tours/${id}`, { patientIds });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
+      toast({
+        title: "Tour aktualisiert",
+        description: "Die Tour wurde erfolgreich aktualisiert.",
+      });
+    },
   });
 
   const todaysTours = tours.filter(
@@ -67,6 +139,34 @@ export default function Tours() {
       },
     })
   );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const draggedPatientId = active.id as number;
+    const tourId = parseInt(over.id.toString());
+
+    if (isNaN(tourId)) {
+      // Create new tour
+      const newTour: InsertTour = {
+        date: new Date().toISOString(),
+        caregiverId: 1, // TODO: Get from auth context
+        patientIds: [draggedPatientId],
+        status: "scheduled",
+      };
+
+      createTourMutation.mutate(newTour);
+    } else {
+      // Update existing tour
+      const tour = tours.find(t => t.id === tourId);
+      if (!tour) return;
+
+      const updatedPatientIds = [...tour.patientIds, draggedPatientId];
+      updateTourMutation.mutate({ id: tourId, patientIds: updatedPatientIds });
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
@@ -87,151 +187,151 @@ export default function Tours() {
             </Button>
           </div>
 
-          <div className="grid grid-cols-[350px,1fr,350px] gap-6">
-            {/* Left Column - Patient List */}
-            <Card className="shadow-lg">
-              <CardHeader className="pb-3">
-                <div className="space-y-3">
-                  <CardTitle className="text-base">Patienten</CardTitle>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Suchen..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-[350px,1fr,350px] gap-6">
+              {/* Left Column - Patient List */}
+              <Card className="shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="space-y-3">
+                    <CardTitle className="text-base">Patienten</CardTitle>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Suchen..."
+                        className="pl-8"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="urgent"
+                          checked={selectedFilters.urgent}
+                          onCheckedChange={(checked) =>
+                            setSelectedFilters(prev => ({ ...prev, urgent: !!checked }))
+                          }
+                        />
+                        <label htmlFor="urgent" className="text-sm">Dringend</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="scheduled"
+                          checked={selectedFilters.scheduled}
+                          onCheckedChange={(checked) =>
+                            setSelectedFilters(prev => ({ ...prev, scheduled: !!checked }))
+                          }
+                        />
+                        <label htmlFor="scheduled" className="text-sm">Geplant</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="completed"
+                          checked={selectedFilters.completed}
+                          onCheckedChange={(checked) =>
+                            setSelectedFilters(prev => ({ ...prev, completed: !!checked }))
+                          }
+                        />
+                        <label htmlFor="completed" className="text-sm">Abgeschlossen</label>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="urgent"
-                        checked={selectedFilters.urgent}
-                        onCheckedChange={(checked) =>
-                          setSelectedFilters(prev => ({ ...prev, urgent: !!checked }))
-                        }
-                      />
-                      <label htmlFor="urgent" className="text-sm">Dringend</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="scheduled"
-                        checked={selectedFilters.scheduled}
-                        onCheckedChange={(checked) =>
-                          setSelectedFilters(prev => ({ ...prev, scheduled: !!checked }))
-                        }
-                      />
-                      <label htmlFor="scheduled" className="text-sm">Geplant</label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="completed"
-                        checked={selectedFilters.completed}
-                        onCheckedChange={(checked) =>
-                          setSelectedFilters(prev => ({ ...prev, completed: !!checked }))
-                        }
-                      />
-                      <label htmlFor="completed" className="text-sm">Abgeschlossen</label>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[calc(100vh-350px)]">
-                  <DndContext sensors={sensors}>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[calc(100vh-350px)]">
                     <SortableContext items={filteredPatients} strategy={verticalListSortingStrategy}>
                       {filteredPatients.map((patient) => (
-                        <div
-                          key={patient.id}
-                          className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-medium">{patient.name}</h3>
-                              <p className="text-sm text-muted-foreground">{patient.address}</p>
-                            </div>
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
+                        <SortablePatientItem key={patient.id} patient={patient} />
                       ))}
                     </SortableContext>
-                  </DndContext>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
 
-            {/* Center Column - Map */}
-            <Card className="shadow-lg overflow-hidden">
-              <CardContent className="p-0">
-                <MapContainer
-                  center={[center.lat, center.lng]}
-                  zoom={13}
-                  style={mapContainerStyle}
-                  scrollWheelZoom={true}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {todaysTours.map((tour) => (
-                    tour.optimizedRoute?.waypoints.map((waypoint, index) => (
-                      <Marker
-                        key={`${tour.id}-${index}`}
-                        position={[waypoint.lat, waypoint.lng]}
-                        icon={defaultIcon}
+              {/* Center Column - Map */}
+              <Card className="shadow-lg overflow-hidden">
+                <CardContent className="p-0">
+                  <MapContainer
+                    center={[center.lat, center.lng]}
+                    zoom={13}
+                    style={mapContainerStyle}
+                    scrollWheelZoom={true}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {todaysTours.map((tour) => (
+                      tour.optimizedRoute?.waypoints.map((waypoint, index) => (
+                        <Marker
+                          key={`${tour.id}-${index}`}
+                          position={[waypoint.lat, waypoint.lng]}
+                          icon={defaultIcon}
+                        >
+                          <Popup>
+                            <div className="p-2">
+                              <p className="font-medium">Stop {index + 1}</p>
+                              <p className="text-sm text-muted-foreground">Patient #{waypoint.patientId}</p>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      ))
+                    ))}
+                  </MapContainer>
+                </CardContent>
+              </Card>
+
+              {/* Right Column - Timeline */}
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-base">Zeitplan</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[calc(100vh-350px)]">
+                    {todaysTours.map((tour) => (
+                      <div
+                        key={tour.id}
+                        className="mb-4 p-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
+                        data-tour-id={tour.id}
                       >
-                        <Popup>
-                          <div className="p-2">
-                            <p className="font-medium">Stop {index + 1}</p>
-                            <p className="text-sm text-muted-foreground">Patient #{waypoint.patientId}</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {format(new Date(tour.date), "HH:mm")}
+                            </span>
                           </div>
-                        </Popup>
-                      </Marker>
-                    ))
-                  ))}
-                </MapContainer>
-              </CardContent>
-            </Card>
-
-            {/* Right Column - Timeline */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-base">Zeitplan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[calc(100vh-350px)]">
-                  {todaysTours.map((tour) => (
-                    <div
-                      key={tour.id}
-                      className="mb-4 p-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">
-                            {format(new Date(tour.date), "HH:mm")}
+                          <span className="text-sm text-muted-foreground">
+                            {tour.optimizedRoute?.estimatedDuration} min
                           </span>
                         </div>
-                        <span className="text-sm text-muted-foreground">
-                          {tour.optimizedRoute?.estimatedDuration} min
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {tour.optimizedRoute?.waypoints.map((waypoint, index) => (
-                          <div key={index} className="flex items-center gap-2 text-sm">
-                            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
-                              {index + 1}
+                        <div className="space-y-2">
+                          {tour.optimizedRoute?.waypoints.map((waypoint, index) => (
+                            <div key={index} className="flex items-center gap-2 text-sm">
+                              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                                {index + 1}
+                              </div>
+                              <span>Patient #{waypoint.patientId}</span>
                             </div>
-                            <span>Patient #{waypoint.patientId}</span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
+                    ))}
+
+                    {/* Drop Zone for new tour */}
+                    <div
+                      className="mt-4 p-4 rounded-lg border-2 border-dashed border-border/40 bg-muted/20 text-center"
+                      data-tour-id="new"
+                    >
+                      <p className="text-sm text-muted-foreground">
+                        Patient hier ablegen für neue Tour
+                      </p>
                     </div>
-                  ))}
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
+          </DndContext>
         </main>
       </div>
     </div>
