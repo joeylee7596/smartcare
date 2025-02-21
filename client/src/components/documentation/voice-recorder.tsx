@@ -97,16 +97,23 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       setTranscriptionProgress(10);
       setPreviewText("Starte Verarbeitung...");
 
+      // Fetch the audio blob
       const response = await fetch(blobUrl);
-      const blob = await response.blob();
+      const audioBlob = await response.blob();
 
-      // Convert blob to text directly
-      const text = await blob.text();
-      console.log("Recorded text:", text);
+      // Create a new array buffer from the blob
+      const arrayBuffer = await audioBlob.arrayBuffer();
 
+      // Convert array buffer to base64
+      const base64String = btoa(
+        new Uint8Array(arrayBuffer)
+          .reduce((data, byte) => data + String.fromCharCode(byte), '')
+      );
+
+      // Send the base64 encoded audio
       sendMessage({
         type: 'VOICE_TRANSCRIPTION',
-        audioContent: btoa(text), // Convert text to base64
+        audioContent: base64String,
       });
 
     } catch (error) {
@@ -166,7 +173,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             )}
             {spokenText && (
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-sm text-blue-700 font-medium mb-1">Gesprochener Text:</p>
+                <p className="text-sm text-blue-700 font-medium mb-1">Aufgenommener Text:</p>
                 <p className="text-sm text-blue-900 whitespace-pre-wrap">
                   {spokenText}
                 </p>
@@ -174,6 +181,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             )}
             {previewText && (
               <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm font-medium mb-1">KI-Formatierte Dokumentation:</p>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {previewText}
                 </p>

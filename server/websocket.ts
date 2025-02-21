@@ -51,6 +51,17 @@ export function setupWebSocket(server: Server) {
                 message: 'Starte Transkription...'
               }));
 
+              // Try to decode the base64 audio data
+              let decodedText;
+              try {
+                const buffer = Buffer.from(data.audioContent, 'base64');
+                decodedText = buffer.toString('utf-8');
+                console.log('Decoded audio text:', decodedText);
+              } catch (error) {
+                console.error('Error decoding audio:', error);
+                throw new Error('Fehler beim Dekodieren der Audioaufnahme');
+              }
+
               // Progress update
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_PROGRESS',
@@ -59,18 +70,14 @@ export function setupWebSocket(server: Server) {
                 message: 'Verarbeite Aufnahme...'
               }));
 
-              // Convert base64 to text (assuming it's already transcribed text)
-              const spokenText = Buffer.from(data.audioContent, 'base64').toString('utf-8');
-              console.log('Received spoken text:', spokenText);
-
               // Generate documentation from the spoken text
-              const documentation = await generateDocumentation(spokenText);
+              const documentation = await generateDocumentation(decodedText);
 
               // Send final transcription
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
                 documentation: documentation,
-                originalText: spokenText
+                originalText: decodedText
               }));
             } catch (error) {
               console.error('Transcription error:', error);
