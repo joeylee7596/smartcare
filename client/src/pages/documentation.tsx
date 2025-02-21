@@ -139,6 +139,7 @@ function DocumentationPage() {
               title="Offen" 
               icon={<Clock className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
+              color="blue"
             >
               {activePatientId ? (
                 <div className="space-y-4">
@@ -163,6 +164,7 @@ function DocumentationPage() {
                       patient={patients.find(p => p.id === doc.patientId)!}
                       onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
                       showMoveForward
+                      color="blue"
                     />
                   ))}
                   <div className="pt-4 border-t border-border/40">
@@ -183,6 +185,7 @@ function DocumentationPage() {
               title="In Überprüfung" 
               icon={<RefreshCw className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
+              color="amber"
             >
               {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
                 <DocumentCard
@@ -193,6 +196,7 @@ function DocumentationPage() {
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveForward
                   showMoveBackward
+                  color="amber"
                 />
               ))}
             </Column>
@@ -201,6 +205,7 @@ function DocumentationPage() {
               title="Abgeschlossen" 
               icon={<Check className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
+              color="green"
             >
               {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
                 <DocumentCard
@@ -209,6 +214,7 @@ function DocumentationPage() {
                   patient={patients.find(p => p.id === doc.patientId)!}
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveBackward
+                  color="green"
                 />
               ))}
             </Column>
@@ -224,12 +230,19 @@ interface ColumnProps {
   icon: React.ReactNode;
   count: number;
   children: React.ReactNode;
+  color: "blue" | "amber" | "green";
 }
 
-function Column({ title, icon, count, children }: ColumnProps) {
+function Column({ title, icon, count, children, color }: ColumnProps) {
+  const colorVariants = {
+    blue: "bg-blue-500/5 border-blue-500/10 hover:border-blue-500/20",
+    amber: "bg-amber-500/5 border-amber-500/10 hover:border-amber-500/20",
+    green: "bg-green-500/5 border-green-500/10 hover:border-green-500/20",
+  };
+
   return (
-    <div className="rounded-lg border bg-card shadow-sm">
-      <div className="p-4 border-b">
+    <div className={`rounded-lg border shadow-lg transition-all duration-300 hover:shadow-xl ${colorVariants[color]}`}>
+      <div className="p-4 border-b border-border/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="text-muted-foreground">
@@ -256,6 +269,7 @@ interface DocumentCardProps {
   onMoveBackward?: () => void;
   showMoveForward?: boolean;
   showMoveBackward?: boolean;
+  color: "blue" | "amber" | "green";
 }
 
 function DocumentCard({ 
@@ -265,20 +279,33 @@ function DocumentCard({
   onMoveBackward,
   showMoveForward,
   showMoveBackward,
+  color
 }: DocumentCardProps) {
   if (!patient) return null;
 
+  const statusColors = {
+    blue: "text-blue-500",
+    amber: "text-amber-500",
+    green: "text-green-500"
+  };
+
+  const borderColors = {
+    blue: "hover:border-blue-500/20",
+    amber: "hover:border-amber-500/20",
+    green: "hover:border-green-500/20"
+  };
+
   return (
-    <Card className="group relative hover:shadow-sm transition-all duration-200">
-      <CardContent className="p-3 space-y-2">
+    <Card className={`group relative border border-border/40 hover:shadow-lg transition-all duration-200 ${borderColors[color]}`}>
+      <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium">{patient.name}</h3>
           {doc.status === DocumentationStatus.COMPLETED ? (
-            <Check className="h-3 w-3 text-green-500" />
+            <Check className={`h-4 w-4 ${statusColors.green}`} />
           ) : doc.status === DocumentationStatus.REVIEW ? (
-            <RefreshCw className="h-3 w-3 text-amber-500" />
+            <RefreshCw className={`h-4 w-4 ${statusColors.amber}`} />
           ) : (
-            <Clock className="h-3 w-3 text-blue-500" />
+            <Clock className={`h-4 w-4 ${statusColors.blue}`} />
           )}
         </div>
 
@@ -286,21 +313,23 @@ function DocumentCard({
           {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
         </p>
 
-        <p className="text-xs line-clamp-2">{doc.content}</p>
+        <div className="bg-muted/30 rounded-lg p-3">
+          <p className="text-sm line-clamp-3">{doc.content}</p>
+        </div>
 
         {doc.reviewNotes && (
-          <div className="text-xs p-2 rounded bg-muted/40">
+          <div className="text-xs p-3 rounded-lg bg-muted/20">
             <p className="text-muted-foreground mb-1">Anmerkungen:</p>
             <p>{doc.reviewNotes}</p>
           </div>
         )}
 
-        <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
           {showMoveBackward && (
             <Button 
               variant="ghost" 
               size="sm"
-              className="h-7 text-xs flex-1"
+              className="h-8 text-xs flex-1 hover:bg-muted"
               onClick={onMoveBackward}
             >
               <ArrowLeft className="w-3 h-3 mr-1" />
@@ -311,7 +340,7 @@ function DocumentCard({
             <Button 
               variant="ghost" 
               size="sm"
-              className="h-7 text-xs flex-1"
+              className="h-8 text-xs flex-1 hover:bg-muted"
               onClick={onMoveForward}
             >
               Weiter
@@ -327,12 +356,12 @@ function DocumentCard({
 function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient; onStartRecording: () => void }) {
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
-      className="w-full justify-start text-xs h-8 mb-1"
+      className="w-full justify-start text-xs h-9 mb-2 bg-card hover:bg-muted/50"
       onClick={onStartRecording}
     >
-      <Plus className="mr-1.5 h-3 w-3" />
+      <Plus className="mr-2 h-3 w-3" />
       {patient.name}
     </Button>
   );

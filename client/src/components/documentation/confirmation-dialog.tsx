@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { Check, Edit2 } from "lucide-react";
+import { Check, Edit2, Brain } from "lucide-react";
 
 interface ConfirmationDialogProps {
   isOpen: boolean;
@@ -29,23 +29,30 @@ export function ConfirmationDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>KI-generierte Dokumentation überprüfen</DialogTitle>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="p-2 rounded-full bg-primary/10">
+              <Brain className="h-5 w-5 text-primary" />
+            </div>
+            <DialogTitle>KI-generierte Dokumentation</DialogTitle>
+          </div>
           <DialogDescription>
             Bitte überprüfen Sie die generierte Dokumentation. Sie können den Text bearbeiten, falls Änderungen erforderlich sind.
           </DialogDescription>
         </DialogHeader>
+
         <div className="mt-4 space-y-4">
           {isEditing ? (
             <Textarea
               value={editedText}
               onChange={(e) => setEditedText(e.target.value)}
-              className="min-h-[200px] font-mono text-sm"
+              className="min-h-[300px] font-mono text-sm leading-relaxed"
             />
           ) : (
-            <div className="p-4 rounded-lg bg-muted/50 border min-h-[200px] whitespace-pre-wrap">
+            <div className="p-4 rounded-lg bg-muted/50 border min-h-[300px] whitespace-pre-wrap font-mono text-sm leading-relaxed">
               {editedText}
             </div>
           )}
+
           <Button
             variant="outline"
             size="sm"
@@ -56,6 +63,7 @@ export function ConfirmationDialog({
             {isEditing ? "Vorschau anzeigen" : "Text bearbeiten"}
           </Button>
         </div>
+
         <DialogFooter className="mt-6">
           <div className="flex gap-3 w-full">
             <Button
@@ -63,13 +71,14 @@ export function ConfirmationDialog({
               onClick={() => handleConfirm(false)}
               className="flex-1"
             >
+              <Check className="w-4 h-4 mr-2" />
               Dokumentation abschließen
             </Button>
             <Button 
               onClick={() => handleConfirm(true)}
               className="flex-1 bg-primary"
             >
-              <Check className="w-4 h-4 mr-2" />
+              <Brain className="w-4 h-4 mr-2" />
               Zur Überprüfung senden
             </Button>
           </div>

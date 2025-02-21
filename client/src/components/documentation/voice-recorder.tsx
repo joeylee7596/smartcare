@@ -137,14 +137,25 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   return (
     <>
-      <Card className={cn("relative overflow-hidden shadow-sm hover:shadow-md transition-all duration-300", className)}>
-        <CardContent className="p-4 space-y-4">
+      <Card className={cn("relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300", className)}>
+        <CardContent className="p-6">
           {isRecording ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-red-600">
-                  <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
-                  <span className="text-sm font-medium">Aufnahme läuft...</span>
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm font-medium text-red-500">Aufnahme läuft...</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {editableText.length} Zeichen
+                </div>
+              </div>
+              <div className="space-y-4">
+                <Progress value={100} className="h-1" />
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <p className="text-sm font-mono whitespace-pre-wrap">
+                    {editableText || "Warte auf Spracheingabe..."}
+                  </p>
                 </div>
               </div>
               <Button
@@ -159,56 +170,42 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           ) : (
             <Button
               variant="outline"
-              className="w-full bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/20"
+              className="w-full h-16 bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/20"
               onClick={startRecording}
               disabled={isProcessing}
             >
-              <Mic className="mr-2 h-4 w-4" />
-              Sprachaufnahme starten
+              <Mic className="mr-3 h-5 w-5" />
+              <span className="font-medium">Sprachaufnahme starten</span>
             </Button>
           )}
 
-          {(isRecording || editableText || error) && (
-            <div className="space-y-4 animate-in fade-in-50">
-              {isRecording && (
-                <>
-                  <div className="flex items-center justify-between text-sm text-primary">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-4 w-4 animate-pulse" />
-                      <span>Spracherkennung aktiv...</span>
-                    </div>
-                  </div>
-                  <Progress value={100} className="h-1.5" />
-                </>
-              )}
+          {error && (
+            <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-100">
+              <p className="text-sm text-red-700">
+                {error}
+              </p>
+            </div>
+          )}
 
-              {error && (
-                <div className="p-3 rounded-lg bg-red-50 border border-red-100">
-                  <p className="text-sm text-red-700">
-                    {error}
-                  </p>
-                </div>
-              )}
-
-              {editableText && !showConfirmation && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Erkannter Text:</p>
-                  <Textarea
-                    value={editableText}
-                    onChange={(e) => setEditableText(e.target.value)}
-                    className="min-h-[100px] bg-muted/50 font-mono text-sm"
-                    placeholder="Text bearbeiten..."
-                  />
-                  <Button 
-                    className="w-full bg-primary hover:bg-primary/90" 
-                    onClick={handleConfirm}
-                    disabled={isProcessing}
-                  >
-                    <Brain className="mr-2 h-4 w-4" />
-                    {isProcessing ? "Verarbeite..." : "Mit KI optimieren"}
-                  </Button>
-                </div>
-              )}
+          {editableText && !showConfirmation && !isRecording && (
+            <div className="mt-6 space-y-4 animate-in fade-in-50">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Aufgenommener Text:</label>
+                <Textarea
+                  value={editableText}
+                  onChange={(e) => setEditableText(e.target.value)}
+                  className="min-h-[150px] font-mono text-sm leading-relaxed"
+                  placeholder="Text bearbeiten..."
+                />
+              </div>
+              <Button 
+                className="w-full bg-primary hover:bg-primary/90" 
+                onClick={handleConfirm}
+                disabled={isProcessing}
+              >
+                <Brain className="mr-2 h-4 w-4" />
+                {isProcessing ? "Verarbeite..." : "Mit KI optimieren"}
+              </Button>
             </div>
           )}
         </CardContent>
