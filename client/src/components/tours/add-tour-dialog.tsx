@@ -8,7 +8,7 @@ import { InsertTour, insertTourSchema, Patient } from "@shared/schema";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Route, Brain, Plus, X } from "lucide-react";
+import { Route, Brain, Plus, X, Clock, MapPin, ArrowRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect } from "react";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -42,7 +42,7 @@ export function AddTourDialog() {
 
         toast({
           title: "Tour optimiert",
-          description: `${message.workflow.waypoints.length} Patienten wurden basierend auf ihren Pflegebedürfnissen optimal eingeplant.`,
+          description: `${message.workflow.waypoints.length} Patienten wurden optimal eingeplant.`,
         });
       }
     });
@@ -62,7 +62,7 @@ export function AddTourDialog() {
 
     toast({
       title: "KI plant die Tour",
-      description: "Analysiere Patientenbedürfnisse und optimiere die Route...",
+      description: "Optimiere Route basierend auf Patientenbedürfnissen...",
     });
   };
 
@@ -87,6 +87,12 @@ export function AddTourDialog() {
     }
   };
 
+  const formatTime = (hours: number) => {
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
   const mutation = useMutation({
     mutationFn: async (data: InsertTour) => {
       const res = await apiRequest("POST", "/api/tours", data);
@@ -102,7 +108,6 @@ export function AddTourDialog() {
       setOptimizedRoute(null);
       setSelectedPatients([]);
 
-      // Broadcast the update to all connected clients
       sendMessage({
         type: 'TOUR_UPDATE',
         tour: data,
@@ -125,110 +130,159 @@ export function AddTourDialog() {
           Tour planen
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px]">
+      <DialogContent className="sm:max-w-[900px]">
         <DialogHeader>
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
-            <div className="grid gap-6">
-              <FormField
-                control={form.control}
-                name="patientIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Patienten zur Tour hinzufügen</FormLabel>
-                    <div className="space-y-4">
-                      <Select
-                        onValueChange={addPatient}
-                        value=""
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Patient auswählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {patients
-                            .filter(p => !selectedPatients.find(sp => sp.id === p.id))
-                            .map((patient) => (
-                              <SelectItem key={patient.id} value={patient.id.toString()}>
-                                {patient.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+            <div className="grid grid-cols-[400px,1fr] gap-6">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="patientIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Patienten zur Tour hinzufügen</FormLabel>
+                      <div className="space-y-4">
+                        <Select
+                          onValueChange={addPatient}
+                          value=""
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Patient auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {patients
+                              .filter(p => !selectedPatients.find(sp => sp.id === p.id))
+                              .map((patient) => (
+                                <SelectItem key={patient.id} value={patient.id.toString()}>
+                                  {patient.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
 
-                      <div className="space-y-2">
-                        <AnimatePresence>
-                          {selectedPatients.map((patient) => (
-                            <motion.div
-                              key={patient.id}
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="flex items-center justify-between p-2 rounded-lg bg-accent"
-                            >
-                              <span>{patient.name}</span>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removePatient(patient.id)}
+                        <div className="space-y-2">
+                          <AnimatePresence>
+                            {selectedPatients.map((patient) => (
+                              <motion.div
+                                key={patient.id}
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="flex items-center justify-between p-2 rounded-lg bg-accent"
                               >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
+                                <span>{patient.name}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removePatient(patient.id)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
                       </div>
-                    </div>
-                  </FormItem>
-                )}
-              />
+                    </FormItem>
+                  )}
+                />
 
-              <AnimatePresence>
                 {optimizedRoute && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    className="space-y-2 p-4 rounded-lg bg-blue-50 border border-blue-100"
-                  >
-                    <div className="flex items-center gap-2 text-blue-700">
-                      <Brain className="h-4 w-4" />
-                      <p className="font-medium">KI-optimierte Tour</p>
-                    </div>
-                    <div className="text-sm text-blue-600">
-                      <p>Geschätzte Dauer: {optimizedRoute.estimatedDuration} min</p>
-                      <p>Optimierte Reihenfolge basierend auf:</p>
-                      <ul className="list-disc list-inside mt-1">
-                        <li>Pflegebedürfnisse der Patienten</li>
-                        <li>Geografische Nähe</li>
-                        <li>Bevorzugte Besuchszeiten</li>
-                      </ul>
-                    </div>
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-blue-700 mb-2">Optimierte Reihenfolge:</p>
-                      <div className="space-y-2">
-                        {optimizedRoute.waypoints.map((waypoint: any, index: number) => (
-                          <motion.div
-                            key={index}
-                            initial={{ x: -20, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            transition={{ delay: index * 0.1 }}
-                            className="flex items-center gap-2"
-                          >
-                            <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm">
-                              {index + 1}
-                            </div>
-                            <span className="text-sm">
-                              {patients.find(p => p.id === waypoint.patientId)?.name}
-                            </span>
-                          </motion.div>
-                        ))}
+                  <div className="space-y-4 p-4 rounded-lg bg-blue-50 border border-blue-100">
+                    <div className="flex items-center justify-between text-blue-700">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-4 w-4" />
+                        <p className="font-medium">Tourübersicht</p>
+                      </div>
+                      <div className="text-sm">
+                        Gesamtdauer: {optimizedRoute.estimatedDuration} Min
                       </div>
                     </div>
-                  </motion.div>
+
+                    <div className="space-y-3">
+                      {optimizedRoute.waypoints.map((waypoint: any, index: number) => (
+                        <div key={index} className="relative">
+                          <div className="flex items-start gap-3">
+                            <div className="flex flex-col items-center">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm font-medium">
+                                {index + 1}
+                              </div>
+                              {index < optimizedRoute.waypoints.length - 1 && (
+                                <div className="h-16 w-0.5 bg-blue-100 mt-1" />
+                              )}
+                            </div>
+                            <div className="flex-1 bg-white rounded-lg p-3 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">
+                                  {patients.find(p => p.id === waypoint.patientId)?.name}
+                                </span>
+                                <span className="text-sm text-muted-foreground">
+                                  {formatTime(waypoint.estimatedTime)} Uhr
+                                </span>
+                              </div>
+                              <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-4 w-4" />
+                                  {waypoint.visitDuration} Min Besuch
+                                </div>
+                                {waypoint.travelTimeToNext > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-4 w-4" />
+                                    {waypoint.distanceToNext.toFixed(1)} km
+                                  </div>
+                                )}
+                              </div>
+                              {waypoint.travelTimeToNext > 0 && (
+                                <div className="absolute left-11 top-[4.5rem] flex items-center gap-1 text-sm text-blue-600">
+                                  <ArrowRight className="h-4 w-4" />
+                                  {waypoint.travelTimeToNext} Min Fahrt
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </AnimatePresence>
+              </div>
+
+              {optimizedRoute && (
+                <div className="relative rounded-lg bg-gray-100 p-4">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-full h-full max-h-[500px] bg-blue-50 rounded-lg border border-blue-100">
+                      {/* Simulated Map */}
+                      <div className="relative w-full h-full">
+                        {optimizedRoute.waypoints.map((waypoint: any, index: number) => {
+                          const x = (waypoint.coordinates.lng - 13.3) * 1000;
+                          const y = (52.6 - waypoint.coordinates.lat) * 1000;
+
+                          return (
+                            <div
+                              key={index}
+                              className="absolute"
+                              style={{
+                                left: `${x}px`,
+                                top: `${y}px`,
+                              }}
+                            >
+                              <div className="w-8 h-8 -mt-4 -ml-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-medium">
+                                {index + 1}
+                              </div>
+                              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white px-2 py-1 rounded text-sm shadow">
+                                {waypoint.visitDuration} Min
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button 

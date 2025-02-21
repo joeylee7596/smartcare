@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { generateDocumentation, optimizeWorkflow } from './ai';
 
@@ -13,25 +13,8 @@ export function setupWebSocket(server: Server) {
         const data = JSON.parse(message.toString());
 
         switch (data.type) {
-          case 'VOICE_TRANSCRIPTION':
-            // Start sending progress updates
-            ws.send(JSON.stringify({
-              type: 'TRANSCRIPTION_PROGRESS',
-              preview: 'Transkribiere Aufnahme...',
-            }));
-
-            // Generate documentation
-            const documentation = await generateDocumentation(data.audioContent);
-
-            // Send final result
-            ws.send(JSON.stringify({
-              type: 'TRANSCRIPTION_RESULT',
-              documentation
-            }));
-            break;
-
           case 'OPTIMIZE_TOUR':
-            const optimizedWorkflow = await optimizeWorkflow(data.patients);
+            const optimizedWorkflow = await optimizeWorkflow(data.patients || data.tours);
             ws.send(JSON.stringify({
               type: 'OPTIMIZED_TOUR',
               workflow: optimizedWorkflow
@@ -54,7 +37,7 @@ export function setupWebSocket(server: Server) {
         console.error('WebSocket error:', error);
         ws.send(JSON.stringify({
           type: 'ERROR',
-          error: error instanceof Error ? error.message : 'Unknown error occurred'
+          error: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten'
         }));
       }
     });
