@@ -1,0 +1,23 @@
+Hier sind alle Funktionen von SmartCare in einer kompakten Liste, jeweils mit einem Satz erklärt:
+	1.	Dashboard mit Tagesübersicht – Zeigt eine personalisierte Übersicht mit offenen Aufgaben, Touren und Dokumentationen.
+	2.	Patientenverwaltung – Erfasst Stammdaten, Notfallkontakte, Medikationspläne und individuelle Patientenwünsche.
+	3.	Touren- und Schichtplanung – Organisiert Dienstpläne, optimiert Routen mit Google Maps und synchronisiert Änderungen in Echtzeit.
+	4.	Medikationsmanagement – Erinnert automatisch an Medikamentengabe und prüft Einhaltung durch doppelte Verifizierung.
+	5.	KI-gestützte Notizerfassung – Strukturiert Pflegeeinträge automatisch per Spracheingabe und erkennt fehlende Dokumentationen.
+	6.	Automatische Abrechnung – Erstellt Rechnungen basierend auf erbrachten Leistungen und sendet diese direkt an Krankenkassen.
+	7.	Live-Benachrichtigungen & Erinnerungen – Informiert Pflegekräfte über Touren, Medikationsfehler oder offene Dokumentationen.
+	8.	Einfache Checklisten & Aufgabenmanagement – Zeigt übersichtlich an, welche Aufgaben noch offen oder erledigt sind.
+	9.	Offline-Modus – Ermöglicht Dateneingabe ohne Internetverbindung und synchronisiert sie später automatisch.
+	10.	DSGVO-konforme Nutzerrechte – Verwaltet individuelle Zugriffsrechte für Pflegekräfte, Verwaltung und Abrechnung.
+	11.	Mobile-optimierte Oberfläche – Lässt sich intuitiv auf Tablets und Smartphones nutzen, mit wenigen Klicks pro Aktion.
+	12.	Automatische KI-Dokumentation – Prüft Pflegeberichte auf Lücken und schlägt Ergänzungen vor.
+	13.	Bewertungs- und Empfehlungsmanagement – Erfasst Feedback von Patienten und optimiert die Servicequalität.
+	14.	Zentrale Wunschverwaltung – Pflegekräfte erfassen Wünsche direkt in der App, die an die Verwaltung weitergeleitet werden.
+	15.	Echtzeit-Synchronisierung – Aktualisiert Änderungen sofort für alle Nutzer, um Fehler oder doppelte Einträge zu vermeiden.
+	16.	Automatische Mahnungen & Zahlungserinnerungen – Schickt Benachrichtigungen bei ausstehenden Rechnungen an Patienten oder Angehörige.
+	17.	Dynamische Formulare & Vorlagen – Erlaubt Pflegekräften, Berichte mit vordefinierten Feldern schneller auszufüllen.
+	18.	Schnittstellen zu Krankenkassen & ePA – Integriert sich mit Telematiksystemen für eine nahtlose Abrechnung und Dokumentation.
+	19.	GPS-gestützte Arbeitszeiterfassung – Erfasst automatisch die Besuchszeit bei Patienten für eine exakte Abrechnung.
+	20.	Schichtplanung mit KI-Optimierung – Verteilt Mitarbeiter basierend auf Verfügbarkeit, Qualifikation und Patientenzuordnung.
+
+Diese Liste enthält alle Kernfunktionen von SmartCare in präziser und klarer Form. Lass mich wissen, wenn du weitere Details benötigst! 🚀
