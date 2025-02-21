@@ -87,14 +87,13 @@ function DocumentationPage() {
   };
 
   const createDocMutation = useMutation({
-    mutationFn: async (data: { content: string; patientId: number; type?: string }) => {
+    mutationFn: async (data: { content: string; patientId: number; type?: string; status: string }) => {
       const res = await apiRequest("POST", "/api/docs", {
         ...data,
         date: new Date().toISOString(),
         type: data.type || "Sprachaufnahme",
         aiGenerated: true,
         verified: false,
-        status: DocumentationStatus.PENDING,
         caregiverId: user?.id,
       });
       return res.json();
@@ -109,38 +108,37 @@ function DocumentationPage() {
     },
   });
 
-  const handleTranscriptionComplete = (text: string) => {
+  const handleTranscriptionComplete = (text: string, sendToReview: boolean) => {
     if (!activePatientId) return;
 
     createDocMutation.mutate({
       content: text,
       patientId: activePatientId,
       type: "KI-Dokumentation",
+      status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.COMPLETED,
     });
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+    <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
       <Sidebar />
       <div className="flex-1">
         <Header />
-        <main className="p-4 md:p-8 max-w-[1920px] mx-auto">
+        <main className="p-6 max-w-[1920px] mx-auto">
           <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+            <h1 className="text-2xl font-semibold tracking-tight mb-2">
               Dokumentation
             </h1>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-sm text-muted-foreground">
               Verwalten Sie hier alle Patientendokumentationen
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Column 
               title="Offen" 
-              icon={<Clock className="h-5 w-5" />}
+              icon={<Clock className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
-              gradient="from-blue-500/20 to-blue-600/20"
-              iconColor="text-blue-600"
             >
               {activePatientId ? (
                 <div className="space-y-4">
@@ -150,7 +148,7 @@ function DocumentationPage() {
                   />
                   <Button
                     variant="outline"
-                    className="w-full"
+                    className="w-full text-sm"
                     onClick={() => setActivePatientId(null)}
                   >
                     Abbrechen
@@ -165,11 +163,10 @@ function DocumentationPage() {
                       patient={patients.find(p => p.id === doc.patientId)!}
                       onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
                       showMoveForward
-                      className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/50 dark:to-gray-900"
                     />
                   ))}
-                  <div className="pt-4 border-t border-blue-100 dark:border-blue-900">
-                    <h3 className="text-sm font-medium mb-3">Neue Dokumentation</h3>
+                  <div className="pt-4 border-t border-border/40">
+                    <h3 className="text-xs font-medium mb-3 text-muted-foreground">Neue Dokumentation</h3>
                     {patients.map((patient) => (
                       <NewDocumentationCard
                         key={patient.id}
@@ -184,10 +181,8 @@ function DocumentationPage() {
 
             <Column 
               title="In Überprüfung" 
-              icon={<RefreshCw className="h-5 w-5" />}
+              icon={<RefreshCw className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
-              gradient="from-amber-500/20 to-amber-600/20"
-              iconColor="text-amber-600"
             >
               {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
                 <DocumentCard
@@ -198,17 +193,14 @@ function DocumentationPage() {
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveForward
                   showMoveBackward
-                  className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/50 dark:to-gray-900"
                 />
               ))}
             </Column>
 
             <Column 
               title="Abgeschlossen" 
-              icon={<Check className="h-5 w-5" />}
+              icon={<Check className="h-4 w-4" />}
               count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
-              gradient="from-green-500/20 to-green-600/20"
-              iconColor="text-green-600"
             >
               {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
                 <DocumentCard
@@ -217,7 +209,6 @@ function DocumentationPage() {
                   patient={patients.find(p => p.id === doc.patientId)!}
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveBackward
-                  className="bg-gradient-to-br from-green-50 to-white dark:from-green-950/50 dark:to-gray-900"
                 />
               ))}
             </Column>
@@ -233,26 +224,26 @@ interface ColumnProps {
   icon: React.ReactNode;
   count: number;
   children: React.ReactNode;
-  gradient: string;
-  iconColor: string;
 }
 
-function Column({ title, icon, count, children, gradient, iconColor }: ColumnProps) {
+function Column({ title, icon, count, children }: ColumnProps) {
   return (
-    <div className={`rounded-xl bg-gradient-to-br ${gradient} backdrop-blur-xl shadow-lg p-4 transition-all duration-200`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className={`p-2 rounded-full bg-white/80 dark:bg-gray-900/80 ${iconColor}`}>
-            {icon}
+    <div className="rounded-lg border bg-card shadow-sm">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="text-muted-foreground">
+              {icon}
+            </div>
+            <h2 className="text-sm font-medium">{title}</h2>
           </div>
-          <h2 className="text-lg font-semibold">{title}</h2>
-        </div>
-        <div className="px-3 py-1 text-sm font-medium rounded-full bg-white/80 dark:bg-gray-900/80 text-primary">
-          {count}
+          <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+            {count}
+          </span>
         </div>
       </div>
-      <ScrollArea className="h-[calc(100vh-280px)]">
-        <div className="space-y-4 pr-4">{children}</div>
+      <ScrollArea className="h-[calc(100vh-240px)]">
+        <div className="p-3 space-y-3">{children}</div>
       </ScrollArea>
     </div>
   );
@@ -265,7 +256,6 @@ interface DocumentCardProps {
   onMoveBackward?: () => void;
   showMoveForward?: boolean;
   showMoveBackward?: boolean;
-  className?: string;
 }
 
 function DocumentCard({ 
@@ -275,69 +265,59 @@ function DocumentCard({
   onMoveBackward,
   showMoveForward,
   showMoveBackward,
-  className
 }: DocumentCardProps) {
   if (!patient) return null;
 
   return (
-    <Card className={`group relative hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${className}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium">{patient.name}</h3>
+    <Card className="group relative hover:shadow-sm transition-all duration-200">
+      <CardContent className="p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">{patient.name}</h3>
           {doc.status === DocumentationStatus.COMPLETED ? (
-            <Check className="h-4 w-4 text-green-600" />
+            <Check className="h-3 w-3 text-green-500" />
           ) : doc.status === DocumentationStatus.REVIEW ? (
-            <RefreshCw className="h-4 w-4 text-amber-600" />
+            <RefreshCw className="h-3 w-3 text-amber-500" />
           ) : (
-            <Clock className="h-4 w-4 text-blue-600" />
+            <Clock className="h-3 w-3 text-blue-500" />
           )}
         </div>
 
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">
-              {doc.status === DocumentationStatus.COMPLETED
-                ? "Abgeschlossen am"
-                : "Erstellt am"}
-            </span>
-            <span className="font-medium">
-              {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
-            </span>
+        <p className="text-xs text-muted-foreground">
+          {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
+        </p>
+
+        <p className="text-xs line-clamp-2">{doc.content}</p>
+
+        {doc.reviewNotes && (
+          <div className="text-xs p-2 rounded bg-muted/40">
+            <p className="text-muted-foreground mb-1">Anmerkungen:</p>
+            <p>{doc.reviewNotes}</p>
           </div>
+        )}
 
-          <p className="text-sm line-clamp-3">{doc.content}</p>
-
-          {doc.reviewNotes && (
-            <div className="mt-2 p-2 rounded-lg bg-muted/50 border">
-              <p className="text-xs text-muted-foreground">Anmerkungen:</p>
-              <p className="text-sm">{doc.reviewNotes}</p>
-            </div>
+        <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+          {showMoveBackward && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={onMoveBackward}
+            >
+              <ArrowLeft className="w-3 h-3 mr-1" />
+              Zurück
+            </Button>
           )}
-
-          <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-all duration-200">
-            {showMoveBackward && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="flex-1 hover:bg-muted"
-                onClick={onMoveBackward}
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Zurück
-              </Button>
-            )}
-            {showMoveForward && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="flex-1 hover:bg-muted"
-                onClick={onMoveForward}
-              >
-                Weiter
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-          </div>
+          {showMoveForward && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-7 text-xs flex-1"
+              onClick={onMoveForward}
+            >
+              Weiter
+              <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -346,18 +326,15 @@ function DocumentCard({
 
 function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient; onStartRecording: () => void }) {
   return (
-    <Card className="group relative hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-      <CardContent className="p-4">
-        <Button
-          variant="outline"
-          className="w-full bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/20"
-          onClick={onStartRecording}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Neue Dokumentation für {patient.name}
-        </Button>
-      </CardContent>
-    </Card>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="w-full justify-start text-xs h-8 mb-1"
+      onClick={onStartRecording}
+    >
+      <Plus className="mr-1.5 h-3 w-3" />
+      {patient.name}
+    </Button>
   );
 }
 
