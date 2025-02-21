@@ -28,7 +28,6 @@ class WebSocketManager {
         this.instance.onclose = () => {
           console.log('WebSocket disconnected');
           this.instance = null;
-          // Attempt to reconnect after 2 seconds
           setTimeout(() => this.getInstance(), 2000);
         };
 
@@ -68,6 +67,9 @@ class WebSocketManager {
     };
   }
 }
+
+// Initialize WebSocket connection
+WebSocketManager.getInstance();
 
 export const sendMessage = WebSocketManager.sendMessage.bind(WebSocketManager);
 export const subscribe = WebSocketManager.subscribe.bind(WebSocketManager);

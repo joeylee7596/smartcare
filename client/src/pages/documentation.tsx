@@ -26,7 +26,220 @@ import {
 } from "@dnd-kit/core";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { sendMessage } from "@/lib/websocket";
+
+function DocumentationPage() {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { sendMessage, subscribe } = useWebSocket();
+  const [activePatientId, setActivePatientId] = useState<number | null>(null);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor),
+    useSensor(TouchSensor)
+  );
+
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients"],
+  });
+
+  const { data: allDocs = [] } = useQuery<Doc[]>({
+    queryKey: ["/api/docs"],
+  });
+
+  const docsByStatus = allDocs.reduce((acc, doc) => {
+    if (!acc[doc.status]) {
+      acc[doc.status] = [];
+    }
+    acc[doc.status].push(doc);
+    return acc;
+  }, {} as Record<string, Doc[]>);
+
+  const updateDocStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/docs/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      toast({
+        title: "Status aktualisiert",
+        description: "Die Dokumentation wurde erfolgreich aktualisiert.",
+      });
+    },
+  });
+
+  // WebSocket subscription for real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe((message) => {
+      if (message.type === 'DOC_STATUS_UPDATED') {
+        queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+        toast({
+          title: "Dokumentation aktualisiert",
+          description: "Der Status einer Dokumentation wurde geändert.",
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [subscribe, toast]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggedItem(event.active.id as number);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const newStatus = over.id as string;
+      const docId = active.id as number;
+
+      updateDocStatusMutation.mutate({
+        id: docId,
+        status: newStatus,
+      });
+
+      sendMessage({
+        type: 'DOC_STATUS_UPDATE',
+        docId,
+        status: newStatus
+      });
+    }
+
+    setDraggedItem(null);
+  };
+
+  const createDocMutation = useMutation({
+    mutationFn: async (data: { content: string; patientId: number; type?: string }) => {
+      const res = await apiRequest("POST", "/api/docs", {
+        ...data,
+        date: new Date().toISOString(),
+        type: data.type || "Sprachaufnahme",
+        aiGenerated: true,
+        verified: false,
+        status: DocumentationStatus.PENDING,
+        caregiverId: user?.id,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      toast({
+        title: "Dokumentation erstellt",
+        description: "Die Dokumentation wurde erfolgreich gespeichert.",
+      });
+      setActivePatientId(null);
+    },
+  });
+
+  const handleTranscriptionComplete = (text: string) => {
+    if (!activePatientId) return;
+
+    createDocMutation.mutate({
+      content: text,
+      patientId: activePatientId,
+      type: "KI-Dokumentation",
+    });
+  };
+
+  const draggingDoc = draggedItem ? allDocs.find(doc => doc.id === draggedItem) : null;
+  const draggingPatient = draggingDoc ? patients.find(p => p.id === draggingDoc.patientId) : null;
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <div className="flex-1">
+        <Header />
+        <main className="p-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">
+              Dokumentation
+            </h1>
+            <p className="text-muted-foreground">
+              Verwalten Sie hier alle Patientendokumentationen
+            </p>
+          </div>
+
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Pending Column */}
+              <StatusColumn
+                title="Offen"
+                count={patients.length}
+                status={DocumentationStatus.PENDING}
+              >
+                {activePatientId ? (
+                  <div className="space-y-4">
+                    <VoiceRecorder
+                      onTranscriptionComplete={handleTranscriptionComplete}
+                      className="mb-4"
+                    />
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setActivePatientId(null)}
+                    >
+                      Abbrechen
+                    </Button>
+                  </div>
+                ) : (
+                  patients.map((patient) => (
+                    <NewDocumentationCard
+                      key={patient.id}
+                      patient={patient}
+                      onStartRecording={() => setActivePatientId(patient.id)}
+                    />
+                  ))
+                )}
+              </StatusColumn>
+
+              {/* Review Column */}
+              <StatusColumn
+                title="In Überprüfung"
+                count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
+                status={DocumentationStatus.REVIEW}
+              >
+                {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    patient={patients.find(p => p.id === doc.patientId)!}
+                  />
+                ))}
+              </StatusColumn>
+
+              {/* Completed Column */}
+              <StatusColumn
+                title="Abgeschlossen"
+                count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
+                status={DocumentationStatus.COMPLETED}
+              >
+                {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    patient={patients.find(p => p.id === doc.patientId)!}
+                  />
+                ))}
+              </StatusColumn>
+            </div>
+
+            <DragOverlay>
+              {draggedItem && draggingDoc && draggingPatient && (
+                <DocumentCard doc={draggingDoc} patient={draggingPatient} />
+              )}
+            </DragOverlay>
+          </DndContext>
+        </main>
+      </div>
+    </div>
+  );
+}
 
 function StatusColumn({
   title,
@@ -136,210 +349,4 @@ function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient;
   );
 }
 
-export default function Documentation() {
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const [activePatientId, setActivePatientId] = useState<number | null>(null);
-  const [draggedItem, setDraggedItem] = useState<number | null>(null);
-
-  const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor)
-  );
-
-  const { data: patients = [] } = useQuery<Patient[]>({
-    queryKey: ["/api/patients"],
-  });
-
-  const { data: allDocs = [] } = useQuery<Doc[]>({
-    queryKey: ["/api/docs"],
-  });
-
-  const docsByStatus = allDocs.reduce((acc, doc) => {
-    if (!acc[doc.status]) {
-      acc[doc.status] = [];
-    }
-    acc[doc.status].push(doc);
-    return acc;
-  }, {} as Record<string, Doc[]>);
-
-  const updateDocStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/docs/${id}`, { status });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-      toast({
-        title: "Status aktualisiert",
-        description: "Die Dokumentation wurde erfolgreich aktualisiert.",
-      });
-    },
-  });
-
-  useEffect(() => {
-    const { subscribe } = useWebSocket();
-    return subscribe((message) => {
-      if (message.type === 'DOC_STATUS_UPDATED') {
-        queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-        toast({
-          title: "Dokumentation aktualisiert",
-          description: "Der Status einer Dokumentation wurde geändert.",
-        });
-      }
-    });
-  }, [toast]);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setDraggedItem(event.active.id as number);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      const newStatus = over.id as string;
-      const docId = active.id as number;
-
-      updateDocStatusMutation.mutate({
-        id: docId,
-        status: newStatus,
-      });
-
-      sendMessage({
-        type: 'DOC_STATUS_UPDATE',
-        docId,
-        status: newStatus
-      });
-    }
-
-    setDraggedItem(null);
-  };
-
-  const createDocMutation = useMutation({
-    mutationFn: async (data: { content: string; patientId: number; type?: string }) => {
-      const res = await apiRequest("POST", "/api/docs", {
-        ...data,
-        date: new Date().toISOString(),
-        type: data.type || "Sprachaufnahme",
-        aiGenerated: true,
-        verified: false,
-        status: DocumentationStatus.PENDING,
-        caregiverId: user?.id,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-      toast({
-        title: "Dokumentation erstellt",
-        description: "Die Dokumentation wurde erfolgreich gespeichert.",
-      });
-      setActivePatientId(null);
-    },
-  });
-
-  const handleTranscriptionComplete = (text: string) => {
-    if (!activePatientId) return;
-
-    createDocMutation.mutate({
-      content: text,
-      patientId: activePatientId,
-      type: "KI-Dokumentation",
-    });
-  };
-
-  const draggingDoc = draggedItem ? allDocs.find(doc => doc.id === draggedItem) : null;
-  const draggingPatient = draggingDoc ? patients.find(p => p.id === draggingDoc.patientId) : null;
-
-  return (
-    <div className="flex min-h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1">
-        <Header />
-        <main className="p-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
-              Dokumentation
-            </h1>
-            <p className="text-muted-foreground">
-              Verwalten Sie hier alle Patientendokumentationen
-            </p>
-          </div>
-
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatusColumn
-                title="Offen"
-                count={patients.length}
-                status={DocumentationStatus.PENDING}
-              >
-                {activePatientId ? (
-                  <div className="space-y-4">
-                    <VoiceRecorder
-                      onTranscriptionComplete={handleTranscriptionComplete}
-                      className="mb-4"
-                    />
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setActivePatientId(null)}
-                    >
-                      Abbrechen
-                    </Button>
-                  </div>
-                ) : (
-                  patients.map((patient) => (
-                    <NewDocumentationCard
-                      key={patient.id}
-                      patient={patient}
-                      onStartRecording={() => setActivePatientId(patient.id)}
-                    />
-                  ))
-                )}
-              </StatusColumn>
-
-              <StatusColumn
-                title="In Überprüfung"
-                count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
-                status={DocumentationStatus.REVIEW}
-              >
-                {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
-                  <DocumentCard
-                    key={doc.id}
-                    doc={doc}
-                    patient={patients.find(p => p.id === doc.patientId)!}
-                  />
-                ))}
-              </StatusColumn>
-
-              <StatusColumn
-                title="Abgeschlossen"
-                count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
-                status={DocumentationStatus.COMPLETED}
-              >
-                {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
-                  <DocumentCard
-                    key={doc.id}
-                    doc={doc}
-                    patient={patients.find(p => p.id === doc.patientId)!}
-                  />
-                ))}
-              </StatusColumn>
-            </div>
-
-            <DragOverlay>
-              {draggedItem && draggingDoc && draggingPatient && (
-                <DocumentCard doc={draggingDoc} patient={draggingPatient} />
-              )}
-            </DragOverlay>
-          </DndContext>
-        </main>
-      </div>
-    </div>
-  );
-}
+export default DocumentationPage;
