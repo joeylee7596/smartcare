@@ -5,9 +5,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { Patient, Documentation as Doc } from "@shared/schema";
 
 export default function Documentation() {
-  const { data: patients = [] } = useQuery({
+  const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
 
@@ -21,7 +22,7 @@ export default function Documentation() {
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {patients.map((patient) => {
-              const { data: docs = [] } = useQuery({
+              const { data: docs = [] } = useQuery<Doc[]>({
                 queryKey: ["/api/patients", patient.id, "docs"],
               });
 

@@ -6,18 +6,21 @@ import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, type InsertUser } from "@shared/schema";
+import type { Pick } from "@tanstack/react-query";
 import { Redirect } from "wouter";
 import { LucideHospital } from "lucide-react";
+
+type LoginData = Pick<InsertUser, "username" | "password">;
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
 
-  const loginForm = useForm({
+  const loginForm = useForm<LoginData>({
     resolver: zodResolver(insertUserSchema.pick({ username: true, password: true })),
   });
 
-  const registerForm = useForm({
+  const registerForm = useForm<InsertUser>({
     resolver: zodResolver(insertUserSchema),
   });
 
@@ -44,7 +47,7 @@ export default function AuthPage() {
                 <TabsTrigger value="login">Anmelden</TabsTrigger>
                 <TabsTrigger value="register">Registrieren</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="login">
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4">

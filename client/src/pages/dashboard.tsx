@@ -4,13 +4,14 @@ import { OverviewCard } from "@/components/dashboard/overview-card";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Activity, Users, CalendarDays, ClipboardList } from "lucide-react";
+import { Patient, Tour } from "@shared/schema";
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { data: patients } = useQuery({
+  const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
-  const { data: tours } = useQuery({
+  const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
   });
 
@@ -32,12 +33,12 @@ export default function Dashboard() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <OverviewCard
               title="Aktive Patienten"
-              value={patients?.length || 0}
+              value={patients.length}
               icon={Users}
             />
             <OverviewCard
               title="Heutige Touren"
-              value={tours?.length || 0}
+              value={tours.length}
               icon={CalendarDays}
             />
             <OverviewCard

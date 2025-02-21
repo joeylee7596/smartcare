@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search } from "lucide-react";
 import { useState } from "react";
+import { Patient } from "@shared/schema";
 
 export default function Patients() {
   const [search, setSearch] = useState("");
-  const { data: patients = [] } = useQuery({
+  const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
 

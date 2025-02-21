@@ -6,10 +6,11 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
+import { Tour } from "@shared/schema";
 
 export default function Tours() {
   const [date, setDate] = useState<Date>(new Date());
-  const { data: tours = [] } = useQuery({
+  const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
   });
 
@@ -24,7 +25,7 @@ export default function Tours() {
         <Header />
         <main className="p-8">
           <h1 className="text-3xl font-bold mb-8">Tourenplanung</h1>
-          
+
           <div className="grid gap-8 md:grid-cols-[300px,1fr]">
             <Card>
               <CardContent className="p-4">
