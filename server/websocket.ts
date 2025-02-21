@@ -15,10 +15,12 @@ export function setupWebSocket(server: Server) {
         switch (data.type) {
           case 'VOICE_TRANSCRIPTION':
             try {
-              // Send back the transcribed text immediately
+              // Generate AI documentation from transcribed text
+              const documentation = await generateDocumentation(data.audioContent);
+
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
-                documentation: data.audioContent,
+                documentation,
                 originalText: data.audioContent
               }));
             } catch (error) {
