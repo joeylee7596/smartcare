@@ -168,8 +168,7 @@ export default function Tours() {
       let startTime = new Date(tourDate.setHours(8, 0, 0, 0));
       if (existingTours.length > 0) {
         const lastTour = existingTours[existingTours.length - 1];
-        const lastWaypoint = lastTour.optimizedRoute?.waypoints[lastTour.optimizedRoute.waypoints.length - 1];
-        if (lastWaypoint) {
+        if (lastTour.optimizedRoute) {
           startTime = new Date(lastTour.date);
           startTime = addMinutes(startTime, lastTour.optimizedRoute.estimatedDuration);
         }
@@ -230,26 +229,14 @@ export default function Tours() {
       const tour = tours.find(t => t.id === id);
       if (!tour) throw new Error('Tour not found');
 
-      // Get existing waypoints
-      const existingWaypoints = tour.optimizedRoute?.waypoints || [];
+      // Keep only waypoints for remaining patients
+      const remainingWaypoints = tour.optimizedRoute?.waypoints.filter(
+        wp => patientIds.includes(wp.patientId)
+      ) || [];
 
-      // Find new patients
-      const newPatientIds = patientIds.filter(
-        id => !existingWaypoints.find(wp => wp.patientId === id)
-      );
-
-      // Generate locations for new patients
-      const newWaypoints = newPatientIds.map(patientId => ({
-        patientId,
-        ...getRandomBerlinLocation(),
-      }));
-
-      // Combine all waypoints
-      const allWaypoints = [...existingWaypoints, ...newWaypoints];
-
-      // Calculate total duration
+      // Calculate total duration for remaining patients
       let totalDuration = 0;
-      allWaypoints.forEach((waypoint, index) => {
+      remainingWaypoints.forEach((waypoint, index) => {
         const patient = patients.find(p => p.id === waypoint.patientId);
         if (!patient) return;
 
@@ -257,8 +244,8 @@ export default function Tours() {
         totalDuration += getPatientCareTime(patient.careLevel);
 
         // Add travel time if there's a next waypoint
-        if (index < allWaypoints.length - 1) {
-          const nextWaypoint = allWaypoints[index + 1];
+        if (index < remainingWaypoints.length - 1) {
+          const nextWaypoint = remainingWaypoints[index + 1];
           totalDuration += calculateTravelTime(
             [waypoint.lat, waypoint.lng],
             [nextWaypoint.lat, nextWaypoint.lng]
@@ -267,12 +254,16 @@ export default function Tours() {
       });
 
       const optimizedRoute = {
-        waypoints: allWaypoints,
-        totalDistance: 0, // Could be calculated if needed
+        waypoints: remainingWaypoints,
+        totalDistance: 0,
         estimatedDuration: totalDuration
       };
 
-      const response = await apiRequest("PATCH", `/api/tours/${id}`, { patientIds, optimizedRoute });
+      const response = await apiRequest("PATCH", `/api/tours/${id}`, { 
+        patientIds, 
+        optimizedRoute 
+      });
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to update tour');
