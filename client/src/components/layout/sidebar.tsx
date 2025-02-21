@@ -43,12 +43,14 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#0B1120] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative",
+        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#1E2A4A] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative",
+        "before:absolute before:inset-0 before:bg-gradient-to-b before:from-blue-500/5 before:to-transparent before:rounded-r-[2rem]",
+        "after:absolute after:inset-0 after:bg-gradient-to-r after:from-black/20 after:via-transparent after:to-transparent",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
       {/* Header with gradient overlay */}
-      <div className="flex h-16 items-center px-4 bg-gradient-to-r from-[#0B1120]/80 to-transparent">
+      <div className="flex h-16 items-center px-4 bg-gradient-to-r from-[#1E2A4A]/90 to-transparent backdrop-blur-sm relative z-10">
         {!isCollapsed && (
           <h2 className="text-lg font-semibold text-white/90">
             SmartCare
@@ -81,7 +83,7 @@ export function Sidebar() {
                     <Link key={action.href} href={action.href}>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 group"
+                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5 group"
                       >
                         <Icon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                         {action.name}
@@ -109,7 +111,9 @@ export function Sidebar() {
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
                         "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href ? "bg-white/10 text-white" : "hover:bg-white/5",
+                        location === item.href 
+                          ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
+                          : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
@@ -140,7 +144,9 @@ export function Sidebar() {
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
                         "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href ? "bg-white/10 text-white" : "hover:bg-white/5",
+                        location === item.href 
+                          ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
+                          : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
