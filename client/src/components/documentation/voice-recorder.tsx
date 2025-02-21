@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useMediaRecorder } from "react-media-recorder";
+import { useReactMediaRecorder } from "react-media-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Mic, StopCircle, Loader2, Brain } from "lucide-react";
+import { Mic, StopCircle, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoiceRecorderProps {
@@ -14,15 +14,15 @@ interface VoiceRecorderProps {
 export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecorderProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
-  
+
   const {
     status,
     startRecording,
     stopRecording,
     mediaBlobUrl,
-  } = useMediaRecorder({
+  } = useReactMediaRecorder({
     audio: true,
-    onStop: async (blobUrl) => {
+    onStop: async (blobUrl: string) => {
       await processRecording(blobUrl);
     },
   });
@@ -31,9 +31,8 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
     try {
       setIsTranscribing(true);
       setTranscriptionProgress(0);
-      
+
       // Simulate AI processing with progress updates
-      // This would be replaced with actual API calls
       const interval = setInterval(() => {
         setTranscriptionProgress(prev => {
           if (prev >= 100) {
@@ -46,7 +45,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
       // Simulate AI processing time
       await new Promise(resolve => setTimeout(resolve, 3000));
-      
+
       // Example transcribed text with smart formatting
       const transcribedText = `Patientenbesuch durchgeführt:
 - Vitalzeichen: Normal

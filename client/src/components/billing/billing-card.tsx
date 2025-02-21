@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { FileText, Send, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Send, CheckCircle, AlertCircle, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BillingCardProps {
@@ -18,14 +18,16 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
     submitted: "text-blue-600 bg-blue-50",
     approved: "text-green-600 bg-green-50",
     rejected: "text-red-600 bg-red-50",
-  };
+  } as const;
 
-  const StatusIcon = {
+  const statusIcons: Record<string, LucideIcon> = {
     pending: AlertCircle,
     submitted: Send,
     approved: CheckCircle,
     rejected: AlertCircle,
-  }[billing.status];
+  };
+
+  const StatusIcon = statusIcons[billing.status] || AlertCircle;
 
   return (
     <Card>
@@ -66,7 +68,7 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Betrag</span>
-            <span className="font-medium">{billing.totalAmount.toFixed(2)} €</span>
+            <span className="font-medium">{Number(billing.totalAmount).toFixed(2)} €</span>
           </div>
         </div>
 

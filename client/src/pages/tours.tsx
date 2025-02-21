@@ -10,6 +10,7 @@ import { useState } from "react";
 import { Tour, WorkflowTemplate } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { MapPin, RotateCw, Clock, Users, Route, Brain, Sparkles } from "lucide-react";
+import { AddTourDialog } from "@/components/tours/add-tour-dialog";
 
 export default function Tours() {
   const [date, setDate] = useState<Date>(new Date());
@@ -81,10 +82,7 @@ export default function Tours() {
                 <Brain className="mr-2 h-4 w-4" />
                 KI-Optimierung
               </Button>
-              <Button>
-                <Route className="mr-2 h-4 w-4" />
-                Tour erstellen
-              </Button>
+              <AddTourDialog />
             </div>
           </div>
 

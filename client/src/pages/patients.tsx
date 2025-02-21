@@ -1,6 +1,7 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PatientTable } from "@/components/patients/patient-table";
+import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
@@ -9,9 +10,14 @@ import { useState } from "react";
 import { Patient } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Link, useLocation } from "wouter";
 
 export default function Patients() {
   const [search, setSearch] = useState("");
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
@@ -20,31 +26,40 @@ export default function Patients() {
     patient.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Quick action cards with smart features
+  // Quick action cards with smart features and navigation
   const quickActions = [
     {
       title: "Vitalzeichen",
       icon: Activity,
       description: "Automatische Überwachung",
       color: "bg-blue-50 text-blue-600",
+      onClick: () => {
+        toast({
+          title: "KI-Analyse",
+          description: "Starte Vitalzeichen-Monitoring...",
+        });
+      },
     },
     {
       title: "Medikamente",
       icon: Pill,
       description: "Smart Medikationsplan",
       color: "bg-green-50 text-green-600",
+      onClick: () => navigate("/medication"),
     },
     {
       title: "Termine",
       icon: Calendar,
       description: "KI-optimierte Planung",
       color: "bg-purple-50 text-purple-600",
+      onClick: () => navigate("/tours/new"),
     },
     {
       title: "Berichte",
       icon: FileText,
       description: "Automatische Dokumentation",
       color: "bg-orange-50 text-orange-600",
+      onClick: () => navigate("/documentation"),
     },
   ];
 
@@ -61,15 +76,14 @@ export default function Patients() {
                 {patients.length} Patienten in Betreuung
               </p>
             </div>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Patient hinzufügen
-            </Button>
+            <AddPatientDialog />
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
             {quickActions.map((action) => (
-              <Card key={action.title} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={action.title} 
+                onClick={action.onClick}
+                className="cursor-pointer hover:shadow-md transition-shadow">
                 <CardContent className={cn("p-6", action.color)}>
                   <action.icon className="h-8 w-8 mb-4" />
                   <h3 className="font-semibold mb-1">{action.title}</h3>
