@@ -43,13 +43,13 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "border-r bg-sidebar transition-all duration-300 flex flex-col",
+        "transition-all duration-300 flex flex-col bg-gradient-to-b from-blue-900 via-blue-800 to-blue-700",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-16 items-center border-b px-4">
+      <div className="flex h-16 items-center px-4 border-b border-white/10">
         {!isCollapsed && (
-          <h2 className="text-lg font-semibold text-sidebar-foreground">
+          <h2 className="text-lg font-semibold text-white/90">
             SmartCare
           </h2>
         )}
@@ -57,7 +57,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           className={cn(
-            "ml-auto",
+            "ml-auto text-white/80 hover:text-white hover:bg-white/10",
             isCollapsed && "rotate-180"
           )}
           onClick={() => setIsCollapsed(!isCollapsed)}
@@ -70,7 +70,7 @@ export function Sidebar() {
         <div className="space-y-6 p-2">
           {!isCollapsed && (
             <div className="px-2 py-2">
-              <h3 className="text-xs uppercase text-muted-foreground tracking-wider">
+              <h3 className="text-xs uppercase text-white/60 tracking-wider">
                 Schnellzugriff
               </h3>
               <div className="mt-2 space-y-1">
@@ -80,9 +80,9 @@ export function Sidebar() {
                     <Link key={action.href} href={action.href}>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start text-muted-foreground hover:text-primary"
+                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300 group"
                       >
-                        <Icon className="h-4 w-4 mr-2" />
+                        <Icon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                         {action.name}
                       </Button>
                     </Link>
@@ -95,7 +95,7 @@ export function Sidebar() {
           <div className="px-2 py-2">
             <h3 className={cn(
               "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-muted-foreground tracking-wider"
+              isCollapsed ? "sr-only" : "text-xs uppercase text-white/60 tracking-wider"
             )}>
               Navigation
             </h3>
@@ -107,7 +107,8 @@ export function Sidebar() {
                     <Button
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
-                        "w-full justify-start",
+                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
+                        location === item.href && "bg-white/10 text-white shadow-lg",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
@@ -125,7 +126,7 @@ export function Sidebar() {
           <div className="px-2 py-2">
             <h3 className={cn(
               "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-muted-foreground tracking-wider"
+              isCollapsed ? "sr-only" : "text-xs uppercase text-white/60 tracking-wider"
             )}>
               System
             </h3>
@@ -137,7 +138,8 @@ export function Sidebar() {
                     <Button
                       variant={location === item.href ? "sidebar" : "ghost"}
                       className={cn(
-                        "w-full justify-start",
+                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
+                        location === item.href && "bg-white/10 text-white shadow-lg",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
