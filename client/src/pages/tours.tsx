@@ -11,7 +11,7 @@ import { MapPin, RotateCw, Clock, Users, Route, Brain, Filter, Search } from "lu
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import "leaflet/dist/leaflet.css";
 import { Icon } from 'leaflet';
 import { CSS } from "@dnd-kit/utilities";
+import React from 'react';
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -74,6 +75,40 @@ function SortablePatientItem({ patient }: SortablePatientItemProps) {
         </div>
         <MapPin className="h-4 w-4 text-muted-foreground" />
       </div>
+    </div>
+  );
+}
+
+interface DroppableTourProps {
+  tour: Tour;
+  children: React.ReactNode;
+}
+
+function DroppableTour({ tour, children }: DroppableTourProps) {
+  const { setNodeRef } = useDroppable({
+    id: tour.id.toString(),
+  });
+
+  return (
+    <div ref={setNodeRef} className="mb-4">
+      {children}
+    </div>
+  );
+}
+
+function NewTourDropZone() {
+  const { setNodeRef } = useDroppable({
+    id: "new-tour",
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="mt-4 p-4 rounded-lg border-2 border-dashed border-border/40 bg-muted/20 text-center transition-colors duration-200 hover:bg-muted/30"
+    >
+      <p className="text-sm text-muted-foreground">
+        Patient hier ablegen für neue Tour
+      </p>
     </div>
   );
 }
@@ -146,9 +181,8 @@ export default function Tours() {
     if (!over) return;
 
     const draggedPatientId = active.id as number;
-    const tourId = parseInt(over.id.toString());
 
-    if (isNaN(tourId)) {
+    if (over.id === "new-tour") {
       // Create new tour
       const newTour: InsertTour = {
         date: new Date().toISOString(),
@@ -160,6 +194,7 @@ export default function Tours() {
       createTourMutation.mutate(newTour);
     } else {
       // Update existing tour
+      const tourId = parseInt(over.id.toString());
       const tour = tours.find(t => t.id === tourId);
       if (!tour) return;
 
@@ -289,44 +324,34 @@ export default function Tours() {
                 <CardContent>
                   <ScrollArea className="h-[calc(100vh-350px)]">
                     {todaysTours.map((tour) => (
-                      <div
-                        key={tour.id}
-                        className="mb-4 p-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
-                        data-tour-id={tour.id}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {format(new Date(tour.date), "HH:mm")}
+                      <DroppableTour key={tour.id} tour={tour}>
+                        <div className="p-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {format(new Date(tour.date), "HH:mm")}
+                              </span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {tour.optimizedRoute?.estimatedDuration} min
                             </span>
                           </div>
-                          <span className="text-sm text-muted-foreground">
-                            {tour.optimizedRoute?.estimatedDuration} min
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {tour.optimizedRoute?.waypoints.map((waypoint, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm">
-                              <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
-                                {index + 1}
+                          <div className="space-y-2">
+                            {tour.optimizedRoute?.waypoints.map((waypoint, index) => (
+                              <div key={index} className="flex items-center gap-2 text-sm">
+                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                                  {index + 1}
+                                </div>
+                                <span>Patient #{waypoint.patientId}</span>
                               </div>
-                              <span>Patient #{waypoint.patientId}</span>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      </DroppableTour>
                     ))}
 
-                    {/* Drop Zone for new tour */}
-                    <div
-                      className="mt-4 p-4 rounded-lg border-2 border-dashed border-border/40 bg-muted/20 text-center"
-                      data-tour-id="new"
-                    >
-                      <p className="text-sm text-muted-foreground">
-                        Patient hier ablegen für neue Tour
-                      </p>
-                    </div>
+                    <NewTourDropZone />
                   </ScrollArea>
                 </CardContent>
               </Card>
