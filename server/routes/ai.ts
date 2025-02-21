@@ -20,7 +20,7 @@ const carePredictionSchema = z.object({
     careLevel: z.number(),
     medications: z.array(z.string()).optional(),
     lastVisit: z.string().nullable(),
-    notes: z.string().optional(),
+    notes: z.string().nullable().optional(),
     emergencyContact: z.string(),
     insuranceProvider: z.string(),
   }),
@@ -96,7 +96,7 @@ Bitte erstelle eine strukturierte Analyse mit folgenden Punkten:
 1. Kurzfristige Prognose (3-6 Monate)
    - Erwartete Entwicklung des Pflegebedarfs
    - Potenzielle Änderungen im Pflegegrad
-   - Empfohlene präventive 2. Maßnahmen
+   - Empfohlene präventive Maßnahmen
 
 2. Mittelfristige Prognose (6-12 Monate)
    - Voraussichtliche Entwicklungen

@@ -1,0 +1,60 @@
+Die Tourenplanung in SmartCare ist darauf ausgelegt, den Prozess der Einsatzplanung für kleine ambulante Pflegedienste radikal zu vereinfachen. Anstatt umständliche Tabellen oder manuelle Eintragungen zu nutzen, ermöglicht das System eine automatisierte, KI-gestützte und intuitive Verwaltung der täglichen Touren mit minimalem Aufwand für die Disponenten.
+
+Funktionale Beschreibung der Tourplanung
+
+1. Tagesplanung auf einen Blick
+
+Beim Aufruf der Tourplanung sieht der Administrator direkt eine Übersicht des aktuellen Tages oder kann über eine einfache Datumsauswahl auf zukünftige Tage wechseln. Hier werden alle Pflegekräfte mit ihren bereits eingeplanten Besuchen in einer strukturierten Listenansicht oder als Timeline dargestellt. Jeder Eintrag enthält die wichtigsten Informationen:
+	•	Patientenname
+	•	Geplante Besuchszeit
+	•	Dauer des Besuchs
+	•	Pflegekraft
+	•	Besuchsstatus (Geplant, In Bearbeitung, Erledigt, Abgesagt)
+	•	Hinweise oder besondere Anforderungen (z. B. Medikamentengabe, Mobilitätseinschränkungen)
+
+2. Intelligente KI-gestützte Tourenerstellung
+
+Anstatt manuell Pflegekräfte und Zeitfenster zuzuweisen, analysiert die KI automatisch die bestehenden Touren und schlägt basierend auf folgenden Parametern die optimale Route vor:
+	•	Verfügbarkeiten der Pflegekräfte
+	•	Tagesarbeitszeiten und Pausenregelungen
+	•	Zeitliche Einschränkungen der Patienten (z. B. bestimmte Pflegezeiten)
+	•	Entfernung und Fahrzeit (simuliert, da keine echten Standortdaten genutzt werden)
+	•	Notfälle oder priorisierte Besuche
+
+Durch einen einzigen Klick auf „Tour optimieren“ werden alle Besuche automatisch den richtigen Pflegekräften zugewiesen, wobei Konflikte (z. B. Überlastung einer Pflegekraft) erkannt und alternative Lösungen vorgeschlagen werden.
+
+3. Manuelle Anpassung per Drag & Drop
+
+Falls der Admin Änderungen vornehmen möchte, kann er Patienten direkt per Drag & Drop einer anderen Pflegekraft zuweisen oder die Reihenfolge der Besuche anpassen. Das System berechnet automatisch die neuen Zeitfenster und zeigt visuelle Warnungen an, falls eine Tour zu eng getaktet oder eine Pflegekraft überlastet ist.
+
+4. Live-Zusammenfassung & Plausibilitätsprüfung
+
+Sobald die Tour fertig geplant ist, erstellt das System eine Vorschau mit allen relevanten Informationen:
+	•	Gesamtarbeitszeit pro Pflegekraft
+	•	Anzahl der zu versorgenden Patienten pro Schicht
+	•	Berechnete Pausen und Wartezeiten
+	•	Konfliktmeldungen (z. B. Überschneidungen oder zu kurze Zeiten zwischen Besuchen)
+
+Falls alle Werte stimmig sind, kann der Admin die Planung mit „Plan speichern“ bestätigen.
+
+5. Automatische Kommunikation & Synchronisation
+
+Nach der Speicherung werden die finalen Touren:
+	•	Direkt in die mobile App der Pflegekräfte übertragen
+	•	Über eine Push-Benachrichtigung an alle Mitarbeiter kommuniziert
+	•	In der Schichtplanung sichtbar gemacht
+	•	Falls aktiviert, per automatisierter Nachricht an Patienten oder Angehörige verschickt
+
+Falls kurzfristige Änderungen eintreten (z. B. ein Patient sagt ab oder eine Pflegekraft fällt aus), erkennt das System dies automatisch und schlägt eine neue Verteilung der Tour vor.
+
+6. Echtzeit-Monitoring & Status-Updates
+
+Der Admin kann jederzeit verfolgen, ob alle Touren planmäßig verlaufen. Pflegekräfte können ihre Ankunfts- und Abschlusszeiten mit einem Klick bestätigen, und falls eine Verzögerung auftritt, wird dies in der Tourenplanung live aktualisiert.
+
+7. Automatische Abrechnungsvorbereitung
+
+Sobald alle Besuche durchgeführt wurden, erstellt das System automatisch eine Übersicht der durchgeführten Leistungen, die zur Abrechnung genutzt werden kann. Falls ein Pflegekraft vergisst, eine Leistung zu bestätigen, erinnert das System automatisch daran.
+
+Optimierter Prompt für die KI
+
+“Erstelle eine vollständige Tourenplanungsfunktion für ein SaaS-Tool für kleine Pflegedienste. Das System soll dem Administrator eine schnelle und intuitive Planung von täglichen Pflegeeinsätzen ermöglichen. Beim Aufruf der Tourplanung sieht der Nutzer eine Übersicht aller Pflegekräfte mit ihren geplanten Besuchen als Listen- oder Timeline-Darstellung. Die KI analysiert automatisch Verfügbarkeiten, Arbeitszeiten, Patientenanforderungen und simulierte Fahrzeiten, um optimale Touren vorzuschlagen. Der Nutzer kann mit einem Klick eine automatische Optimierung ausführen oder manuell per Drag & Drop Anpassungen vornehmen. Alle Änderungen werden live berechnet, und Konflikte wie Überlastung oder enge Zeitfenster werden sofort durch visuelle Warnungen angezeigt. Nach Bestätigung der Planung werden alle Tourdaten synchronisiert, sodass Pflegekräfte die geplanten Einsätze direkt auf ihrem mobilen Gerät sehen. Das System bietet Live-Updates, zeigt Statusmeldungen zu laufenden Touren und erinnert Pflegekräfte an ausstehende Bestätigungen. Nach Abschluss der Touren werden alle Leistungen automatisch für die Abrechnung vorbereitet. Stelle sicher, dass das Interface minimalistisch, klar strukturiert und für nicht technikaffine Nutzer optimiert ist.”
