@@ -423,6 +423,11 @@ export default function Tours() {
     return tourDate >= startOfDay(selectedDate) && tourDate <= endOfDay(selectedDate);
   });
 
+  // Filter tours by selected employee
+  const employeeTours = selectedEmployee
+    ? dateFilteredTours.filter(tour => tour.employeeId === selectedEmployee)
+    : dateFilteredTours;
+
   const patientsInTours = dateFilteredTours.flatMap(tour => tour.patientIds);
 
   const filteredPatients = patients.filter(patient => {
@@ -436,6 +441,14 @@ export default function Tours() {
   });
 
   const handleAddToTour = async (patientId: number) => {
+    if (!selectedEmployee) {
+      toast({
+        title: "Kein Mitarbeiter ausgewählt",
+        description: "Bitte wählen Sie zuerst einen Mitarbeiter aus.",
+        variant: "destructive",
+      });
+      return;
+    }
     createTourMutation.mutate(patientId);
   };
 
@@ -660,14 +673,18 @@ export default function Tours() {
             <Card className="shadow-lg">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">Zeitplan</CardTitle>
+                  <CardTitle className="text-base">
+                    {selectedEmployee 
+                      ? `Zeitplan: ${employees.find(e => e.id === selectedEmployee)?.name}`
+                      : "Zeitplan: Alle Mitarbeiter"}
+                  </CardTitle>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="text-destructive hover:text-destructive"
                     onClick={() => {
-                      // Get all tour IDs for the selected date
-                      const tourIds = dateFilteredTours.map(tour => tour.id);
+                      // Get tour IDs for the selected employee and date
+                      const tourIds = employeeTours.map(tour => tour.id);
 
                       // Delete each tour
                       tourIds.forEach(id => {
@@ -682,7 +699,7 @@ export default function Tours() {
                         description: "Alle Touren für diesen Tag wurden entfernt.",
                       });
                     }}
-                    disabled={dateFilteredTours.length === 0}
+                    disabled={employeeTours.length === 0}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -690,14 +707,18 @@ export default function Tours() {
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[calc(100vh-350px)]">
-                  {dateFilteredTours.length === 0 ? (
+                  {employeeTours.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Clock className="mx-auto h-12 w-12 mb-3 opacity-50" />
-                      <p>Keine Touren für diesen Tag geplant</p>
-                      <p className="text-sm">Fügen Sie Patienten hinzu, um eine neue Tour zu erstellen</p>
+                      <p>Keine Touren für {selectedEmployee ? "diesen Mitarbeiter" : "diesen Tag"} geplant</p>
+                      <p className="text-sm">
+                        {selectedEmployee 
+                          ? "Fügen Sie Patienten hinzu, um eine neue Tour zu erstellen"
+                          : "Wählen Sie einen Mitarbeiter aus und fügen Sie Patienten hinzu"}
+                      </p>
                     </div>
                   ) : (
-                    dateFilteredTours.map((tour) => (
+                    employeeTours.map((tour) => (
                       <div
                         key={tour.id}
                         className="p-4 mb-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
