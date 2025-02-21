@@ -43,7 +43,9 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col h-screen bg-[#1E2A4A] relative",
+        "flex flex-col min-h-screen bg-[#1E2A4A] relative",
+        "shadow-[8px_0_30px_-12px_rgba(0,0,0,0.45)]",
+        "transition-all duration-500 ease-in-out",
         isCollapsed ? "w-20" : "w-64"
       )}
     >
@@ -61,7 +63,7 @@ export function Sidebar() {
         {/* Header */}
         <div className="flex h-16 items-center px-4">
           {!isCollapsed && (
-            <h2 className="text-lg font-semibold text-white/90">
+            <h2 className="text-lg font-semibold text-white/90 transition-opacity duration-500">
               SmartCare
             </h2>
           )}
@@ -69,7 +71,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             className={cn(
-              "ml-auto text-white/70 hover:text-white hover:bg-white/5",
+              "ml-auto text-white/70 hover:text-white hover:bg-white/5 transition-all duration-500",
               isCollapsed && "rotate-180"
             )}
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -81,7 +83,7 @@ export function Sidebar() {
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-6 py-3">
             {!isCollapsed && (
-              <div className="px-2">
+              <div className="px-2 transition-opacity duration-500">
                 <h3 className="mb-2 text-xs uppercase text-white/50 tracking-wider font-medium">
                   Schnellzugriff
                 </h3>
@@ -107,7 +109,7 @@ export function Sidebar() {
 
             <div className="px-2">
               <h3 className={cn(
-                "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium",
+                "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium transition-opacity duration-500",
                 isCollapsed && "sr-only"
               )}>
                 Navigation
@@ -133,7 +135,7 @@ export function Sidebar() {
                           !isCollapsed && "mr-2",
                           "transition-transform duration-300 group-hover:scale-110"
                         )} />
-                        {!isCollapsed && <span>{item.name}</span>}
+                        {!isCollapsed && <span className="transition-opacity duration-500">{item.name}</span>}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
                     </Link>
@@ -144,7 +146,7 @@ export function Sidebar() {
 
             <div className="px-2">
               <h3 className={cn(
-                "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium",
+                "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium transition-opacity duration-500",
                 isCollapsed && "sr-only"
               )}>
                 System
@@ -170,7 +172,7 @@ export function Sidebar() {
                           !isCollapsed && "mr-2",
                           "transition-transform duration-300 group-hover:scale-110"
                         )} />
-                        {!isCollapsed && <span>{item.name}</span>}
+                        {!isCollapsed && <span className="transition-opacity duration-500">{item.name}</span>}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
                     </Link>
