@@ -1,0 +1,80 @@
+Hier ist ein optimierter Prompt für Bolt.dev, um SmartCare effizient zu entwickeln:
+
+Prompt für Bolt.dev: Entwicklung von SmartCare
+
+Erstelle eine vollständige Web-App namens “SmartCare” für ambulante Pflegedienste und kleine Altenheime, die eine intuitive und moderne Benutzeroberfläche für Pflegekräfte bietet.
+Die Anwendung muss eine einfache, mobile-optimierte UX mit klaren, strukturierten Funktionen bieten.
+Nutze React (Next.js) mit Tailwind CSS für das Frontend und Node.js (NestJS) mit PostgreSQL für das Backend.
+
+1. Anforderungen an das UI/UX
+
+Erstelle ein benutzerfreundliches Dashboard mit:
+	•	Links: Seitenleiste mit folgenden Menüpunkten:
+	•	Dashboard (Home)
+	•	Patienten
+	•	Planung
+	•	Dokumentation
+	•	Abrechnung
+	•	Einstellungen
+	•	Button „Einklappen“, um die Sidebar zu minimieren.
+	•	Oben rechts: Nutzerprofil (Dropdown mit Einstellungen & Logout) und Benachrichtigungs-Icon.
+	•	Hauptbereich des Dashboards:
+	•	Begrüßungstext mit Benutzername & Tagesübersicht.
+	•	Kacheln mit Schnellzugriffen:
+	•	Patientenliste (X Patienten heute)
+	•	Tourenübersicht (Nächster Besuch um X Uhr)
+	•	Offene Aufgaben (X zu erledigende Aufgaben)
+	•	Ausstehende Dokumentation (X Berichte fehlen)
+
+2. Patientenverwaltung
+	•	Patientenübersicht (Tabelle mit Filter & Suche)
+	•	Spalten: Name | Pflegegrad | Medikation | Nächster Besuch
+	•	Klick öffnet Detailansicht mit:
+	•	Stammdaten & Notfallkontakte
+	•	Medikationsplan mit Erinnerungen
+	•	Letzte Pflegeeinträge & Notizen
+	•	Wunschmanagement-Feld (Patientenwünsche erfassen)
+
+3. Tourenplanung & Dienstplanung
+	•	Kalenderansicht für Tages-/Wochenplanung
+	•	Pflegekräfte sehen geplante Besuche
+	•	Google Maps API für automatische Tourenoptimierung
+	•	Änderungen an Schichten in Echtzeit synchronisiert
+
+4. Dokumentation & KI-gestützte Spracherfassung
+	•	Pflegekräfte erfassen Notizen per Sprache (automatisch strukturiert)
+	•	Dokumentation mit vorgefertigten Dropdowns & Checkboxen
+	•	Automatische Prüfung auf fehlende Einträge
+
+5. Abrechnung & Schnittstellen
+	•	Automatische Rechnungsstellung basierend auf erbrachten Leistungen
+	•	Anbindung an Krankenkassen für direkte Abrechnung
+	•	Statusverwaltung: Offene, bezahlte & überfällige Rechnungen
+	•	Automatische Erinnerung an fehlende Abrechnungen
+
+6. Automatisierte Erinnerungen & Echtzeit-Benachrichtigungen
+	•	Push-Benachrichtigungen für:
+	•	Vergessene Dokumentation
+	•	Medikamentengabe
+	•	Schichtänderungen
+	•	Kritische Warnmeldungen (z. B. falsche Medikation erkannt)
+
+7. Offline-Modus & DSGVO-Konformität
+	•	App funktioniert auch offline – synchronisiert Daten später
+	•	DSGVO-konforme Benutzerrechte & Rollensystem
+
+Technologie-Stack
+	•	Frontend: React (Next.js) mit Tailwind CSS
+	•	Backend: Node.js (NestJS) mit PostgreSQL
+	•	Auth & Sicherheit: OAuth2 mit DSGVO-konformen Rollenrechten
+	•	Realtime & Kommunikation: WebSockets für Live-Benachrichtigungen
+	•	Cloud-Speicherung: AWS S3 für Dokumente & Firebase für Echtzeitdaten
+	•	Offline-Support: IndexedDB zur temporären Datenspeicherung
+
+Wichtige Entwicklungsanforderungen:
+	•	Minimaler Klickaufwand: Alle Kernfunktionen maximal 2 Klicks entfernt.
+	•	Mobile-First-Design: Perfekte Nutzung auf Tablets & Smartphones.
+	•	Super einfache Bedienung: Für nicht technikaffine Pflegekräfte.
+	•	Extrem schnelle Performance & Echtzeit-Synchronisierung.
+
+Dieser Prompt gibt Bolt.dev eine klare, vollständige Struktur, um SmartCare effizient und optimal zu entwickeln. Lass mich wissen, falls du Anpassungen brauchst! 🚀
