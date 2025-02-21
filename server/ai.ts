@@ -70,16 +70,26 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
     const totalDuration = waypoints.reduce((sum, wp) => sum + wp.visitDuration + wp.travelTimeToNext, 0);
 
     // Start actual API call in background for future optimizations
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    model.generateContent(`Optimiere diese Tour basierend auf:
+    const prompt = `Optimiere diese Tour basierend auf:
 1. Pflegebedürfnisse der Patienten (${patientData.map(p => `Patient ${p.id}: Level ${p.careLevel}`).join(', ')})
 2. Geografische Nähe
 3. Bevorzugte Besuchszeiten
 4. Erforderliche Pflegedauer
 
 Aktuelle Route:
-${waypoints.map((wp, i) => `${i+1}. Patient ${wp.patientId}: ${wp.visitDuration}min Pflege`).join('\n')}
-`).catch(console.error); // Log errors but don't wait
+${waypoints.map((wp, i) => `${i+1}. Patient ${wp.patientId}: ${wp.visitDuration}min Pflege`).join('\n')}`;
+
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    }).catch(console.error); // Log errors but don't wait
 
     return {
       waypoints,
@@ -96,10 +106,20 @@ ${waypoints.map((wp, i) => `${i+1}. Patient ${wp.patientId}: ${wp.visitDuration}
 export async function testAIConnection(): Promise<boolean> {
   try {
     validateApiKey();
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const result = await model.generateContent("Test connection. Reply with: Connection successful.");
-    const response = await result.response;
-    return response.text().includes("Connection successful");
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: "Test connection. Reply with: Connection successful." }]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.includes("Connection successful") || false;
   } catch (error: any) {
     console.error("Gemini connection test failed:", error.response?.data || error.message);
     return false;
@@ -109,7 +129,6 @@ export async function testAIConnection(): Promise<boolean> {
 export async function generateDocumentation(audioContent: string): Promise<string> {
   try {
     validateApiKey();
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `Formatiere die folgende Spracheingabe in eine strukturierte medizinische Notiz.
 Verwende folgende Abschnitte:
@@ -120,9 +139,20 @@ Verwende folgende Abschnitte:
 
 Eingabe: ${audioContent}`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Keine Dokumentation generiert';
   } catch (error: any) {
     console.error("Gemini API error:", error.response?.data || error.message);
     if (error.response?.status === 401) {
@@ -139,9 +169,8 @@ export async function generateAISuggestion(context: {
 }): Promise<string> {
   try {
     validateApiKey();
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const result = await model.generateContent(`Basierend auf folgenden Informationen, schlage eine passende Dokumentation vor:
+    const prompt = `Basierend auf folgenden Informationen, schlage eine passende Dokumentation vor:
 - Aktuelle Zeit: ${context.currentTime}
 - Letzter Besuch: ${context.lastVisit || 'Keine Information'}
 - Patientenhistorie: ${JSON.stringify(context.patientHistory)}
@@ -149,10 +178,22 @@ export async function generateAISuggestion(context: {
 Berücksichtige:
 1. Tageszeit-spezifische Aktivitäten
 2. Veränderungen seit dem letzten Besuch
-3. Besondere Bedürfnisse des Patienten`);
+3. Besondere Bedürfnisse des Patienten`;
 
-    const response = await result.response;
-    return response.text();
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }]
+      })
+    });
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Keine Vorschläge generiert';
   } catch (error: any) {
     console.error("Gemini API error:", error.response?.data || error.message);
     if (error.response?.status === 401) {
