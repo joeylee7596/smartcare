@@ -12,6 +12,13 @@ interface VoiceRecorderProps {
   className?: string;
 }
 
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecorderProps) {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcriptionProgress, setTranscriptionProgress] = useState(0);
@@ -22,7 +29,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const { sendMessage, subscribe } = useWebSocket();
 
   useEffect(() => {
-    const unsubscribe = subscribe((message) => {
+    return subscribe((message) => {
       switch (message.type) {
         case 'TRANSCRIPTION_COMPLETE':
           setIsTranscribing(false);
@@ -44,10 +51,6 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           break;
       }
     });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, [subscribe, onTranscriptionComplete]);
 
   const {
@@ -97,29 +100,28 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       setTranscriptionProgress(10);
       setPreviewText("Starte Verarbeitung...");
 
-      // Fetch the audio blob and convert it to text
-      const response = await fetch(blobUrl);
-      const audioBlob = await response.blob();
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        throw new Error("Speech recognition is not supported in this browser");
+      }
 
-      // Convert audio to text using Web Speech API
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      const recognition = new SpeechRecognition();
       recognition.lang = 'de-DE';
       recognition.continuous = true;
       recognition.interimResults = true;
 
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join(' ');
 
-        // Send the transcript to the backend
         sendMessage({
           type: 'VOICE_TRANSCRIPTION',
           audioContent: transcript
         });
       };
 
-      recognition.onerror = (event) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsTranscribing(false);
         setTranscriptionProgress(0);
@@ -176,7 +178,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                 <div className="flex items-center justify-between text-sm text-primary">
                   <div className="flex items-center gap-2">
                     <Brain className="h-4 w-4 animate-pulse" />
-                    <span>KI verarbeitet Aufnahme...</span>
+                    <span>Verarbeite Aufnahme...</span>
                   </div>
                   <span>{transcriptionProgress}%</span>
                 </div>
@@ -193,7 +195,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             )}
             {previewText && (
               <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-medium mb-1">KI-Formatierte Dokumentation:</p>
+                <p className="text-sm font-medium mb-1">Dokumentation:</p>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {previewText}
                 </p>

@@ -8,6 +8,25 @@ import { setupWebSocket } from "./websocket";
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Documentation
+  app.get("/api/docs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const patientId = req.query.patientId ? parseInt(req.query.patientId as string) : undefined;
+    if (patientId && isNaN(patientId)) {
+      return res.status(400).json({ error: "Invalid patient ID" });
+    }
+    const docs = await storage.getDocs(patientId);
+    res.json(docs);
+  });
+
+  app.post("/api/docs", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const parsed = insertDocSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const doc = await storage.createDoc(parsed.data);
+    res.status(201).json(doc);
+  });
+
   // Patients
   app.get("/api/patients", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -64,21 +83,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     await storage.deleteTour(id);
     res.sendStatus(204);
-  });
-
-  // Documentation
-  app.get("/api/docs", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    const docs = await storage.getDocs(parseInt(req.query.patientId as string));
-    res.json(docs);
-  });
-
-  app.post("/api/docs", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertDocSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json(parsed.error);
-    const doc = await storage.createDoc(parsed.data);
-    res.status(201).json(doc);
   });
 
   const httpServer = createServer(app);
