@@ -5,10 +5,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, startOfDay, endOfDay, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
-import { Tour, Patient, type InsertTour } from "@shared/schema";
+import { Tour, Patient, type InsertTour, Employee } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { MapPin, RotateCw, Clock, Calendar, Search, Plus, X, Maximize2, Trash2 } from "lucide-react";
+import { MapPin, RotateCw, Clock, Calendar, Search, Plus, X, Maximize2, Trash2, UserCheck, Shield, Briefcase } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -103,6 +103,77 @@ interface FilterState {
   location: string;
 }
 
+interface EmployeeCardProps {
+  employee: Employee;
+  onSelect: (employeeId: number) => void;
+  isSelected: boolean;
+  workload: number;
+}
+
+function EmployeeCard({ employee, onSelect, isSelected, workload }: EmployeeCardProps) {
+  return (
+    <div
+      className={`p-3 mb-2 rounded-lg border transition-all duration-200 cursor-pointer ${
+        isSelected
+          ? 'bg-primary/10 border-primary'
+          : 'bg-card border-border/40 hover:shadow-md'
+      }`}
+      onClick={() => onSelect(employee.id)}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="font-medium truncate">{employee.name}</h3>
+            <Badge variant={workload > 80 ? "destructive" : workload > 60 ? "warning" : "secondary"}>
+              {workload}% Auslastung
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Briefcase className="h-3 w-3 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{employee.role}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {employee.qualifications.nursingDegree && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Shield className="h-4 w-4 text-primary" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  Pflegeexaminiert
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        {Object.entries(employee.qualifications)
+          .filter(([key, value]) => value === true && key !== 'nursingDegree')
+          .map(([key]) => (
+            <Badge key={key} variant="outline" className="text-xs">
+              {formatQualification(key)}
+            </Badge>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+function formatQualification(key: string): string {
+  const mapping: Record<string, string> = {
+    medicationAdministration: "Medikamentengabe",
+    woundCare: "Wundversorgung",
+    dementiaCare: "Demenzbetreuung",
+    palliativeCare: "Palliativpflege",
+    lifting: "Hebetechniken",
+    firstAid: "Erste Hilfe"
+  };
+  return mapping[key] || key;
+}
+
 export default function Tours() {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -113,6 +184,7 @@ export default function Tours() {
     location: "all"
   });
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
@@ -122,12 +194,18 @@ export default function Tours() {
     queryKey: ["/api/patients"],
   });
 
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+  });
+
   const createTourMutation = useMutation({
     mutationFn: async (patientId: number) => {
       const tourDate = new Date(selectedDate);
+      const suggestedEmployee = suggestEmployee(patientId);
 
-      // Find latest end time of existing tours for this date
+      // Find latest end time of existing tours
       const latestTour = dateFilteredTours
+        .filter(tour => tour.employeeId === (suggestedEmployee?.id || selectedEmployee))
         .map(tour => {
           const waypoints = tour.optimizedRoute?.waypoints || [];
           if (waypoints.length === 0) return null;
@@ -147,6 +225,17 @@ export default function Tours() {
         startTime.setMinutes(startTime.getMinutes() + 15); // Add buffer between tours
       }
 
+      // Get required qualifications based on patient care level
+      const patient = patients.find(p => p.id === patientId);
+      const requiredQualifications = [];
+      if (patient) {
+        if (patient.careLevel >= 4) requiredQualifications.push('nursingDegree');
+        if (patient.careLevel >= 3) {
+          requiredQualifications.push('medicationAdministration');
+          requiredQualifications.push('woundCare');
+        }
+      }
+
       // Generate simulated location for the new patient
       const patientLocation = {
         lat: 52.520008 + (Math.random() * 0.1 - 0.05),
@@ -155,7 +244,7 @@ export default function Tours() {
 
       const newTour: InsertTour = {
         date: startTime,
-        caregiverId: 1,
+        employeeId: suggestedEmployee?.id || selectedEmployee || 1,
         patientIds: [patientId],
         status: "scheduled",
         optimizedRoute: {
@@ -166,7 +255,8 @@ export default function Tours() {
             estimatedTime: startTime.toISOString(),
             visitDuration: 30,
             travelTimeToNext: 0,
-            distanceToNext: 0
+            distanceToNext: 0,
+            requiredQualifications
           }],
           totalDistance: 0,
           estimatedDuration: 30
@@ -298,6 +388,36 @@ export default function Tours() {
     }
   });
 
+  const calculateWorkload = (employeeId: number) => {
+    const employeeTours = dateFilteredTours.filter(tour => tour.employeeId === employeeId);
+    const totalDuration = employeeTours.reduce((sum, tour) =>
+      sum + (tour.optimizedRoute?.estimatedDuration || 0), 0);
+    const maxMinutes = 8 * 60; // 8 hours workday
+    return Math.round((totalDuration / maxMinutes) * 100);
+  };
+
+  const suggestEmployee = (patientId: number) => {
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return null;
+
+    return employees
+      .filter(emp => emp.status === 'active')
+      .map(emp => {
+        let score = 0;
+
+        // Score based on current workload (lower is better)
+        const workload = calculateWorkload(emp.id);
+        score -= workload;
+
+        // Score based on care level match
+        if (patient.careLevel >= 4 && emp.qualifications.nursingDegree) score += 50;
+        if (patient.careLevel >= 3 && (emp.qualifications.medicationAdministration || emp.qualifications.woundCare)) score += 30;
+
+        return { employee: emp, score };
+      })
+      .sort((a, b) => b.score - a.score)[0]?.employee || null;
+  };
+
   const dateFilteredTours = tours.filter(tour => {
     const tourDate = parseISO(tour.date.toString());
     return tourDate >= startOfDay(selectedDate) && tourDate <= endOfDay(selectedDate);
@@ -339,105 +459,123 @@ export default function Tours() {
           </div>
 
           <div className="grid grid-cols-[350px,1fr,350px] gap-6">
-            {/* Left Column - Patient List */}
-            <Card className="shadow-lg">
-              <CardHeader className="pb-3">
-                <div className="space-y-3">
-                  <CardTitle className="text-base">Patienten</CardTitle>
-
-                  {/* Enhanced Search */}
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Patient suchen..."
-                      className="pl-8"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Date Picker */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <Calendar className="mr-2 h-4 w-4" />
-                        {format(selectedDate, "PPP", { locale: de })}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" style={{ zIndex: 100 }}>
-                      <CalendarComponent
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        initialFocus
+            <div className="space-y-6">
+              <Card className="shadow-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Mitarbeiter</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[300px]">
+                    {employees.map((employee) => (
+                      <EmployeeCard
+                        key={employee.id}
+                        employee={employee}
+                        onSelect={setSelectedEmployee}
+                        isSelected={employee.id === selectedEmployee}
+                        workload={calculateWorkload(employee.id)}
                       />
-                    </PopoverContent>
-                  </Popover>
+                    ))}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+              <Card className="shadow-lg">
+                <CardHeader className="pb-3">
+                  <div className="space-y-3">
+                    <CardTitle className="text-base">Patienten</CardTitle>
 
-                  {/* Enhanced Filters */}
-                  <div className="space-y-2">
-                    <Select
-                      value={filters.urgency}
-                      onValueChange={(value) => setFilters(prev => ({ ...prev, urgency: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Dringlichkeit" />
-                      </SelectTrigger>
-                      <SelectContent style={{ zIndex: 100 }}>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="urgent">Dringend</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {/* Enhanced Search */}
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Patient suchen..."
+                        className="pl-8"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
 
-                    <Select
-                      value={filters.careType}
-                      onValueChange={(value) => setFilters(prev => ({ ...prev, careType: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pflegeart" />
-                      </SelectTrigger>
-                      <SelectContent style={{ zIndex: 100 }}>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="basic">Grundpflege</SelectItem>
-                        <SelectItem value="medical">Medizinische Pflege</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {/* Date Picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {format(selectedDate, "PPP", { locale: de })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" style={{ zIndex: 100 }}>
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
 
-                    <Select
-                      value={filters.location}
-                      onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Standort" />
-                      </SelectTrigger>
-                      <SelectContent style={{ zIndex: 100 }}>
-                        <SelectItem value="all">Alle Bezirke</SelectItem>
-                        <SelectItem value="north">Nord</SelectItem>
-                        <SelectItem value="south">Süd</SelectItem>
-                        <SelectItem value="east">Ost</SelectItem>
-                        <SelectItem value="west">West</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {/* Enhanced Filters */}
+                    <div className="space-y-2">
+                      <Select
+                        value={filters.urgency}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, urgency: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Dringlichkeit" />
+                        </SelectTrigger>
+                        <SelectContent style={{ zIndex: 100 }}>
+                          <SelectItem value="all">Alle</SelectItem>
+                          <SelectItem value="urgent">Dringend</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={filters.careType}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, careType: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pflegeart" />
+                        </SelectTrigger>
+                        <SelectContent style={{ zIndex: 100 }}>
+                          <SelectItem value="all">Alle</SelectItem>
+                          <SelectItem value="basic">Grundpflege</SelectItem>
+                          <SelectItem value="medical">Medizinische Pflege</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={filters.location}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Standort" />
+                        </SelectTrigger>
+                        <SelectContent style={{ zIndex: 100 }}>
+                          <SelectItem value="all">Alle Bezirke</SelectItem>
+                          <SelectItem value="north">Nord</SelectItem>
+                          <SelectItem value="south">Süd</SelectItem>
+                          <SelectItem value="east">Ost</SelectItem>
+                          <SelectItem value="west">West</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[calc(100vh-350px)]">
-                  {filteredPatients.map((patient) => (
-                    <PatientCard
-                      key={patient.id}
-                      patient={patient}
-                      onAdd={handleAddToTour}
-                      isInTour={patientsInTours.includes(patient.id)}
-                      onSelect={setSelectedPatient}
-                    />
-                  ))}
-                </ScrollArea>
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[calc(100vh-350px)]">
+                    {filteredPatients.map((patient) => (
+                      <PatientCard
+                        key={patient.id}
+                        patient={patient}
+                        onAdd={handleAddToTour}
+                        isInTour={patientsInTours.includes(patient.id)}
+                        onSelect={setSelectedPatient}
+                      />
+                    ))}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Center Column - Map */}
             <Card className="shadow-lg overflow-hidden relative">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Karte</CardTitle>
@@ -519,7 +657,6 @@ export default function Tours() {
               </CardContent>
             </Card>
 
-            {/* Right Column - Timeline */}
             <Card className="shadow-lg">
               <CardHeader>
                 <div className="flex items-center justify-between">
