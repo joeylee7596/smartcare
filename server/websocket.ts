@@ -21,6 +21,28 @@ export function setupWebSocket(server: Server) {
             }));
             break;
 
+          case 'VOICE_TRANSCRIPTION':
+            // Send initial progress update
+            ws.send(JSON.stringify({
+              type: 'TRANSCRIPTION_PROGRESS',
+              status: 'started',
+              message: 'Transkribiere Sprachaufnahme...'
+            }));
+
+            try {
+              const documentation = await generateDocumentation(data.audioContent);
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_COMPLETE',
+                documentation
+              }));
+            } catch (error) {
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_ERROR',
+                error: error instanceof Error ? error.message : 'Fehler bei der Transkription'
+              }));
+            }
+            break;
+
           case 'TOUR_UPDATE':
             // Broadcast tour updates to all connected clients
             wss.clients.forEach(client => {

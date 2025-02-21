@@ -19,6 +19,7 @@ export function AddTourDialog() {
   const { toast } = useToast();
   const [optimizedRoute, setOptimizedRoute] = useState<any>(null);
   const [selectedPatients, setSelectedPatients] = useState<Patient[]>([]);
+  const [isOpen, setIsOpen] = useState(false); // Added state for dialog
   const { sendMessage, subscribe } = useWebSocket();
 
   const { data: patients = [] } = useQuery<Patient[]>({
@@ -107,6 +108,7 @@ export function AddTourDialog() {
       form.reset();
       setOptimizedRoute(null);
       setSelectedPatients([]);
+      setIsOpen(false); // Close dialog after success
 
       sendMessage({
         type: 'TOUR_UPDATE',
@@ -123,7 +125,7 @@ export function AddTourDialog() {
   });
 
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}> {/* Updated Dialog with state */}
       <DialogTrigger asChild>
         <Button>
           <Route className="mr-2 h-4 w-4" />
@@ -135,7 +137,33 @@ export function AddTourDialog() {
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => {
+            mutation.mutate(data, {
+              onSuccess: (data) => {
+                queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
+                toast({
+                  title: "Tour geplant",
+                  description: "Die Tour wurde erfolgreich angelegt.",
+                });
+                form.reset();
+                setOptimizedRoute(null);
+                setSelectedPatients([]);
+                setIsOpen(false); // Close dialog after success
+
+                sendMessage({
+                  type: 'TOUR_UPDATE',
+                  tour: data,
+                });
+              },
+              onError: (error) => {
+                toast({
+                  title: "Fehler",
+                  description: "Tour konnte nicht angelegt werden.",
+                  variant: "destructive",
+                });
+              }
+            });
+          })} className="space-y-4">
             <div className="grid grid-cols-[400px,1fr] gap-6">
               <div className="space-y-4">
                 <FormField
@@ -285,8 +313,8 @@ export function AddTourDialog() {
               )}
             </div>
 
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full"
               disabled={mutation.isPending || !selectedPatients.length || !optimizedRoute}
             >
