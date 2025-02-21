@@ -1,10 +1,10 @@
 import { Patient } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Phone, 
-  MapPin, 
-  FileText, 
+import {
+  Phone,
+  MapPin,
+  FileText,
   Activity,
   MoreVertical,
   Edit,
@@ -31,6 +31,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EditPatientDialog } from "./edit-patient-dialog";
 import { useLocation } from "wouter";
+import { CarePredictionDialog } from "./care-prediction-dialog";
+
 
 interface PatientGridProps {
   patients: Patient[];
@@ -42,6 +44,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
+  const [showCarePrediction, setShowCarePrediction] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState<string>("");
 
@@ -116,15 +119,15 @@ export function PatientGrid({ patients }: PatientGridProps) {
   return (
     <>
       <AnimatePresence>
-        <motion.div 
+        <motion.div
           className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
           variants={container}
           initial="hidden"
           animate="show"
         >
           {patients.map((patient) => (
-            <motion.div 
-              key={patient.id} 
+            <motion.div
+              key={patient.id}
               variants={item}
               className="group"
             >
@@ -134,9 +137,9 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     <div className="space-y-1">
                       <CardTitle className="text-xl font-bold">{patient.name}</CardTitle>
                       <div className="flex items-center gap-2">
-                        <Badge 
-                          variant={patient.careLevel >= 4 ? "destructive" : 
-                                 patient.careLevel >= 3 ? "secondary" : "default"}
+                        <Badge
+                          variant={patient.careLevel >= 4 ? "destructive" :
+                            patient.careLevel >= 3 ? "secondary" : "default"}
                           className="text-xs"
                         >
                           Pflegegrad {patient.careLevel}
@@ -168,6 +171,15 @@ export function PatientGrid({ patients }: PatientGridProps) {
                         >
                           <Brain className="mr-2 h-4 w-4" />
                           KI-Analyse
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedPatient(patient);
+                            setShowCarePrediction(true);
+                          }}
+                        >
+                          <Brain className="mr-2 h-4 w-4" />
+                          Pflegebedarfsprognose
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
@@ -207,18 +219,18 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="flex-1"
                         onClick={() => setLocation(`/documentation/${patient.id}`)}
                       >
                         <FileText className="h-4 w-4 mr-2" />
                         Dokumentation
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         className="flex-1"
                         onClick={() => setLocation(`/tours/${patient.id}`)}
                       >
@@ -270,6 +282,12 @@ export function PatientGrid({ patients }: PatientGridProps) {
               </ScrollArea>
             </DialogContent>
           </Dialog>
+
+          <CarePredictionDialog
+            patient={selectedPatient}
+            open={showCarePrediction}
+            onOpenChange={setShowCarePrediction}
+          />
         </>
       )}
     </>
