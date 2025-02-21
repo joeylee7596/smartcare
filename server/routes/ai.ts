@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 
 const router = Router();
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY || "");
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 const patientInsightsSchema = z.object({
   patientData: z.object({
@@ -17,33 +17,49 @@ const patientInsightsSchema = z.object({
 router.post("/patient-insights", async (req, res) => {
   try {
     const { patientData } = patientInsightsSchema.parse(req.body);
-    
+
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    
-    const prompt = `Analysiere die folgenden Patientendaten und erstelle eine kurze, professionelle Zusammenfassung mit Empfehlungen für die Pflege. Berücksichtige dabei den Pflegegrad und die Medikation.
+
+    const prompt = `Als medizinischer Assistent, analysiere bitte die folgenden Patientendaten und erstelle eine professionelle Zusammenfassung. Berücksichtige dabei den Pflegegrad und alle verfügbaren Informationen.
 
 Patient: ${patientData.name}
 Pflegegrad: ${patientData.careLevel}
-Medikamente: ${patientData.medications?.join(", ") || "Keine"}
-Letzter Besuch: ${patientData.lastVisit ? new Date(patientData.lastVisit).toLocaleDateString('de-DE') : "Kein Besuch vermerkt"}
+${patientData.medications?.length ? `Medikamente: ${patientData.medications.join(", ")}` : ''}
+${patientData.lastVisit ? `Letzter Besuch: ${new Date(patientData.lastVisit).toLocaleDateString('de-DE')}` : ''}
 
-Bitte strukturiere die Analyse in folgende Abschnitte:
+Bitte strukturiere die Analyse in die folgenden Abschnitte:
 1. Allgemeine Einschätzung
-2. Pflegebedarf basierend auf Pflegegrad
-3. Medikationsanalyse und Empfehlungen
-4. Vorschläge für die weitere Betreuung`;
+   - Basierend auf Pflegegrad und verfügbaren Daten
+   - Besondere Aufmerksamkeitspunkte
+
+2. Pflegeempfehlungen
+   - Konkrete Vorschläge für die Pflege
+   - Anpassungen basierend auf dem Pflegegrad
+
+3. Hinweise für das Pflegepersonal
+   - Wichtige Beobachtungspunkte
+   - Vorgeschlagene Dokumentationsschwerpunkte
+
+Bitte halte die Analyse sachlich und professionell.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     res.json({ insights: text });
   } catch (error) {
     console.error("AI Analysis Error:", error);
-    res.status(500).json({ 
-      error: "KI-Analyse konnte nicht durchgeführt werden",
-      details: error instanceof Error ? error.message : "Unbekannter Fehler"
-    });
+    if (error instanceof Error) {
+      res.status(500).json({ 
+        error: "KI-Analyse konnte nicht durchgeführt werden",
+        details: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        error: "KI-Analyse konnte nicht durchgeführt werden",
+        details: "Unbekannter Fehler"
+      });
+    }
   }
 });
 
