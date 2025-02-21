@@ -1,0 +1,17 @@
+Erstelle ein vollständiges Tourenplanungs-Feature für den Admin-Bereich von SmartCare, das als Prototyp mit simulierten Patientendaten arbeitet. Die Tourenplanung soll eine zentrale Ansicht bieten, in der ein Administrator Pflegeeinsätze für den Tag effizient planen, verwalten und optimieren kann. Da die Patientendaten nicht real sind, darf die Routenoptimierung nicht auf Adressdaten basieren, sondern muss sich auf eine einfache, fiktive Logik für Abstände und Fahrzeiten zwischen den Einsätzen stützen.
+
+Die Oberfläche ist in drei Hauptbereiche unterteilt: Links befindet sich eine Liste aller geplanten Besuche mit Filter- und Suchoptionen, in der Mitte eine interaktive Ansicht zur Reihenfolge-Anpassung, und rechts eine vertikale Timeline mit Zeitfenstern für Pflegekräfte.
+
+Der Workflow beginnt damit, dass der Admin einen Tag im Kalender auswählt. Danach lädt das System automatisch eine Liste der für diesen Tag eingetragenen Patientenbesuche. Jeder Eintrag enthält den Namen des Patienten, die geplante Besuchsdauer, die zuständige Pflegekraft und einen Prioritätsindikator. In dieser Liste kann der Admin Patienten manuell einem anderen Pfleger zuweisen oder die Reihenfolge anpassen, indem er per Drag & Drop die geplante Tour verändert.
+
+Da reale Standortdaten fehlen, wird die Tour-Optimierung durch eine KI-Logik simuliert, die basierend auf vordefinierten Zeitdauern zwischen Besuchen realistische Abfahrtszeiten berechnet. Sobald ein Besuch verschoben oder ein neuer Besuch hinzugefügt wird, berechnet das System automatisch die geschätzten Start- und Endzeiten für jede Tour. Das System zeigt Warnungen an, falls eine geplante Route eine Überlastung der Pflegekraft verursacht oder die Gesamtzeit den Arbeitstag überschreitet.
+
+In der mittleren Ansicht erhält der Admin eine visuelle Darstellung der Touren, die als geordnete Liste oder als schematische Karte ohne echte Geodaten dargestellt wird. Hier können Besuche innerhalb eines Zeitblocks per Drag & Drop umgeordnet werden. Eine KI-gestützte Vorschlagsfunktion prüft die gesamte Tour und schlägt basierend auf der Pflegepriorität und der Tagesauslastung alternative Routen vor.
+
+Die rechte Timeline zeigt den gesamten Tag der Pflegekraft als Balkendiagramm an, mit farblich gekennzeichneten Zeitfenstern für geplante Besuche. Jede Änderung an der Liste oder Reihenfolge aktualisiert sofort die Zeitleiste, sodass der Admin jederzeit sieht, wie sich Änderungen auf die Tagesstruktur auswirken.
+
+Sobald alle Touren geplant sind, kann der Admin mit einem Klick den Plan speichern. Das System generiert dann einen Tagesplan für jede Pflegekraft, der eine Liste aller zu besuchenden Patienten enthält, geordnet nach der geplanten Reihenfolge mit geschätzten Zeitfenstern. Diese Daten werden an das mobile Interface der Pflegekräfte weitergeleitet.
+
+Da das System ein Prototyp ist, sollte es flexibel sein, um spätere reale Adress- und Routenlogik zu integrieren. Die KI soll in der Lage sein, Pflegekräfte basierend auf verfügbaren Zeitfenstern intelligent vorzuschlagen und bei Überlastung Warnungen auszugeben. Außerdem muss das System in der Lage sein, einfache Regelwerke für automatische Anpassungen einzubinden, z. B. dass ein Besuch mit hoher Priorität immer am Anfang einer Tour stehen sollte.
+
+Das gesamte Interface muss intuitiv, minimalistisch und ohne überflüssige Komplexität gestaltet sein. Jeder Schritt der Planung soll mit maximal zwei Klicks ausführbar sein, sodass auch nicht technisch versierte Nutzer die Touren effizient organisieren können.
