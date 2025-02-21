@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useReactMediaRecorder } from "react-media-recorder";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -20,10 +19,7 @@ declare global {
 }
 
 export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecorderProps) {
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcriptionProgress, setTranscriptionProgress] = useState(0);
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingInterval, setRecordingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [previewText, setPreviewText] = useState<string>("");
   const [error, setError] = useState<string>("");
   const { sendMessage, subscribe } = useWebSocket();
@@ -33,22 +29,21 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
     return subscribe((message) => {
       switch (message.type) {
         case 'TRANSCRIPTION_COMPLETE':
-          setIsTranscribing(false);
-          setTranscriptionProgress(100);
           setPreviewText(message.documentation);
           onTranscriptionComplete(message.documentation);
           break;
         case 'TRANSCRIPTION_ERROR':
-          setIsTranscribing(false);
-          setTranscriptionProgress(0);
           setError(message.error);
           break;
       }
     });
   }, [subscribe, onTranscriptionComplete]);
 
-  const setupRecognition = () => {
+  const startRecording = () => {
     try {
+      setError("");
+      setPreviewText("");
+
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         throw new Error("Spracherkennung wird in diesem Browser nicht unterstützt");
@@ -58,6 +53,10 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       recognition.lang = 'de-DE';
       recognition.continuous = true;
       recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+      };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
@@ -91,89 +90,44 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
         }
 
         setError(errorMessage);
-        setIsTranscribing(false);
-        setTranscriptionProgress(0);
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
       };
 
       setRecognition(recognition);
-      return recognition;
+      recognition.start();
+
     } catch (error) {
-      setError("Spracherkennung konnte nicht initialisiert werden");
-      return null;
+      setError(error instanceof Error ? error.message : "Spracherkennung konnte nicht initialisiert werden");
     }
   };
 
-  const {
-    status,
-    startRecording,
-    stopRecording,
-  } = useReactMediaRecorder({
-    audio: true,
-    onStop: () => {
-      if (recordingInterval) {
-        clearInterval(recordingInterval);
-        setRecordingInterval(null);
-      }
-      if (recognition) {
-        recognition.stop();
-      }
-    },
-  });
-
-  const handleStartRecording = () => {
-    setError("");
-    setRecordingDuration(0);
-    setPreviewText("");
-
-    const newRecognition = setupRecognition();
-    if (!newRecognition) {
-      return;
-    }
-
-    setIsTranscribing(true);
-    startRecording();
-    newRecognition.start();
-
-    const interval = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-    setRecordingInterval(interval);
-  };
-
-  const handleStopRecording = () => {
-    if (recordingInterval) {
-      clearInterval(recordingInterval);
-      setRecordingInterval(null);
-    }
+  const stopRecording = () => {
     if (recognition) {
       recognition.stop();
+      setRecognition(null);
     }
-    stopRecording();
-    setIsTranscribing(false);
-  };
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    setIsRecording(false);
   };
 
   return (
     <Card className={cn("relative overflow-hidden", className)}>
       <CardContent className="p-4 space-y-4">
-        {status === "recording" ? (
+        {isRecording ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-red-600">
                 <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
                 <span className="text-sm font-medium">Aufnahme läuft...</span>
               </div>
-              <span className="text-sm font-medium">{formatDuration(recordingDuration)}</span>
             </div>
             <Button
               variant="destructive"
               className="w-full"
-              onClick={handleStopRecording}
+              onClick={stopRecording}
             >
               <StopCircle className="mr-2 h-4 w-4" />
               Aufnahme beenden
@@ -183,17 +137,16 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           <Button
             variant="outline"
             className="w-full"
-            onClick={handleStartRecording}
-            disabled={isTranscribing}
+            onClick={startRecording}
           >
             <Mic className="mr-2 h-4 w-4" />
             Sprachaufnahme starten
           </Button>
         )}
 
-        {(isTranscribing || previewText || error) && (
+        {(isRecording || previewText || error) && (
           <div className="space-y-2 animate-in fade-in-50">
-            {isTranscribing && (
+            {isRecording && (
               <>
                 <div className="flex items-center justify-between text-sm text-primary">
                   <div className="flex items-center gap-2">
@@ -201,7 +154,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                     <span>Spracherkennung aktiv...</span>
                   </div>
                 </div>
-                <Progress value={transcriptionProgress} className="h-2" />
+                <Progress value={100} className="h-2" />
               </>
             )}
             {error && (
