@@ -268,11 +268,23 @@ export default function Tours() {
 
             {/* Right Column - Workflow */}
             <div className="space-y-6">
-              <SmartWorkflow
-                workflow={workflows[0]}
-                tour={todaysTours[0]}
-                onOptimize={optimizeRoute}
-              />
+              {workflows[0] && todaysTours[0] ? (
+                <SmartWorkflow
+                  workflow={workflows[0]}
+                  tour={todaysTours[0]}
+                  onOptimize={optimizeRoute}
+                />
+              ) : (
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Workflow</CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-center p-6 text-muted-foreground">
+                    <Route className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Keine aktiven Touren verfügbar</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </main>
