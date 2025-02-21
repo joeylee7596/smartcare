@@ -1,9 +1,45 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { generateDocumentation } from './ai';
+import { parse } from 'cookie';
+import * as sessionParser from 'express-session';
+import { storage } from './storage';
 
 export function setupWebSocket(server: Server) {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server,
+    path: '/ws',
+    verifyClient: async (info, done) => {
+      try {
+        if (!info.req.headers.cookie) {
+          return done(false, 401, 'Unauthorized');
+        }
+
+        const cookies = parse(info.req.headers.cookie);
+        const sid = cookies['connect.sid'];
+        if (!sid) {
+          return done(false, 401, 'No session found');
+        }
+
+        // Verify session
+        const sessionID = sid.slice(2).split('.')[0];
+        const session = await new Promise((resolve) => {
+          storage.sessionStore.get(sessionID, (err, session) => {
+            resolve(session);
+          });
+        });
+
+        if (!session) {
+          return done(false, 401, 'Invalid session');
+        }
+
+        done(true);
+      } catch (error) {
+        console.error('WebSocket authentication error:', error);
+        done(false, 500, 'Internal server error');
+      }
+    }
+  });
 
   wss.on('connection', (ws) => {
     console.log('Client connected');
