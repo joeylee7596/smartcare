@@ -253,21 +253,77 @@ export default function Tours() {
         }
       });
 
+      // Get all tours for the current day and sort them by time
+      const dayTours = dateFilteredTours.sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+
+      // Find index of current tour
+      const currentTourIndex = dayTours.findIndex(t => t.id === id);
+
+      // If this is not the first tour, start after the previous tour
+      let startTime: Date;
+      if (currentTourIndex > 0) {
+        const previousTour = dayTours[currentTourIndex - 1];
+        startTime = new Date(previousTour.date);
+        startTime = addMinutes(startTime, previousTour.optimizedRoute?.estimatedDuration || 0);
+      } else {
+        // If it's the first tour, start at 8 AM
+        startTime = new Date(selectedDate);
+        startTime.setHours(8, 0, 0, 0);
+      }
+
       const optimizedRoute = {
         waypoints: remainingWaypoints,
         totalDistance: 0,
         estimatedDuration: totalDuration
       };
 
+      // Update current tour
       const response = await apiRequest("PATCH", `/api/tours/${id}`, { 
         patientIds, 
-        optimizedRoute 
+        optimizedRoute,
+        date: startTime.toISOString()
       });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to update tour');
       }
+
+      // After updating current tour, update all subsequent tours
+      const subsequentTours = dayTours.slice(currentTourIndex + 1);
+      let currentTime = new Date(startTime);
+      currentTime = addMinutes(currentTime, totalDuration);
+
+      try {
+        for (const nextTour of subsequentTours) {
+          // Calculate travel time from last waypoint of current tour to first waypoint of next tour
+          let additionalTravelTime = 0;
+          if (remainingWaypoints.length > 0 && nextTour.optimizedRoute?.waypoints.length > 0) {
+            const lastWaypoint = remainingWaypoints[remainingWaypoints.length - 1];
+            const nextFirstWaypoint = nextTour.optimizedRoute.waypoints[0];
+            additionalTravelTime = calculateTravelTime(
+              [lastWaypoint.lat, lastWaypoint.lng],
+              [nextFirstWaypoint.lat, nextFirstWaypoint.lng]
+            );
+          }
+
+          // Add travel time to the start time
+          currentTime = addMinutes(currentTime, additionalTravelTime);
+
+          await apiRequest("PATCH", `/api/tours/${nextTour.id}`, {
+            date: currentTime.toISOString()
+          });
+
+          // Prepare for next tour
+          currentTime = addMinutes(currentTime, nextTour.optimizedRoute?.estimatedDuration || 0);
+        }
+      } catch (error) {
+        console.error('Error updating subsequent tours:', error);
+        throw new Error('Failed to update tour schedule');
+      }
+
       return response.json();
     },
     onSuccess: () => {
