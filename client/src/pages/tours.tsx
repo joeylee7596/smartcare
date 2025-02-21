@@ -128,7 +128,7 @@ export default function Tours() {
       tourDate.setHours(9, 0, 0, 0); // Set default time to 9:00
 
       const newTour: InsertTour = {
-        date: tourDate.toISOString(), // Ensure we send ISO string for the date
+        date: tourDate.toISOString(), // Convert Date to ISO string for API
         caregiverId: 1, // TODO: Get from auth context
         patientIds: [patientId],
         status: "scheduled",
@@ -161,7 +161,7 @@ export default function Tours() {
       console.error('Tour creation error:', error);
       toast({
         title: "Fehler",
-        description: error.message || "Die Tour konnte nicht erstellt werden.",
+        description: "Die Tour konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
         variant: "destructive",
       });
     }
