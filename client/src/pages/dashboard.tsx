@@ -28,19 +28,19 @@ function DashboardCard({
 }) {
   return (
     <Card className={cn(
-      "transition-all hover:shadow-md",
-      gradient && "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20",
+      "transition-all duration-300 hover:scale-[1.02] hover:shadow-xl dark:shadow-primary/5",
+      gradient && "bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border-primary/20 dark:from-primary/10 dark:via-primary/5 dark:to-transparent",
       className
     )}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className={cn(
-            "p-2 rounded-lg",
-            gradient ? "bg-primary/10" : "bg-muted"
+            "p-3 rounded-xl",
+            gradient ? "bg-primary/10 dark:bg-primary/20" : "bg-muted"
           )}>
             <Icon className={cn(
               "h-8 w-8",
-              gradient ? "text-primary" : "text-muted-foreground"
+              gradient ? "text-primary dark:text-primary/90" : "text-muted-foreground"
             )} />
           </div>
           <div className="text-right">
@@ -49,7 +49,7 @@ function DashboardCard({
           </div>
         </div>
         <div className="mt-4">
-          <h3 className="font-medium text-sm">{title}</h3>
+          <h3 className="font-medium text-sm text-muted-foreground">{title}</h3>
         </div>
       </CardContent>
     </Card>
@@ -81,14 +81,14 @@ export default function Dashboard() {
   const pendingDocs = docs.filter(doc => doc.status === "pending");
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-background dark:bg-slate-950">
       <Sidebar />
       <div className="flex-1">
         <Header />
-        <main className="p-6">
+        <main className="p-6 md:p-8">
           {/* Header Section */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-r from-primary/90 to-primary/60 bg-clip-text text-transparent">
               Willkommen zurück, {user?.name}
             </h1>
             <p className="text-lg text-muted-foreground">
@@ -124,16 +124,16 @@ export default function Dashboard() {
               value={criticalPatients.length}
               description="Kritische Patienten"
               icon={AlertTriangle}
-              className="bg-red-50 border-red-100"
+              className="bg-red-500/10 border-red-500/20 dark:bg-red-500/5 dark:border-red-500/10"
             />
           </div>
 
           {/* Main Content Area */}
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Left Column: Active Tours */}
-            <Card className="lg:col-span-2 border-primary/20">
+            <Card className="lg:col-span-2 border-primary/20 dark:shadow-lg dark:shadow-primary/5">
               <CardHeader>
-                <CardTitle>Aktive Touren</CardTitle>
+                <CardTitle className="text-xl">Aktive Touren</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -141,7 +141,10 @@ export default function Dashboard() {
                     <p className="text-muted-foreground">Keine Touren für heute geplant</p>
                   ) : (
                     todaysTours.map((tour) => (
-                      <div key={tour.id} className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                      <div 
+                        key={tour.id} 
+                        className="p-4 rounded-xl border bg-card hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors duration-300 dark:border-primary/10"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="font-medium">Tour #{tour.id}</h3>
@@ -150,7 +153,7 @@ export default function Dashboard() {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium">
+                            <p className="font-medium text-primary">
                               {format(new Date(tour.date), "HH:mm")}
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -166,27 +169,36 @@ export default function Dashboard() {
             </Card>
 
             {/* Right Column: Quick Actions */}
-            <Card className="border-primary/20">
+            <Card className="border-primary/20 dark:shadow-lg dark:shadow-primary/5">
               <CardHeader>
-                <CardTitle>Schnellzugriff</CardTitle>
+                <CardTitle className="text-xl">Schnellzugriff</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Link href="/patients/new">
-                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
-                      <Users className="mr-2 h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-12 dark:bg-primary/5 dark:hover:bg-primary/10 dark:border-primary/20 dark:text-primary-foreground transition-colors duration-300"
+                    >
+                      <Users className="mr-3 h-5 w-5" />
                       Patient aufnehmen
                     </Button>
                   </Link>
                   <Link href="/tours/new">
-                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
-                      <CalendarDays className="mr-2 h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-12 dark:bg-primary/5 dark:hover:bg-primary/10 dark:border-primary/20 dark:text-primary-foreground transition-colors duration-300"
+                    >
+                      <CalendarDays className="mr-3 h-5 w-5" />
                       Tour planen
                     </Button>
                   </Link>
                   <Link href="/documentation/new">
-                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
-                      <ClipboardList className="mr-2 h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-12 dark:bg-primary/5 dark:hover:bg-primary/10 dark:border-primary/20 dark:text-primary-foreground transition-colors duration-300"
+                    >
+                      <ClipboardList className="mr-3 h-5 w-5" />
                       Dokumentation erstellen
                     </Button>
                   </Link>
