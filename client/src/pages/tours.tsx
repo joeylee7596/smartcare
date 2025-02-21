@@ -7,12 +7,13 @@ import { de } from "date-fns/locale";
 import { useState } from "react";
 import { Tour, Patient, type InsertTour } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { MapPin, RotateCw, Clock, Users, Calendar, Search, Plus, X } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { MapPin, RotateCw, Clock, Calendar, Search, Plus, X, Maximize2, Minimize2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +22,7 @@ import { Icon } from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PatientDetailsDialog } from "@/components/patients/patient-details-dialog";
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -30,9 +32,14 @@ const defaultIcon = new Icon({
   iconAnchor: [12, 41],
 });
 
-const mapContainerStyle = {
+const compactMapStyle = {
   width: "100%",
-  height: "calc(100vh - 200px)",
+  height: "300px",
+};
+
+const expandedMapStyle = {
+  width: "100%",
+  height: "80vh",
 };
 
 const center: LatLngExpression = [52.520008, 13.404954];
@@ -41,11 +48,15 @@ interface PatientCardProps {
   patient: Patient;
   onAdd: (patientId: number) => void;
   isInTour?: boolean;
+  onSelect: (patient: Patient) => void;
 }
 
-function PatientCard({ patient, onAdd, isInTour }: PatientCardProps) {
+function PatientCard({ patient, onAdd, isInTour, onSelect }: PatientCardProps) {
   return (
-    <div className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-md transition-all duration-200">
+    <div 
+      className="p-3 mb-2 rounded-lg bg-card border border-border/40 hover:shadow-md transition-all duration-200 cursor-pointer"
+      onClick={() => onSelect(patient)}
+    >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -63,7 +74,10 @@ function PatientCard({ patient, onAdd, isInTour }: PatientCardProps) {
                 variant="ghost"
                 size="icon"
                 className="ml-2"
-                onClick={() => onAdd(patient.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdd(patient.id);
+                }}
                 disabled={isInTour}
               >
                 {isInTour ? (
@@ -98,6 +112,8 @@ export default function Tours() {
     careType: "all",
     location: "all"
   });
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
@@ -109,8 +125,11 @@ export default function Tours() {
 
   const createTourMutation = useMutation({
     mutationFn: async (patientId: number) => {
+      const tourDate = new Date(selectedDate);
+      tourDate.setHours(9, 0, 0, 0); // Set default time to 9:00
+
       const newTour: InsertTour = {
-        date: selectedDate,
+        date: tourDate.toISOString(),
         caregiverId: 1, // TODO: Get from auth context
         patientIds: [patientId],
         status: "scheduled",
@@ -177,20 +196,8 @@ export default function Tours() {
     return matchesSearch && matchesUrgency && matchesCareType && matchesLocation;
   });
 
-  const handleAddToTour = async (patientId: number, tourId?: number) => {
-    if (tourId) {
-      // Add to existing tour
-      const tour = tours.find(t => t.id === tourId);
-      if (!tour) return;
-
-      updateTourMutation.mutate({
-        id: tourId,
-        patientIds: [...tour.patientIds, patientId],
-      });
-    } else {
-      // Create new tour
-      createTourMutation.mutate(patientId);
-    }
+  const handleAddToTour = async (patientId: number) => {
+    createTourMutation.mutate(patientId);
   };
 
   return (
@@ -203,7 +210,7 @@ export default function Tours() {
             <div>
               <h1 className="text-2xl font-bold mb-1">Tourenplanung</h1>
               <p className="text-sm text-muted-foreground">
-                Planen und optimieren Sie die täglichen Routen
+                {format(selectedDate, "EEEE, dd. MMMM yyyy", { locale: de })}
               </p>
             </div>
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -302,8 +309,9 @@ export default function Tours() {
                     <PatientCard
                       key={patient.id}
                       patient={patient}
-                      onAdd={(patientId) => handleAddToTour(patientId)}
+                      onAdd={handleAddToTour}
                       isInTour={patientsInTours.includes(patient.id)}
+                      onSelect={setSelectedPatient}
                     />
                   ))}
                 </ScrollArea>
@@ -312,11 +320,52 @@ export default function Tours() {
 
             {/* Center Column - Map */}
             <Card className="shadow-lg overflow-hidden">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-base">Karte</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={() => setIsMapExpanded(true)}>
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[90vw] w-[90vw]">
+                    <MapContainer
+                      center={center}
+                      zoom={13}
+                      style={expandedMapStyle}
+                      scrollWheelZoom
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      />
+                      {dateFilteredTours.map((tour) => (
+                        tour.optimizedRoute?.waypoints.map((waypoint, index) => (
+                          <Marker
+                            key={`${tour.id}-${index}`}
+                            position={[waypoint.lat, waypoint.lng] as LatLngExpression}
+                            icon={defaultIcon}
+                          >
+                            <Popup>
+                              <div className="p-2">
+                                <p className="font-medium">Stop {index + 1}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {patients.find(p => p.id === waypoint.patientId)?.name || `Patient #${waypoint.patientId}`}
+                                </p>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        ))
+                      ))}
+                    </MapContainer>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
               <CardContent className="p-0">
                 <MapContainer
                   center={center}
                   zoom={13}
-                  style={mapContainerStyle}
+                  style={compactMapStyle}
                   scrollWheelZoom
                 >
                   <TileLayer
@@ -333,7 +382,9 @@ export default function Tours() {
                         <Popup>
                           <div className="p-2">
                             <p className="font-medium">Stop {index + 1}</p>
-                            <p className="text-sm text-muted-foreground">Patient #{waypoint.patientId}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {patients.find(p => p.id === waypoint.patientId)?.name || `Patient #${waypoint.patientId}`}
+                            </p>
                           </div>
                         </Popup>
                       </Marker>
@@ -377,7 +428,11 @@ export default function Tours() {
                           {tour.optimizedRoute?.waypoints.map((waypoint, index) => {
                             const patient = patients.find(p => p.id === waypoint.patientId);
                             return (
-                              <div key={index} className="flex items-center gap-2 text-sm">
+                              <div 
+                                key={index} 
+                                className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md"
+                                onClick={() => setSelectedPatient(patient || null)}
+                              >
                                 <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
                                   {index + 1}
                                 </div>
@@ -388,7 +443,8 @@ export default function Tours() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     updateTourMutation.mutate({
                                       id: tour.id,
                                       patientIds: tour.patientIds.filter(id => id !== waypoint.patientId)
@@ -408,6 +464,12 @@ export default function Tours() {
               </CardContent>
             </Card>
           </div>
+
+          <PatientDetailsDialog
+            patient={selectedPatient}
+            open={!!selectedPatient}
+            onOpenChange={(open) => !open && setSelectedPatient(null)}
+          />
         </main>
       </div>
     </div>
