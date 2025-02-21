@@ -1,10 +1,10 @@
 import {
-  users, patients, tours, documentation, workflowTemplates, insuranceBilling,
-  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling,
-  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, type InsertBilling
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees,
+  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, type Employee,
+  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, type InsertBilling, type InsertEmployee
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, not } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -41,6 +41,16 @@ export interface IStorage {
   getBillings(patientId: number): Promise<InsuranceBilling[]>;
   createBilling(billing: InsertBilling): Promise<InsuranceBilling>;
   updateBillingStatus(id: number, status: string): Promise<InsuranceBilling>;
+
+  // New Employee methods
+  getEmployees(): Promise<Employee[]>;
+  getEmployee(id: number): Promise<Employee | undefined>;
+  getEmployeeByUserId(userId: number): Promise<Employee | undefined>;
+  createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: number, employee: Partial<InsertEmployee>): Promise<Employee>;
+  deleteEmployee(id: number): Promise<void>;
+  getAvailableEmployees(date: Date): Promise<Employee[]>;
+  getEmployeeQualifications(id: number): Promise<Employee['qualifications']>;
 
   sessionStore: session.Store;
 }
@@ -128,9 +138,11 @@ export class DatabaseStorage implements IStorage {
       actualStartTime: tour.actualStartTime ? new Date(tour.actualStartTime) : null,
       actualEndTime: tour.actualEndTime ? new Date(tour.actualEndTime) : null,
       patientIds: Array.isArray(tour.patientIds) ? tour.patientIds : [],
+      optimizationScore: 0,
+      matchingScore: 0,
     };
 
-    const [created] = await db.insert(tours).values([formattedTour]).returning();
+    const [created] = await db.insert(tours).values(formattedTour).returning();
     return created;
   }
 
@@ -220,6 +232,76 @@ export class DatabaseStorage implements IStorage {
       .where(eq(insuranceBilling.id, id))
       .returning();
     return updated;
+  }
+
+  // New Employee methods
+  async getEmployees(): Promise<Employee[]> {
+    return db.select().from(employees);
+  }
+
+  async getEmployee(id: number): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.id, id));
+    return employee;
+  }
+
+  async getEmployeeByUserId(userId: number): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.userId, userId));
+    return employee;
+  }
+
+  async createEmployee(employee: InsertEmployee): Promise<Employee> {
+    const [created] = await db.insert(employees).values({
+      ...employee,
+      qualifications: {
+        nursingDegree: false,
+        medicationAdministration: false,
+        woundCare: false,
+        dementiaCare: false,
+        palliativeCare: false,
+        lifting: false,
+        firstAid: false,
+        additionalCertifications: [],
+        ...employee.qualifications,
+      },
+      languages: employee.languages || [],
+      preferredDistricts: employee.preferredDistricts || [],
+      vacationDays: employee.vacationDays || [],
+    }).returning();
+    return created;
+  }
+
+  async updateEmployee(id: number, updates: Partial<InsertEmployee>): Promise<Employee> {
+    const [updated] = await db
+      .update(employees)
+      .set(updates)
+      .where(eq(employees.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEmployee(id: number): Promise<void> {
+    await db.delete(employees).where(eq(employees.id, id));
+  }
+
+  async getAvailableEmployees(date: Date): Promise<Employee[]> {
+    const dayOfWeek = date.toLocaleLowerCase().split(',')[0];
+    return db
+      .select()
+      .from(employees)
+      .where(
+        and(
+          eq(employees.status, 'active'),
+          not(employees.vacationDays.contains([date.toISOString().split('T')[0]]))
+        )
+      );
+  }
+
+  async getEmployeeQualifications(id: number): Promise<Employee['qualifications']> {
+    const [employee] = await db
+      .select({ qualifications: employees.qualifications })
+      .from(employees)
+      .where(eq(employees.id, id));
+    return employee?.qualifications;
   }
 }
 

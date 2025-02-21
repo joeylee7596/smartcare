@@ -33,10 +33,49 @@ export const patients = pgTable("patients", {
   nextScheduledVisit: timestamp("next_scheduled_visit"),
 });
 
+export const employees = pgTable("employees", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("caregiver"),
+  status: text("status").notNull().default("active"),
+  workingHours: json("working_hours").$type<{
+    [key: string]: {
+      start: string;
+      end: string;
+      isWorkingDay: boolean;
+    };
+  }>().notNull(),
+  qualifications: json("qualifications").$type<{
+    nursingDegree: boolean;
+    medicationAdministration: boolean;
+    woundCare: boolean;
+    dementiaCare: boolean;
+    palliativeCare: boolean;
+    lifting: boolean;
+    firstAid: boolean;
+    additionalCertifications: string[];
+  }>().notNull(),
+  languages: json("languages").$type<string[]>().notNull(),
+  vehicleInfo: json("vehicle_info").$type<{
+    hasVehicle: boolean;
+    type: "car" | "bicycle" | "public_transport";
+    licensePlate?: string;
+  }>().notNull(),
+  maxPatientsPerDay: integer("max_patients_per_day").notNull().default(8),
+  preferredDistricts: json("preferred_districts").$type<string[]>().notNull(),
+  vacationDays: json("vacation_days").$type<string[]>().notNull(),
+  notes: text("notes"),
+  lastTour: timestamp("last_tour"),
+  nextScheduledTour: timestamp("next_scheduled_tour"),
+});
+
 export const tours = pgTable("tours", {
   id: serial("id").primaryKey(),
   date: timestamp("date").notNull(),
-  caregiverId: integer("caregiver_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
   patientIds: json("patient_ids").$type<number[]>().notNull(),
   status: text("status").notNull().default("scheduled"),
   optimizedRoute: json("optimized_route").$type<{
@@ -48,18 +87,22 @@ export const tours = pgTable("tours", {
       visitDuration: number;
       travelTimeToNext: number;
       distanceToNext: number;
+      requiredQualifications: string[];
     }[];
     totalDistance: number;
     estimatedDuration: number;
   }>(),
   actualStartTime: timestamp("actual_start_time"),
   actualEndTime: timestamp("actual_end_time"),
+  employeeNotes: text("employee_notes"),
+  optimizationScore: decimal("optimization_score"),
+  matchingScore: decimal("matching_score"),
 });
 
 export const documentation = pgTable("documentation", {
   id: serial("id").primaryKey(),
   patientId: integer("patient_id").notNull(),
-  caregiverId: integer("caregiver_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
   date: timestamp("date").notNull(),
   content: text("content").notNull(),
   type: text("type").notNull(),
@@ -88,7 +131,7 @@ export const workflowTemplates = pgTable("workflow_templates", {
 export const insuranceBilling = pgTable("insurance_billing", {
   id: serial("id").primaryKey(),
   patientId: integer("patient_id").notNull(),
-  caregiverId: integer("caregiver_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
   date: timestamp("date").notNull(),
   services: json("services").$type<{
     code: string;
@@ -104,6 +147,7 @@ export const insuranceBilling = pgTable("insurance_billing", {
 
 export const insertUserSchema = createInsertSchema(users);
 export const insertPatientSchema = createInsertSchema(patients);
+export const insertEmployeeSchema = createInsertSchema(employees);
 export const insertTourSchema = createInsertSchema(tours).extend({
   date: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
@@ -117,6 +161,8 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Patient = typeof patients.$inferSelect;
 export type InsertPatient = z.infer<typeof insertPatientSchema>;
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Tour = typeof tours.$inferSelect;
 export type InsertTour = z.infer<typeof insertTourSchema>;
 export type Documentation = typeof documentation.$inferSelect;

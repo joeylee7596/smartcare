@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertPatientSchema, insertTourSchema, insertDocSchema } from "@shared/schema";
+import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeSchema } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -100,6 +100,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const id = parseInt(req.params.id);
     await storage.deleteTour(id);
+    res.sendStatus(204);
+  });
+
+  // Employees (new endpoints)
+  app.get("/api/employees", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const employees = await storage.getEmployees();
+    res.json(employees);
+  });
+
+  app.get("/api/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    const employee = await storage.getEmployee(id);
+    if (!employee) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    res.json(employee);
+  });
+
+  app.get("/api/employees/:id/qualifications", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    const qualifications = await storage.getEmployeeQualifications(id);
+    if (!qualifications) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
+    res.json(qualifications);
+  });
+
+  app.get("/api/employees/available", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const date = req.query.date ? new Date(req.query.date as string) : new Date();
+    const employees = await storage.getAvailableEmployees(date);
+    res.json(employees);
+  });
+
+  app.post("/api/employees", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const parsed = insertEmployeeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const employee = await storage.createEmployee(parsed.data);
+    res.status(201).json(employee);
+  });
+
+  app.patch("/api/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    const employee = await storage.updateEmployee(id, req.body);
+    res.json(employee);
+  });
+
+  app.delete("/api/employees/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    await storage.deleteEmployee(id);
     res.sendStatus(204);
   });
 
