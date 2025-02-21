@@ -4,16 +4,14 @@ const mistralAxios = axios.create({
   baseURL: 'https://api.mistral.ai/v1',
   headers: {
     'Content-Type': 'application/json',
-    // Add 'Bearer' prefix to the API key
     'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`,
   },
 });
 
 export async function generateDocumentation(audioContent: string): Promise<string> {
   try {
-    // Updated request format according to Mistral API docs
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-large",  // Changed from mistral-large-latest
+      model: "mistral-tiny", // Using their base model for testing
       messages: [
         {
           role: "system",
@@ -33,7 +31,7 @@ export async function generateDocumentation(audioContent: string): Promise<strin
     }
 
     return response.data.choices[0].message.content;
-  } catch (error: any) {  // Added type annotation
+  } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
     throw new Error(`Failed to generate documentation: ${error.response?.data?.message || error.message}`);
   }
@@ -46,7 +44,7 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
 }> {
   try {
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-large",  // Changed from mistral-large-latest
+      model: "mistral-tiny",
       messages: [
         {
           role: "system",
@@ -71,7 +69,7 @@ export async function optimizeWorkflow(patientData: any[]): Promise<{
       totalDistance: aiResponse.totalDistance || 0,
       estimatedDuration: aiResponse.estimatedDuration || 0
     };
-  } catch (error: any) {  // Added type annotation
+  } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
     throw new Error(`Failed to optimize workflow: ${error.response?.data?.message || error.message}`);
   }
@@ -84,7 +82,7 @@ export async function generateAISuggestion(context: {
 }): Promise<string> {
   try {
     const response = await mistralAxios.post('/chat/completions', {
-      model: "mistral-large",  // Changed from mistral-large-latest
+      model: "mistral-tiny",
       messages: [
         {
           role: "system",
@@ -104,7 +102,7 @@ export async function generateAISuggestion(context: {
     }
 
     return response.data.choices[0].message.content;
-  } catch (error: any) {  // Added type annotation
+  } catch (error: any) {
     console.error("Mistral AI API error:", error.response?.data || error.message);
     throw new Error(`Failed to generate AI suggestion: ${error.response?.data?.message || error.message}`);
   }
