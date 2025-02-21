@@ -9,21 +9,28 @@ class WebSocketManager {
   private static instance: WebSocket | null = null;
   private static messageHandlers: Set<(message: WebSocketMessage) => void> = new Set();
   private static reconnectAttempts = 0;
-  private static maxReconnectAttempts = 5;
-  private static reconnectDelay = 2000;
+  private static maxReconnectAttempts = 10; // Increased from 5 to 10
+  private static reconnectDelay = 1000; // Reduced from 2000 to 1000
+  private static reconnectTimer: NodeJS.Timeout | null = null;
 
   static getInstance(): WebSocket | null {
     if (!this.instance || this.instance.readyState === WebSocket.CLOSED) {
       try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws`;
 
+        console.log('Connecting to WebSocket:', wsUrl);
         this.instance = new WebSocket(wsUrl);
         this.reconnectAttempts = 0;
 
         this.instance.onopen = () => {
           console.log('WebSocket connected successfully');
           this.reconnectAttempts = 0;
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+          }
         };
 
         this.instance.onmessage = (event) => {
@@ -42,7 +49,10 @@ class WebSocketManager {
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-            setTimeout(() => this.getInstance(), this.reconnectDelay);
+
+            // Exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 10000);
+            this.reconnectTimer = setTimeout(() => this.getInstance(), delay);
           } else {
             toast({
               title: "Verbindungsfehler",
@@ -68,11 +78,10 @@ class WebSocketManager {
     if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     } else {
-      toast({
-        title: "Fehler",
-        description: "Nachricht konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.",
-        variant: "destructive",
-      });
+      console.log('WebSocket not ready, attempting to connect...');
+      // Try to establish connection before sending
+      this.getInstance();
+      setTimeout(() => this.sendMessage(message), 1000);
     }
   }
 

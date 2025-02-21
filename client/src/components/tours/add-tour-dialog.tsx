@@ -4,7 +4,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { InsertTour, insertTourSchema, Patient } from "@shared/schema";
+import { InsertTour, insertTourSchema, Patient, Tour } from "@shared/schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -104,11 +104,39 @@ export function AddTourDialog() {
 
   const mutation = useMutation({
     mutationFn: async (data: InsertTour) => {
+      // Find latest end time of existing tours for this date
+      const dateFilteredTours = await apiRequest("GET", "/api/tours").then(res => res.json());
+      const selectedDate = new Date(data.date);
+
+      const latestTour = dateFilteredTours
+        .filter((tour: Tour) => {
+          const tourDate = new Date(tour.date);
+          return tourDate.getDate() === selectedDate.getDate() &&
+                 tourDate.getMonth() === selectedDate.getMonth() &&
+                 tourDate.getFullYear() === selectedDate.getFullYear();
+        })
+        .map((tour: Tour) => {
+          const waypoints = tour.optimizedRoute?.waypoints || [];
+          if (waypoints.length === 0) return null;
+          const lastWaypoint = waypoints[waypoints.length - 1];
+          const endTime = new Date(lastWaypoint.estimatedTime);
+          endTime.setMinutes(endTime.getMinutes() + lastWaypoint.visitDuration + lastWaypoint.travelTimeToNext);
+          return endTime;
+        })
+        .filter(Boolean)
+        .sort((a, b) => b!.getTime() - a!.getTime())[0];
+
+      // Set start time to either 9 AM or after the latest tour
+      const baseTime = latestTour || new Date(selectedDate.setHours(9, 0, 0, 0));
+      if (latestTour) {
+        baseTime.setMinutes(baseTime.getMinutes() + 15); // Add buffer between tours
+      }
+
       // Generate simulated locations for each patient
       const patientLocations = data.patientIds.reduce((acc, patientId) => ({
         ...acc,
         [patientId]: {
-          lat: 52.520008 + (Math.random() * 0.1 - 0.05), // Simulate different locations
+          lat: 52.520008 + (Math.random() * 0.1 - 0.05),
           lng: 13.404954 + (Math.random() * 0.1 - 0.05)
         }
       }), {} as Record<number, { lat: number; lng: number }>);
@@ -119,9 +147,6 @@ export function AddTourDialog() {
         const distance = Math.sqrt(dx * dx + dy * dy) * 111; // Rough km conversion
         return Math.round(distance * 2); // 2 minutes per km
       }
-
-      const baseTime = new Date(data.date);
-      baseTime.setHours(9, 0, 0, 0); // Start at 9 AM
 
       let currentTime = new Date(baseTime);
       let totalDistance = 0;
@@ -172,6 +197,7 @@ export function AddTourDialog() {
 
       const tourData = {
         ...data,
+        date: baseTime.toISOString(), // Use the calculated start time
         optimizedRoute
       };
 

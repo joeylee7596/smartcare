@@ -125,35 +125,43 @@ export default function Tours() {
   const createTourMutation = useMutation({
     mutationFn: async (patientId: number) => {
       const tourDate = new Date(selectedDate);
-      tourDate.setHours(9, 0, 0, 0); // Start at 9 AM
 
-      // Simulate an intelligent route with variable travel times
-      function calculateTravelTime(fromLat: number, fromLng: number, toLat: number, toLng: number) {
-        // Simulate different travel times based on "distance"
-        const dx = Math.abs(fromLat - toLat);
-        const dy = Math.abs(fromLng - toLng);
-        const distance = Math.sqrt(dx * dx + dy * dy) * 111; // Rough km conversion
-        return Math.round(distance * 2); // 2 minutes per km
+      // Find latest end time of existing tours for this date
+      const latestTour = dateFilteredTours
+        .map(tour => {
+          const waypoints = tour.optimizedRoute?.waypoints || [];
+          if (waypoints.length === 0) return null;
+          const lastWaypoint = waypoints[waypoints.length - 1];
+          const endTime = new Date(lastWaypoint.estimatedTime);
+          endTime.setMinutes(endTime.getMinutes() + lastWaypoint.visitDuration + lastWaypoint.travelTimeToNext);
+          return endTime;
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.getTime() - a.getTime())[0];
+
+      // Set start time to either 9 AM or after the latest tour
+      const startTime = latestTour || new Date(tourDate.setHours(9, 0, 0, 0));
+      if (latestTour) {
+        startTime.setMinutes(startTime.getMinutes() + 15); // Add buffer between tours
       }
 
-      const patientLocations = {
-        [patientId]: {
-          lat: 52.520008 + (Math.random() * 0.1 - 0.05), // Simulate different locations
-          lng: 13.404954 + (Math.random() * 0.1 - 0.05)
-        }
+      // Generate simulated location for the new patient
+      const patientLocation = {
+        lat: 52.520008 + (Math.random() * 0.1 - 0.05),
+        lng: 13.404954 + (Math.random() * 0.1 - 0.05)
       };
 
       const newTour: InsertTour = {
-        date: tourDate.toISOString(),
+        date: startTime.toISOString(),
         caregiverId: 1,
         patientIds: [patientId],
         status: "scheduled",
         optimizedRoute: {
           waypoints: [{
             patientId: patientId,
-            lat: patientLocations[patientId].lat,
-            lng: patientLocations[patientId].lng,
-            estimatedTime: tourDate.toISOString(),
+            lat: patientLocation.lat,
+            lng: patientLocation.lng,
+            estimatedTime: startTime.toISOString(),
             visitDuration: 30,
             travelTimeToNext: 0,
             distanceToNext: 0
@@ -261,9 +269,9 @@ export default function Tours() {
         estimatedDuration: totalDuration
       };
 
-      const response = await apiRequest("PATCH", `/api/tours/${id}`, { 
-        patientIds, 
-        optimizedRoute 
+      const response = await apiRequest("PATCH", `/api/tours/${id}`, {
+        patientIds,
+        optimizedRoute
       });
 
       if (!response.ok) {
