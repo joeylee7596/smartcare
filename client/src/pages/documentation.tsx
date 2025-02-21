@@ -1,6 +1,6 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -120,13 +120,13 @@ function DocumentationPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
       <Sidebar />
       <div className="flex-1">
         <Header />
-        <main className="p-8">
+        <main className="p-4 md:p-8 max-w-[1920px] mx-auto">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
               Dokumentation
             </h1>
             <p className="text-muted-foreground text-lg">
@@ -134,11 +134,13 @@ function DocumentationPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <StatusColumn
-              title="Offen"
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
+            <Column 
+              title="Offen" 
+              icon={<Clock className="h-5 w-5" />}
               count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
-              color="blue"
+              gradient="from-blue-500/20 to-blue-600/20"
+              iconColor="text-blue-600"
             >
               {activePatientId ? (
                 <div className="space-y-4">
@@ -163,9 +165,10 @@ function DocumentationPage() {
                       patient={patients.find(p => p.id === doc.patientId)!}
                       onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
                       showMoveForward
+                      className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/50 dark:to-gray-900"
                     />
                   ))}
-                  <div className="pt-4 border-t">
+                  <div className="pt-4 border-t border-blue-100 dark:border-blue-900">
                     <h3 className="text-sm font-medium mb-3">Neue Dokumentation</h3>
                     {patients.map((patient) => (
                       <NewDocumentationCard
@@ -177,12 +180,14 @@ function DocumentationPage() {
                   </div>
                 </>
               )}
-            </StatusColumn>
+            </Column>
 
-            <StatusColumn
-              title="In Überprüfung"
+            <Column 
+              title="In Überprüfung" 
+              icon={<RefreshCw className="h-5 w-5" />}
               count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
-              color="amber"
+              gradient="from-amber-500/20 to-amber-600/20"
+              iconColor="text-amber-600"
             >
               {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
                 <DocumentCard
@@ -193,14 +198,17 @@ function DocumentationPage() {
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveForward
                   showMoveBackward
+                  className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/50 dark:to-gray-900"
                 />
               ))}
-            </StatusColumn>
+            </Column>
 
-            <StatusColumn
-              title="Abgeschlossen"
+            <Column 
+              title="Abgeschlossen" 
+              icon={<Check className="h-5 w-5" />}
               count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
-              color="green"
+              gradient="from-green-500/20 to-green-600/20"
+              iconColor="text-green-600"
             >
               {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
                 <DocumentCard
@@ -209,9 +217,10 @@ function DocumentationPage() {
                   patient={patients.find(p => p.id === doc.patientId)!}
                   onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
                   showMoveBackward
+                  className="bg-gradient-to-br from-green-50 to-white dark:from-green-950/50 dark:to-gray-900"
                 />
               ))}
-            </StatusColumn>
+            </Column>
           </div>
         </main>
       </div>
@@ -219,41 +228,44 @@ function DocumentationPage() {
   );
 }
 
-function StatusColumn({
-  title,
-  count,
-  children,
-  color
-}: {
+interface ColumnProps {
   title: string;
+  icon: React.ReactNode;
   count: number;
   children: React.ReactNode;
-  color: 'blue' | 'amber' | 'green';
-}) {
-  const colorClasses = {
-    blue: 'bg-blue-50/50 border-blue-100 shadow-blue-100/20',
-    amber: 'bg-amber-50/50 border-amber-100 shadow-amber-100/20',
-    green: 'bg-green-50/50 border-green-100 shadow-green-100/20'
-  };
+  gradient: string;
+  iconColor: string;
+}
 
+function Column({ title, icon, count, children, gradient, iconColor }: ColumnProps) {
   return (
-    <div className={`rounded-xl border backdrop-blur-sm ${colorClasses[color]} shadow-lg transition-all duration-200`}>
-      <div className="p-4 border-b border-opacity-50">
-        <div className="flex items-center justify-between">
+    <div className={`rounded-xl bg-gradient-to-br ${gradient} backdrop-blur-xl shadow-lg p-4 transition-all duration-200`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-full bg-white/80 dark:bg-gray-900/80 ${iconColor}`}>
+            {icon}
+          </div>
           <h2 className="text-lg font-semibold">{title}</h2>
-          <span className={`px-3 py-1 text-sm font-medium rounded-full 
-            ${color === 'blue' ? 'bg-blue-100 text-blue-700' : 
-              color === 'amber' ? 'bg-amber-100 text-amber-700' : 
-              'bg-green-100 text-green-700'}`}>
-            {count}
-          </span>
+        </div>
+        <div className="px-3 py-1 text-sm font-medium rounded-full bg-white/80 dark:bg-gray-900/80 text-primary">
+          {count}
         </div>
       </div>
-      <ScrollArea className="h-[calc(100vh-250px)]">
-        <div className="p-4 space-y-4">{children}</div>
+      <ScrollArea className="h-[calc(100vh-280px)]">
+        <div className="space-y-4 pr-4">{children}</div>
       </ScrollArea>
     </div>
   );
+}
+
+interface DocumentCardProps {
+  doc: Doc;
+  patient: Patient;
+  onMoveForward?: () => void;
+  onMoveBackward?: () => void;
+  showMoveForward?: boolean;
+  showMoveBackward?: boolean;
+  className?: string;
 }
 
 function DocumentCard({ 
@@ -262,22 +274,16 @@ function DocumentCard({
   onMoveForward,
   onMoveBackward,
   showMoveForward,
-  showMoveBackward
-}: { 
-  doc: Doc; 
-  patient: Patient;
-  onMoveForward?: () => void;
-  onMoveBackward?: () => void;
-  showMoveForward?: boolean;
-  showMoveBackward?: boolean;
-}) {
+  showMoveBackward,
+  className
+}: DocumentCardProps) {
   if (!patient) return null;
 
   return (
-    <Card className="group relative hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{patient.name}</span>
+    <Card className={`group relative hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${className}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium">{patient.name}</h3>
           {doc.status === DocumentationStatus.COMPLETED ? (
             <Check className="h-4 w-4 text-green-600" />
           ) : doc.status === DocumentationStatus.REVIEW ? (
@@ -285,9 +291,8 @@ function DocumentCard({
           ) : (
             <Clock className="h-4 w-4 text-blue-600" />
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </div>
+
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">
@@ -299,18 +304,21 @@ function DocumentCard({
               {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
             </span>
           </div>
+
           <p className="text-sm line-clamp-3">{doc.content}</p>
+
           {doc.reviewNotes && (
             <div className="mt-2 p-2 rounded-lg bg-muted/50 border">
               <p className="text-xs text-muted-foreground">Anmerkungen:</p>
               <p className="text-sm">{doc.reviewNotes}</p>
             </div>
           )}
-          <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+
+          <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-all duration-200">
             {showMoveBackward && (
               <Button 
                 variant="outline" 
-                size="sm" 
+                size="sm"
                 className="flex-1 hover:bg-muted"
                 onClick={onMoveBackward}
               >
@@ -321,7 +329,7 @@ function DocumentCard({
             {showMoveForward && (
               <Button 
                 variant="outline" 
-                size="sm" 
+                size="sm"
                 className="flex-1 hover:bg-muted"
                 onClick={onMoveForward}
               >
@@ -338,11 +346,11 @@ function DocumentCard({
 
 function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient; onStartRecording: () => void }) {
   return (
-    <Card className="relative hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-      <CardContent className="pt-4">
+    <Card className="group relative hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
+      <CardContent className="p-4">
         <Button
           variant="outline"
-          className="w-full"
+          className="w-full bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/20"
           onClick={onStartRecording}
         >
           <Plus className="mr-2 h-4 w-4" />
