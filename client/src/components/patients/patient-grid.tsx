@@ -43,7 +43,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
               <CardTitle className="flex justify-between items-center">
                 <span>{patient.name}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
                     Pflegegrad {patient.careLevel}
                   </span>
                 </div>
@@ -51,16 +51,16 @@ export function PatientGrid({ patients }: PatientGridProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <div className="flex items-center text-sm">
-                  <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+                <div className="flex items-center text-sm bg-muted/50 p-2 rounded-lg transition-colors group-hover:bg-muted">
+                  <MapPin className="h-4 w-4 mr-2 text-primary" />
                   <span>{patient.address}</span>
                 </div>
-                <div className="flex items-center text-sm">
-                  <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                <div className="flex items-center text-sm bg-muted/50 p-2 rounded-lg transition-colors group-hover:bg-muted">
+                  <Phone className="h-4 w-4 mr-2 text-primary" />
                   <span>{patient.emergencyContact}</span>
                 </div>
-                <div className="flex items-center text-sm">
-                  <Heart className="h-4 w-4 mr-2 text-muted-foreground" />
+                <div className="flex items-center text-sm bg-muted/50 p-2 rounded-lg transition-colors group-hover:bg-muted">
+                  <Heart className="h-4 w-4 mr-2 text-primary" />
                   <span>{patient.insuranceProvider}</span>
                 </div>
               </div>
@@ -70,36 +70,30 @@ export function PatientGrid({ patients }: PatientGridProps) {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1"
+                    className="flex-1 bg-white hover:bg-primary/5"
                     onClick={() => {
-                      toast({
-                        title: "Dokumentation",
-                        description: "Öffne Dokumentation für " + patient.name,
-                      });
+                      window.location.href = `/documentation?patient=${patient.id}`;
                     }}
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2 text-primary" />
                     Dokumentation
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1"
+                    className="flex-1 bg-white hover:bg-primary/5"
                     onClick={() => {
-                      toast({
-                        title: "Termine",
-                        description: "Öffne Termine für " + patient.name,
-                      });
+                      window.location.href = `/tours/new?patient=${patient.id}`;
                     }}
                   >
-                    <Clock className="h-4 w-4 mr-2" />
+                    <Clock className="h-4 w-4 mr-2 text-primary" />
                     Termine
                   </Button>
                 </div>
               </div>
 
               {patient.lastVisit && (
-                <div className="text-xs text-muted-foreground">
+                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-lg">
                   Letzter Besuch: {format(new Date(patient.lastVisit), "dd. MMMM yyyy", { locale: de })}
                 </div>
               )}

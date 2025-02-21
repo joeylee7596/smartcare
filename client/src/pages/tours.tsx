@@ -25,7 +25,6 @@ export default function Tours() {
     (tour) => format(new Date(tour.date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
   );
 
-  // Simulated AI optimization function
   const optimizeRoute = () => {
     console.log("Optimizing routes with AI...");
   };
@@ -63,8 +62,15 @@ export default function Tours() {
     aiOptimized: true,
   };
 
+  // Get dates with tours for calendar highlighting
+  const datesWithTours = tours.reduce((acc, tour) => {
+    const tourDate = format(new Date(tour.date), "yyyy-MM-dd");
+    acc[tourDate] = true;
+    return acc;
+  }, {} as Record<string, boolean>);
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <div className="flex-1">
         <Header />
@@ -88,7 +94,7 @@ export default function Tours() {
 
           <div className="grid gap-8 md:grid-cols-[300px,1fr,300px]">
             <div className="space-y-6">
-              <Card>
+              <Card className="shadow-lg">
                 <CardContent className="p-4">
                   <Calendar
                     mode="single"
@@ -96,30 +102,40 @@ export default function Tours() {
                     onSelect={(date) => date && setDate(date)}
                     locale={de}
                     className="rounded-md border"
+                    modifiers={{
+                      hasTour: (date) => datesWithTours[format(date, "yyyy-MM-dd")] || false,
+                    }}
+                    modifiersStyles={{
+                      hasTour: {
+                        backgroundColor: "hsl(220 70% 50% / 0.1)",
+                        color: "hsl(220 70% 50%)",
+                        fontWeight: "bold",
+                      },
+                    }}
                   />
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium">Statistiken</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
                     <span className="text-sm text-muted-foreground">Touren heute</span>
                     <span className="font-medium">{todaysTours.length}</span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
                     <span className="text-sm text-muted-foreground">Patienten</span>
                     <span className="font-medium">
                       {todaysTours.reduce((acc, tour) => acc + tour.patientIds.length, 0)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
                     <span className="text-sm text-muted-foreground">Zeitaufwand</span>
                     <span className="font-medium">4.5h</span>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
                     <span className="text-sm text-muted-foreground">KI-Optimierungen</span>
                     <span className="font-medium text-primary">3 Vorschläge</span>
                   </div>
@@ -127,7 +143,7 @@ export default function Tours() {
               </Card>
             </div>
 
-            <Card className="row-span-2">
+            <Card className="row-span-2 shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">
@@ -154,7 +170,7 @@ export default function Tours() {
                     {todaysTours.map((tour) => (
                       <div
                         key={tour.id}
-                        className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 transition-colors"
+                        className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/5 transition-colors shadow-sm hover:shadow-md"
                       >
                         <div className="p-2 rounded-full bg-primary/10">
                           <Clock className="h-5 w-5 text-primary" />
@@ -187,10 +203,10 @@ export default function Tours() {
                             )}
                           </div>
                           {tour.optimizedRoute && (
-                            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
                               <div className="flex items-center gap-2 mb-2">
                                 <Route className="h-4 w-4 text-blue-600" />
-                                <span className="text-sm font-medium text-blue-700">Stationen</span>
+                                <span className="text-sm font-medium text-blue-700">Optimierte Route</span>
                               </div>
                               <div className="space-y-2">
                                 {tour.optimizedRoute.waypoints.map((waypoint, index) => (
@@ -205,7 +221,7 @@ export default function Tours() {
                             </div>
                           )}
                         </div>
-                        <Button variant="ghost" size="sm">Details</Button>
+                        <Button variant="outline" size="sm" className="hover:bg-primary/5">Details</Button>
                       </div>
                     ))}
                   </div>
