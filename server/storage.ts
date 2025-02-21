@@ -3,7 +3,7 @@ import {
   type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling,
   type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, type InsertBilling
 } from "@shared/schema";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -49,7 +49,7 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     this.sessionStore = new PostgresStore({
-      pool: db,
+      pool: pool, // Changed from db to pool
       createTableIfMissing: true,
     });
   }
@@ -66,7 +66,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [created] = await db.insert(users).values(user).returning();
+    const [created] = await db.insert(users).values([user]).returning();
     return created;
   }
 
@@ -81,7 +81,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPatient(patient: InsertPatient): Promise<Patient> {
-    const [created] = await db.insert(patients).values(patient).returning();
+    const [created] = await db.insert(patients).values([patient]).returning();
     return created;
   }
 
@@ -109,7 +109,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTour(tour: InsertTour): Promise<Tour> {
-    const [created] = await db.insert(tours).values(tour).returning();
+    const [created] = await db.insert(tours).values([tour]).returning();
     return created;
   }
 
@@ -136,7 +136,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDoc(doc: InsertDoc): Promise<Documentation> {
-    const [created] = await db.insert(documentation).values(doc).returning();
+    const [created] = await db.insert(documentation).values([doc]).returning();
     return created;
   }
 
@@ -146,7 +146,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWorkflowTemplate(workflow: InsertWorkflow): Promise<WorkflowTemplate> {
-    const [created] = await db.insert(workflowTemplates).values(workflow).returning();
+    const [created] = await db.insert(workflowTemplates).values([workflow]).returning();
     return created;
   }
 
@@ -159,7 +159,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBilling(billing: InsertBilling): Promise<InsuranceBilling> {
-    const [created] = await db.insert(insuranceBilling).values(billing).returning();
+    const [created] = await db.insert(insuranceBilling).values([billing]).returning();
     return created;
   }
 
