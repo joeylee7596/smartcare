@@ -2,7 +2,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc } from "@shared/schema";
@@ -11,13 +11,28 @@ import { Mic, Type, Sparkles, Clock, Brain } from "lucide-react";
 import { useState } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Documentation() {
   const { toast } = useToast();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
+
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
+
+  const { data: allDocs = [] } = useQuery<Doc[]>({
+    queryKey: ["/api/docs"],
+  });
+
+  // Group docs by patient ID
+  const docsByPatient = allDocs.reduce((acc, doc) => {
+    if (!acc[doc.patientId]) {
+      acc[doc.patientId] = [];
+    }
+    acc[doc.patientId].push(doc);
+    return acc;
+  }, {} as Record<number, Doc[]>);
 
   // Simulated AI suggestions based on time and context
   const getAISuggestions = (patientId: number, time: Date) => {
@@ -32,13 +47,40 @@ export default function Documentation() {
     return "Routinecheck durchgeführt, keine Besonderheiten";
   };
 
+  const createDocMutation = useMutation({
+    mutationFn: async (data: { content: string; patientId: number }) => {
+      const res = await apiRequest("POST", "/api/docs", {
+        ...data,
+        date: new Date().toISOString(),
+        type: "Sprachaufnahme",
+        aiGenerated: false,
+        verified: false,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      toast({
+        title: "Dokumentation erstellt",
+        description: "Die Dokumentation wurde erfolgreich gespeichert.",
+      });
+    },
+  });
+
   const handleTranscriptionComplete = (text: string) => {
-    toast({
-      title: "Dokumentation erstellt",
-      description: "Die KI hat Ihre Sprachaufnahme erfolgreich verarbeitet.",
+    if (!activePatientId) return;
+
+    createDocMutation.mutate({
+      content: text,
+      patientId: activePatientId,
     });
-    // Here we would typically save the documentation via API
-    console.log("Transcribed text:", text);
+  };
+
+  const handleAISuggestion = (patientId: number, suggestion: string) => {
+    createDocMutation.mutate({
+      content: suggestion,
+      patientId,
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -67,77 +109,79 @@ export default function Documentation() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {patients.map((patient) => {
-              const { data: docs = [] } = useQuery<Doc[]>({
-                queryKey: ["/api/patients", patient.id, "docs"],
-              });
-
-              return (
-                <Card key={patient.id} className="relative">
-                  <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                      <span>{patient.name}</span>
-                      <Button variant="ghost" size="sm" className="text-xs">
-                        <Clock className="mr-1 h-3 w-3" />
-                        Zeitleiste
+            {patients.map((patient) => (
+              <Card key={patient.id} className="relative">
+                <CardHeader>
+                  <CardTitle className="flex justify-between items-center">
+                    <span>{patient.name}</span>
+                    <Button variant="ghost" size="sm" className="text-xs">
+                      <Clock className="mr-1 h-3 w-3" />
+                      Zeitleiste
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[300px]">
+                    {activePatientId === patient.id ? (
+                      <VoiceRecorder
+                        onTranscriptionComplete={handleTranscriptionComplete}
+                        className="mb-4"
+                      />
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="w-full mb-4"
+                        onClick={() => setActivePatientId(patient.id)}
+                      >
+                        <Mic className="mr-2 h-4 w-4" />
+                        Sprachaufnahme
                       </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-[300px]">
-                      {activePatientId === patient.id ? (
-                        <VoiceRecorder
-                          onTranscriptionComplete={handleTranscriptionComplete}
-                          className="mb-4"
-                        />
-                      ) : (
-                        <Button
-                          variant="outline"
-                          className="w-full mb-4"
-                          onClick={() => setActivePatientId(patient.id)}
-                        >
-                          <Mic className="mr-2 h-4 w-4" />
-                          Sprachaufnahme
-                        </Button>
-                      )}
+                    )}
 
-                      <div className="space-y-4">
-                        {/* AI Suggestion Card */}
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                          <div className="flex items-center text-sm text-blue-700 mb-2">
-                            <Sparkles className="h-3 w-3 mr-1" />
-                            KI-Vorschlag
-                          </div>
-                          <p className="text-sm text-blue-900">
-                            {getAISuggestions(patient.id, new Date())}
-                          </p>
-                          <Button variant="ghost" size="sm" className="mt-2 text-xs text-blue-700">
-                            Übernehmen
-                          </Button>
+                    <div className="space-y-4">
+                      {/* AI Suggestion Card */}
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="flex items-center text-sm text-blue-700 mb-2">
+                          <Sparkles className="h-3 w-3 mr-1" />
+                          KI-Vorschlag
                         </div>
-
-                        {docs.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="p-4 border rounded-lg space-y-2 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                {doc.type}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {formatDate(doc.date)}
-                              </span>
-                            </div>
-                            <p className="text-sm">{doc.content}</p>
-                          </div>
-                        ))}
+                        <p className="text-sm text-blue-900">
+                          {getAISuggestions(patient.id, new Date())}
+                        </p>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="mt-2 text-xs text-blue-700"
+                          onClick={() => handleAISuggestion(
+                            patient.id,
+                            getAISuggestions(patient.id, new Date())
+                          )}
+                        >
+                          Übernehmen
+                        </Button>
                       </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              );
-            })}
+
+                      {(docsByPatient[patient.id] || []).map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="p-4 border rounded-lg space-y-2 hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                              {doc.type}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {formatDate(doc.date)}
+                            </span>
+                          </div>
+                          <p className="text-sm">{doc.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </main>
       </div>

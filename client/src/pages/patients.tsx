@@ -1,6 +1,6 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
-import { PatientTable } from "@/components/patients/patient-table";
+import { PatientGrid } from "@/components/patients/patient-grid";
 import { AddPatientDialog } from "@/components/patients/add-patient-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,6 @@ export default function Patients() {
     patient.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Quick action cards with smart features and navigation
   const quickActions = [
     {
       title: "Vitalzeichen",
@@ -105,7 +104,7 @@ export default function Patients() {
             </div>
           </div>
 
-          <PatientTable patients={filteredPatients} />
+          <PatientGrid patients={filteredPatients} />
         </main>
       </div>
     </div>
