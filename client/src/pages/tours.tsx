@@ -173,15 +173,37 @@ export default function Tours() {
                               <Users className="h-4 w-4 mr-1" />
                               {tour.patientIds.length} Patienten
                             </div>
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              {tour.optimizedRoute?.totalDistance.toFixed(1) || "2.5"} km
-                            </div>
-                            <div className="flex items-center">
-                              <Clock className="h-4 w-4 mr-1" />
-                              ~{tour.optimizedRoute?.estimatedDuration || 45} min
-                            </div>
+                            {tour.optimizedRoute && (
+                              <>
+                                <div className="flex items-center">
+                                  <MapPin className="h-4 w-4 mr-1" />
+                                  {tour.optimizedRoute.totalDistance.toFixed(1)} km
+                                </div>
+                                <div className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-1" />
+                                  ~{tour.optimizedRoute.estimatedDuration} min
+                                </div>
+                              </>
+                            )}
                           </div>
+                          {tour.optimizedRoute && (
+                            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Route className="h-4 w-4 text-blue-600" />
+                                <span className="text-sm font-medium text-blue-700">Stationen</span>
+                              </div>
+                              <div className="space-y-2">
+                                {tour.optimizedRoute.waypoints.map((waypoint, index) => (
+                                  <div key={index} className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-sm">
+                                      {index + 1}
+                                    </div>
+                                    <span className="text-sm text-blue-600">Patient #{waypoint.patientId}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <Button variant="ghost" size="sm">Details</Button>
                       </div>

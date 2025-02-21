@@ -41,6 +41,15 @@ export default function Documentation() {
     console.log("Transcribed text:", text);
   };
 
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), "dd.MM.yyyy HH:mm", { locale: de });
+    } catch (error) {
+      console.error("Invalid date:", dateString);
+      return "Ungültiges Datum";
+    }
+  };
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -117,9 +126,7 @@ export default function Documentation() {
                                 {doc.type}
                               </span>
                               <span className="text-sm text-muted-foreground">
-                                {format(new Date(doc.date), "dd.MM.yyyy HH:mm", {
-                                  locale: de,
-                                })}
+                                {formatDate(doc.date)}
                               </span>
                             </div>
                             <p className="text-sm">{doc.content}</p>
