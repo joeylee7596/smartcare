@@ -35,8 +35,17 @@ function DocumentationPage() {
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
   const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor)
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 10, // Mindestabstand für Drag-Start
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Verzögerung für Touch-Geräte
+        tolerance: 5,
+      },
+    })
   );
 
   const { data: patients = [] } = useQuery<Patient[]>({
@@ -69,7 +78,6 @@ function DocumentationPage() {
     },
   });
 
-  // WebSocket subscription for real-time updates
   useEffect(() => {
     const unsubscribe = subscribe((message) => {
       if (message.type === 'DOC_STATUS_UPDATED') {
@@ -85,7 +93,8 @@ function DocumentationPage() {
   }, [subscribe, toast]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    setDraggedItem(event.active.id as number);
+    const { active } = event;
+    setDraggedItem(active.id as number);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -167,10 +176,9 @@ function DocumentationPage() {
             onDragEnd={handleDragEnd}
           >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Pending Column */}
               <StatusColumn
                 title="Offen"
-                count={patients.length}
+                count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
                 status={DocumentationStatus.PENDING}
               >
                 {activePatientId ? (
@@ -188,17 +196,28 @@ function DocumentationPage() {
                     </Button>
                   </div>
                 ) : (
-                  patients.map((patient) => (
-                    <NewDocumentationCard
-                      key={patient.id}
-                      patient={patient}
-                      onStartRecording={() => setActivePatientId(patient.id)}
-                    />
-                  ))
+                  <>
+                    {docsByStatus[DocumentationStatus.PENDING]?.map((doc) => (
+                      <DocumentCard
+                        key={doc.id}
+                        doc={doc}
+                        patient={patients.find(p => p.id === doc.patientId)!}
+                      />
+                    ))}
+                    <div className="pt-4 border-t">
+                      <h3 className="text-sm font-medium mb-3">Neue Dokumentation</h3>
+                      {patients.map((patient) => (
+                        <NewDocumentationCard
+                          key={patient.id}
+                          patient={patient}
+                          onStartRecording={() => setActivePatientId(patient.id)}
+                        />
+                      ))}
+                    </div>
+                  </>
                 )}
               </StatusColumn>
 
-              {/* Review Column */}
               <StatusColumn
                 title="In Überprüfung"
                 count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
@@ -213,7 +232,6 @@ function DocumentationPage() {
                 ))}
               </StatusColumn>
 
-              {/* Completed Column */}
               <StatusColumn
                 title="Abgeschlossen"
                 count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
@@ -229,7 +247,10 @@ function DocumentationPage() {
               </StatusColumn>
             </div>
 
-            <DragOverlay>
+            <DragOverlay dropAnimation={{
+              duration: 200,
+              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+            }}>
               {draggedItem && draggingDoc && draggingPatient && (
                 <DocumentCard doc={draggingDoc} patient={draggingPatient} />
               )}
@@ -259,12 +280,14 @@ function StatusColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`space-y-4 p-4 rounded-lg transition-colors ${
-        isOver ? "bg-muted/50" : ""
-      }`}
+      className={`rounded-lg border ${
+        isOver 
+          ? "bg-muted/50 border-primary/50 ring-1 ring-primary/20" 
+          : "bg-card"
+      } transition-all duration-200`}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
           <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary">
             {count}
@@ -272,7 +295,7 @@ function StatusColumn({
         </div>
       </div>
       <ScrollArea className="h-[calc(100vh-250px)]">
-        <div className="space-y-4 pr-4">{children}</div>
+        <div className="p-4 space-y-4">{children}</div>
       </ScrollArea>
     </div>
   );
@@ -289,7 +312,9 @@ function DocumentCard({ doc, patient }: { doc: Doc; patient: Patient }) {
     <Card
       ref={setNodeRef}
       className={`relative cursor-move transition-all ${
-        isDragging ? "opacity-50" : ""
+        isDragging 
+          ? "opacity-50 scale-105 shadow-lg" 
+          : "hover:shadow-md"
       }`}
       {...attributes}
       {...listeners}
@@ -314,7 +339,9 @@ function DocumentCard({ doc, patient }: { doc: Doc; patient: Patient }) {
                 ? "Abgeschlossen am"
                 : "Erstellt am"}
             </span>
-            <span>{format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}</span>
+            <span className="font-medium">
+              {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
+            </span>
           </div>
           <p className="text-sm line-clamp-3">{doc.content}</p>
           {doc.reviewNotes && (
@@ -332,17 +359,14 @@ function DocumentCard({ doc, patient }: { doc: Doc; patient: Patient }) {
 function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient; onStartRecording: () => void }) {
   return (
     <Card className="relative hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{patient.name}</CardTitle>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         <Button
           variant="outline"
           className="w-full"
           onClick={onStartRecording}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Neue Dokumentation
+          Neue Dokumentation für {patient.name}
         </Button>
       </CardContent>
     </Card>
