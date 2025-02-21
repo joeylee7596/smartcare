@@ -158,8 +158,8 @@ export default function Tours() {
   });
 
   const updateTourMutation = useMutation({
-    mutationFn: async ({ id, patientIds }: { id: number; patientIds: number[] }) => {
-      const res = await apiRequest("PATCH", `/api/tours/${id}`, { patientIds });
+    mutationFn: async ({ id, patientIds, optimizedRoute }: { id: number; patientIds: number[]; optimizedRoute: any }) => {
+      const res = await apiRequest("PATCH", `/api/tours/${id}`, { patientIds, optimizedRoute });
       return res.json();
     },
     onSuccess: () => {
@@ -203,21 +203,47 @@ export default function Tours() {
     if (over.id === "new-tour") {
       // Create new tour
       const newTour: InsertTour = {
-        date: new Date(),
+        date: new Date().toISOString(),
         caregiverId: 1, // TODO: Get from auth context
         patientIds: [draggedPatientId],
         status: "scheduled",
+        optimizedRoute: {
+          estimatedDuration: 30,
+          waypoints: [{ 
+            patientId: draggedPatientId,
+            lat: 52.520008,
+            lng: 13.404954
+          }]
+        }
       };
 
       createTourMutation.mutate(newTour);
     } else {
       // Update existing tour
       const tourId = parseInt(over.id.toString());
+      if (isNaN(tourId)) return;
+
       const tour = tours.find(t => t.id === tourId);
       if (!tour) return;
 
       const updatedPatientIds = [...tour.patientIds, draggedPatientId];
-      updateTourMutation.mutate({ id: tourId, patientIds: updatedPatientIds });
+      const updatedWaypoints = [
+        ...(tour.optimizedRoute?.waypoints || []),
+        { 
+          patientId: draggedPatientId,
+          lat: 52.520008,
+          lng: 13.404954
+        }
+      ];
+
+      updateTourMutation.mutate({ 
+        id: tourId, 
+        patientIds: updatedPatientIds,
+        optimizedRoute: {
+          estimatedDuration: updatedWaypoints.length * 30,
+          waypoints: updatedWaypoints
+        }
+      });
     }
   };
 
