@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Edit2, Brain } from "lucide-react";
 
 interface ConfirmationDialogProps {
@@ -19,6 +19,11 @@ export function ConfirmationDialog({
 }: ConfirmationDialogProps) {
   const [editedText, setEditedText] = useState(documentation);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Update editedText when documentation changes
+  useEffect(() => {
+    setEditedText(documentation);
+  }, [documentation]);
 
   const handleConfirm = (sendToReview: boolean) => {
     onConfirm(editedText, sendToReview);
