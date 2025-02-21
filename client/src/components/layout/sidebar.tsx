@@ -43,10 +43,10 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#1E2A4A] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative",
-        "before:absolute before:inset-0 before:bg-gradient-to-b before:from-blue-500/5 before:to-transparent before:rounded-r-[2rem]",
-        "after:absolute after:inset-0 after:bg-gradient-to-r after:from-black/20 after:via-transparent after:to-transparent",
-        isCollapsed ? "w-16" : "w-64"
+        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#1E2A4A] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative h-screen",
+        "before:absolute before:inset-0 before:bg-gradient-to-b before:from-blue-500/5 before:to-transparent before:rounded-r-[2rem] before:pointer-events-none",
+        "after:absolute after:inset-0 after:bg-gradient-to-r after:from-black/20 after:via-transparent after:to-transparent after:pointer-events-none",
+        isCollapsed ? "w-20" : "w-64"
       )}
     >
       {/* Header with gradient overlay */}
@@ -69,24 +69,25 @@ export function Sidebar() {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="space-y-6 p-2">
+      <ScrollArea className="flex-1 px-3">
+        <div className="space-y-6 py-3">
           {!isCollapsed && (
-            <div className="px-2 py-2">
-              <h3 className="text-xs uppercase text-white/50 tracking-wider">
+            <div className="px-2">
+              <h3 className="mb-2 text-xs uppercase text-white/50 tracking-wider font-medium">
                 Schnellzugriff
               </h3>
-              <div className="mt-2 space-y-1">
+              <div className="space-y-1">
                 {quickActions.map((action) => {
                   const Icon = action.icon;
                   return (
                     <Link key={action.href} href={action.href}>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5 group"
+                        className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5 group relative overflow-hidden"
                       >
                         <Icon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                         {action.name}
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
                     </Link>
                   );
@@ -95,32 +96,36 @@ export function Sidebar() {
             </div>
           )}
 
-          <div className="px-2 py-2">
+          <div className="px-2">
             <h3 className={cn(
-              "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-white/50 tracking-wider"
+              "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium",
+              isCollapsed && "sr-only"
             )}>
               Navigation
             </h3>
             <div className="space-y-1">
               {primaryNavigation.map((item) => {
                 const Icon = item.icon;
+                const isActive = location === item.href;
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
-                      variant={location === item.href ? "sidebar" : "ghost"}
+                      variant={isActive ? "sidebar" : "ghost"}
                       className={cn(
-                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href 
+                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
+                        isActive 
                           ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
                           : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
-                      <Icon className="h-4 w-4" />
-                      {!isCollapsed && (
-                        <span className="ml-2">{item.name}</span>
-                      )}
+                      <Icon className={cn(
+                        "h-4 w-4",
+                        !isCollapsed && "mr-2",
+                        "transition-transform duration-300 group-hover:scale-110"
+                      )} />
+                      {!isCollapsed && <span>{item.name}</span>}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </Button>
                   </Link>
                 );
@@ -128,32 +133,36 @@ export function Sidebar() {
             </div>
           </div>
 
-          <div className="px-2 py-2">
+          <div className="px-2">
             <h3 className={cn(
-              "mb-2",
-              isCollapsed ? "sr-only" : "text-xs uppercase text-white/50 tracking-wider"
+              "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium",
+              isCollapsed && "sr-only"
             )}>
               System
             </h3>
             <div className="space-y-1">
               {secondaryNavigation.map((item) => {
                 const Icon = item.icon;
+                const isActive = location === item.href;
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
-                      variant={location === item.href ? "sidebar" : "ghost"}
+                      variant={isActive ? "sidebar" : "ghost"}
                       className={cn(
-                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300",
-                        location === item.href 
+                        "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
+                        isActive 
                           ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
                           : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                         isCollapsed && "justify-center p-2"
                       )}
                     >
-                      <Icon className="h-4 w-4" />
-                      {!isCollapsed && (
-                        <span className="ml-2">{item.name}</span>
-                      )}
+                      <Icon className={cn(
+                        "h-4 w-4",
+                        !isCollapsed && "mr-2",
+                        "transition-transform duration-300 group-hover:scale-110"
+                      )} />
+                      {!isCollapsed && <span>{item.name}</span>}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                     </Button>
                   </Link>
                 );
