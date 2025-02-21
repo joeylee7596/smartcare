@@ -21,17 +21,32 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const { sendMessage, subscribe } = useWebSocket();
 
   useEffect(() => {
-    subscribe((message) => {
-      if (message.type === 'TRANSCRIPTION_RESULT') {
-        setIsTranscribing(false);
-        setTranscriptionProgress(100);
-        onTranscriptionComplete(message.documentation);
-      } else if (message.type === 'TRANSCRIPTION_PROGRESS') {
-        setPreviewText(message.preview || "");
-        setTranscriptionProgress(Math.min(95, transcriptionProgress + 5));
+    const unsubscribe = subscribe((message) => {
+      switch (message.type) {
+        case 'TRANSCRIPTION_COMPLETE':
+          setIsTranscribing(false);
+          setTranscriptionProgress(100);
+          setPreviewText(message.documentation);
+          onTranscriptionComplete(message.documentation);
+          break;
+        case 'TRANSCRIPTION_PROGRESS':
+          setTranscriptionProgress(message.progress || 0);
+          if (message.message) {
+            setPreviewText(message.message);
+          }
+          break;
+        case 'TRANSCRIPTION_ERROR':
+          setIsTranscribing(false);
+          setTranscriptionProgress(0);
+          setPreviewText(`Fehler: ${message.error}`);
+          break;
       }
     });
-  }, [subscribe, onTranscriptionComplete, transcriptionProgress]);
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [subscribe, onTranscriptionComplete]);
 
   const {
     status,
@@ -76,7 +91,8 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const processRecording = async (blobUrl: string) => {
     try {
       setIsTranscribing(true);
-      setTranscriptionProgress(0);
+      setTranscriptionProgress(10);
+      setPreviewText("Starte Verarbeitung...");
 
       const response = await fetch(blobUrl);
       const blob = await response.blob();
@@ -98,6 +114,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
       console.error("Error processing recording:", error);
       setIsTranscribing(false);
       setTranscriptionProgress(0);
+      setPreviewText("Fehler bei der Verarbeitung der Aufnahme");
     }
   };
 
@@ -113,11 +130,6 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
               </div>
               <span className="text-sm font-medium">{formatDuration(recordingDuration)}</span>
             </div>
-            {previewText && (
-              <div className="p-3 bg-gray-50 rounded-lg text-sm">
-                <p className="text-muted-foreground">{previewText}</p>
-              </div>
-            )}
             <Button
               variant="destructive"
               className="w-full"
@@ -139,19 +151,27 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           </Button>
         )}
 
-        {isTranscribing && (
+        {(isTranscribing || previewText) && (
           <div className="space-y-2 animate-in fade-in-50">
-            <div className="flex items-center justify-between text-sm text-primary">
-              <div className="flex items-center gap-2">
-                <Brain className="h-4 w-4 animate-pulse" />
-                <span>KI verarbeitet Aufnahme...</span>
+            {isTranscribing && (
+              <>
+                <div className="flex items-center justify-between text-sm text-primary">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 animate-pulse" />
+                    <span>KI verarbeitet Aufnahme...</span>
+                  </div>
+                  <span>{transcriptionProgress}%</span>
+                </div>
+                <Progress value={transcriptionProgress} className="h-2" />
+              </>
+            )}
+            {previewText && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {previewText}
+                </p>
               </div>
-              <span>{transcriptionProgress}%</span>
-            </div>
-            <Progress value={transcriptionProgress} className="h-2" />
-            <p className="text-xs text-muted-foreground">
-              Ihre Aufnahme wird transkribiert und intelligent formatiert...
-            </p>
+            )}
           </div>
         )}
       </CardContent>

@@ -42,20 +42,33 @@ export function setupWebSocket(server: Server) {
             break;
 
           case 'VOICE_TRANSCRIPTION':
-            // Send initial progress update
-            ws.send(JSON.stringify({
-              type: 'TRANSCRIPTION_PROGRESS',
-              status: 'started',
-              message: 'Transkribiere Sprachaufnahme...'
-            }));
-
             try {
+              // Initial progress update
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_PROGRESS',
+                status: 'started',
+                progress: 10,
+                message: 'Starte Transkription...'
+              }));
+
+              // Process transcription
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_PROGRESS',
+                status: 'processing',
+                progress: 50,
+                message: 'Verarbeite Aufnahme...'
+              }));
+
               const documentation = await generateDocumentation(data.audioContent);
+
+              // Send final transcription
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
-                documentation
+                documentation,
+                originalText: data.audioContent // Send original spoken text back
               }));
             } catch (error) {
+              console.error('Transcription error:', error);
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_ERROR',
                 error: error instanceof Error ? error.message : 'Fehler bei der Transkription'
