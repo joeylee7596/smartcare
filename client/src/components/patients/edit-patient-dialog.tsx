@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { X } from "lucide-react";
 
 interface EditPatientDialogProps {
   patient: Patient;
@@ -39,7 +40,7 @@ interface EditPatientDialogProps {
 
 const editPatientSchema = insertPatientSchema.extend({
   id: insertPatientSchema.shape.id,
-  urgentNote: insertPatientSchema.shape.urgentNote,
+  notes: insertPatientSchema.shape.notes,
 });
 
 export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDialogProps) {
@@ -50,15 +51,15 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
     defaultValues: {
       ...patient,
       medications: patient.medications || [],
-      conditions: patient.conditions || [],
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (values: typeof form.getValues) => {
+    mutationFn: async (values: Patient) => {
       const response = await apiRequest("PATCH", `/api/patients/${patient.id}`, values);
       if (!response.ok) {
-        throw new Error("Fehler beim Aktualisieren des Patienten");
+        const error = await response.json();
+        throw new Error(error.message || "Fehler beim Aktualisieren des Patienten");
       }
       return response.json();
     },
@@ -70,14 +71,27 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
       });
       onOpenChange(false);
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Fehler",
-        description: "Die Änderungen konnten nicht gespeichert werden.",
+        description: error instanceof Error ? error.message : "Die Änderungen konnten nicht gespeichert werden.",
         variant: "destructive",
       });
     },
   });
+
+  const handleAddMedication = (value: string) => {
+    const medications = form.getValues("medications") || [];
+    if (value.trim() && !medications.includes(value.trim())) {
+      form.setValue("medications", [...medications, value.trim()]);
+    }
+  };
+
+  const handleRemoveMedication = (index: number) => {
+    const medications = form.getValues("medications") || [];
+    medications.splice(index, 1);
+    form.setValue("medications", [...medications]);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -191,7 +205,7 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
             <div className="space-y-2">
               <Label>Medikamente</Label>
               <div className="flex flex-wrap gap-2">
-                {form.watch("medications")?.map((med, index) => (
+                {(form.watch("medications") || []).map((med, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-1 bg-secondary text-secondary-foreground px-2 py-1 rounded-md text-sm"
@@ -201,14 +215,10 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-4 w-4"
-                      onClick={() => {
-                        const medications = form.getValues("medications");
-                        medications?.splice(index, 1);
-                        form.setValue("medications", [...(medications || [])]);
-                      }}
+                      className="h-4 w-4 hover:bg-secondary/80"
+                      onClick={() => handleRemoveMedication(index)}
                     >
-                      ×
+                      <X className="h-3 w-3" />
                     </Button>
                   </div>
                 ))}
@@ -219,12 +229,8 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
                     if (e.key === "Enter") {
                       e.preventDefault();
                       const input = e.currentTarget;
-                      const value = input.value.trim();
-                      if (value) {
-                        const medications = form.getValues("medications");
-                        form.setValue("medications", [...(medications || []), value]);
-                        input.value = "";
-                      }
+                      handleAddMedication(input.value);
+                      input.value = "";
                     }
                   }}
                 />
@@ -233,10 +239,10 @@ export function EditPatientDialog({ patient, open, onOpenChange }: EditPatientDi
 
             <FormField
               control={form.control}
-              name="urgentNote"
+              name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Wichtiger Hinweis</FormLabel>
+                  <FormLabel>Wichtige Hinweise</FormLabel>
                   <FormControl>
                     <Textarea {...field} />
                   </FormControl>
