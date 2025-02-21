@@ -43,11 +43,9 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#1E2A4A] via-[#111827] to-[#1F2937] relative",
-        "before:absolute before:inset-0 before:bg-gradient-to-b before:from-blue-500/5 before:to-transparent",
+        "flex flex-col transition-all duration-300 bg-gradient-to-b from-[#1E2A4A] via-[#111827] to-[#1F2937] rounded-r-[2rem] shadow-2xl relative",
+        "before:absolute before:inset-0 before:bg-gradient-to-b before:from-blue-500/5 before:to-transparent before:rounded-r-[2rem]",
         "after:absolute after:inset-0 after:bg-gradient-to-r after:from-black/20 after:via-transparent after:to-transparent",
-        // Only round the top-right corner
-        "[border-top-right-radius:2rem] shadow-2xl",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
