@@ -8,12 +8,7 @@ import {
   CalendarDays,
   ClipboardList,
   Settings,
-  Menu,
   ChevronLeft,
-  Plus,
-  FileText,
-  UserPlus,
-  Calendar,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -27,12 +22,6 @@ const primaryNavigation = [
 
 const secondaryNavigation = [
   { name: "Einstellungen", href: "/settings", icon: Settings },
-];
-
-const quickActions = [
-  { name: "Patient hinzufügen", href: "/patients/new", icon: UserPlus },
-  { name: "Tour planen", href: "/tours/new", icon: Calendar },
-  { name: "Dokumentation erstellen", href: "/documentation/new", icon: FileText },
 ];
 
 export function Sidebar() {
@@ -82,31 +71,6 @@ export function Sidebar() {
 
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-6 py-3">
-            {!isCollapsed && (
-              <div className="px-2 transition-opacity duration-500">
-                <h3 className="mb-2 text-xs uppercase text-white/50 tracking-wider font-medium">
-                  Schnellzugriff
-                </h3>
-                <div className="space-y-1">
-                  {quickActions.map((action) => {
-                    const Icon = action.icon;
-                    return (
-                      <Link key={action.href} href={action.href}>
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-white/70 hover:text-white hover:bg-white/5 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/5 group relative overflow-hidden"
-                        >
-                          <Icon className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
-                          {action.name}
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        </Button>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             <div className="px-2">
               <h3 className={cn(
                 "mb-2 text-xs uppercase text-white/50 tracking-wider font-medium transition-opacity duration-500",
