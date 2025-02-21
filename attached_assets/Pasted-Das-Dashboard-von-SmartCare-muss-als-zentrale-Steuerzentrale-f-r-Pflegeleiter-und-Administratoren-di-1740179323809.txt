@@ -1,0 +1,41 @@
+Das Dashboard von SmartCare muss als zentrale Steuerzentrale für Pflegeleiter und Administratoren dienen. Es soll alle relevanten Informationen in einer strukturierten, minimalistisch designten Oberfläche präsentieren und den Zugriff auf die wichtigsten Funktionen mit minimalem Klickaufwand ermöglichen.
+
+Beschreibung des Dashboards
+
+1. Hauptstruktur & Layout
+
+Das Dashboard besteht aus vier Hauptbereichen:
+	•	Obere Navigationsleiste: Enthält den aktuellen Benutzer, eine globale Suchfunktion, eine Benachrichtigungszentrale und Schnellzugriffe auf die wichtigsten Module (z. B. Tourenplanung, Abrechnung, Mitarbeiterverwaltung).
+	•	Linke Seitenleiste: Enthält eine kategorisierte Menüstruktur mit Zugriff auf alle Funktionen des Systems (z. B. Patientenverwaltung, Terminplanung, Dokumentation).
+	•	Zentrale Ansicht mit Widgets: Zeigt eine anpassbare Übersicht mit den wichtigsten KPIs und Statusmeldungen, darunter offene Touren, anstehende Schichten, ausstehende Dokumentationen und kritische Warnungen.
+	•	Rechte Infospalte: Zeigt kontextbezogene Informationen wie zuletzt bearbeitete Akten, Systembenachrichtigungen oder Schnellzugriffe auf häufig genutzte Funktionen.
+
+2. Wichtige Funktionen und Widgets auf dem Dashboard
+	1.	Tagesübersicht & Kritische Meldungen
+	•	Zeigt anstehende Touren, kritische Patientenfälle (z. B. fehlende Medikation, Notfälle), ausgefallene Pflegekräfte oder ausstehende Genehmigungen.
+	•	Farbige Indikatoren zeigen Dringlichkeit (z. B. rot für Notfälle, gelb für zu klärende Aufgaben).
+	2.	Live-Status der Touren & Einsätze
+	•	Listet aktuelle Touren mit Echtzeit-Statusmeldungen:
+	•	„In Bearbeitung“ → Pflegekraft ist vor Ort
+	•	„Abgeschlossen“ → Besuch dokumentiert
+	•	„Verzögert“ → Wartezeit oder Problem gemeldet
+	•	Warnsystem erkennt ungeplante Verzögerungen oder Konflikte und schlägt Anpassungen vor.
+	3.	Mitarbeiterübersicht & Arbeitslast
+	•	Zeigt eine Live-Übersicht aller aktiven Pflegekräfte mit Arbeitszeiten, offenen Schichten und aktuellen Einsätzen.
+	•	Falls eine Pflegekraft ausfällt, schlägt das System automatisch eine Umverteilung vor.
+	4.	Patientenverwaltung & Aktuelle Pflegeberichte
+	•	Zeigt eine Liste der heute betreuten Patienten mit Status (Pflege erledigt, ausstehend, abgebrochen).
+	•	Falls wichtige Dokumentationen fehlen, wird dies visuell hervorgehoben.
+	5.	Automatisierte Warnmeldungen & Handlungsempfehlungen (AI-gestützt)
+	•	System erkennt Risiken (z. B. eine Pflegekraft hat zu viele Besuche hintereinander, ein Patient benötigt eine Anpassung des Pflegeplans).
+	•	KI schlägt automatisch Handlungsempfehlungen vor (z. B. Umplanung eines Einsatzes oder Anpassung eines Pflegeplans).
+	6.	Schnellzugriff auf wichtige Funktionen
+	•	Schichtplanung, Rechnungsverwaltung, Tourenoptimierung sind mit einem Klick zugänglich.
+	•	Pflegekräfte können direkt über das Dashboard kontaktiert werden.
+	7.	Abrechnungsstatus & Finanzübersicht
+	•	Offene Rechnungen, Zahlungsstatus und Mahnungen werden angezeigt.
+	•	Falls ein Pflegebesuch nicht abgerechnet wurde, erkennt das System dies automatisch.
+
+Optimierter Prompt für die KI
+
+“Erstelle ein Dashboard für ein SaaS-Tool zur Verwaltung ambulanter Pflegedienste. Das Dashboard soll eine klare, intuitive Oberfläche bieten, die Administratoren einen schnellen Überblick über den aktuellen Tagesstatus ermöglicht. Das Layout besteht aus einer oberen Navigationsleiste mit Suchfunktion, Benachrichtigungen und Schnellzugriffen, einer linken Menüleiste mit allen Modulen und einer zentralen Ansicht mit dynamischen Widgets. Die Hauptfunktionen umfassen eine Live-Übersicht über anstehende Pflegeeinsätze, den Status laufender Touren mit Echtzeit-Updates und eine Mitarbeiterübersicht mit aktuellen Arbeitszeiten und Schichten. Kritische Warnmeldungen und AI-gestützte Handlungsempfehlungen sollen automatisiert angezeigt werden, falls Konflikte oder Engpässe erkannt werden. Patientenverwaltung, ausstehende Dokumentationen und Rechnungsstatus müssen direkt sichtbar sein, mit interaktiven Elementen für schnelles Eingreifen. Das System muss Pflegekräfte und Administratoren aktiv entlasten, indem es Routineaufgaben automatisiert, schnelle Umplanungen ermöglicht und Echtzeit-Feedback zu laufenden Einsätzen liefert. Stelle sicher, dass das Design modern, minimalistisch und für nicht technikaffine Nutzer optimiert ist.”
