@@ -2,16 +2,19 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import { Tour, Patient, type InsertTour } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { MapPin, RotateCw, Clock, Users, Route, Brain, Filter, Search } from "lucide-react";
+import { MapPin, RotateCw, Clock, Users, Route, Brain, Filter, Search, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, useDroppable, DraggableAttributes, DragOverlay } from "@dnd-kit/core";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, LatLngExpression } from 'react-leaflet';
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, useDroppable, DragOverlay } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +22,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import "leaflet/dist/leaflet.css";
 import { Icon } from 'leaflet';
 import { CSS } from "@dnd-kit/utilities";
-import React from 'react';
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -34,10 +36,7 @@ const mapContainerStyle = {
   height: "calc(100vh - 200px)",
 };
 
-const center = {
-  lat: 52.520008,
-  lng: 13.404954,
-};
+const center: LatLngExpression = [52.520008, 13.404954];
 
 interface DraggablePatientProps {
   patient: Patient;
@@ -96,7 +95,7 @@ function DroppableTour({ tour, children }: DroppableTourProps) {
   });
 
   return (
-    <div 
+    <div
       ref={setNodeRef}
       className={`mb-4 transition-colors duration-200 ${isOver ? 'bg-primary/5 rounded-lg' : ''}`}
     >
@@ -124,14 +123,20 @@ function NewTourDropZone() {
   );
 }
 
+interface FilterState {
+  urgency: string;
+  careType: string;
+  location: string;
+}
+
 export default function Tours() {
   const { toast } = useToast();
-  const [date, setDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFilters, setSelectedFilters] = useState({
-    urgent: false,
-    scheduled: false,
-    completed: false,
+  const [filters, setFilters] = useState<FilterState>({
+    urgency: "all",
+    careType: "all",
+    location: "all"
   });
   const [activeId, setActiveId] = useState<number | null>(null);
 
@@ -171,13 +176,18 @@ export default function Tours() {
     },
   });
 
-  const todaysTours = tours.filter(
-    (tour) => format(new Date(tour.date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
-  );
+  const dateFilteredTours = tours.filter(tour => {
+    const tourDate = new Date(tour.date);
+    return tourDate >= startOfDay(selectedDate) && tourDate <= endOfDay(selectedDate);
+  });
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesUrgency = filters.urgency === "all" || patient.careLevel >= 4; // Assuming careLevel >= 4 indicates urgency
+    const matchesCareType = filters.careType === "all"; // TODO: Add care type to patient schema
+    const matchesLocation = filters.location === "all"; // TODO: Add location districts
+    return matchesSearch && matchesUrgency && matchesCareType && matchesLocation;
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -209,7 +219,7 @@ export default function Tours() {
         status: "scheduled",
         optimizedRoute: {
           estimatedDuration: 30,
-          waypoints: [{ 
+          waypoints: [{
             patientId: draggedPatientId,
             lat: 52.520008,
             lng: 13.404954
@@ -229,15 +239,15 @@ export default function Tours() {
       const updatedPatientIds = [...tour.patientIds, draggedPatientId];
       const updatedWaypoints = [
         ...(tour.optimizedRoute?.waypoints || []),
-        { 
+        {
           patientId: draggedPatientId,
           lat: 52.520008,
           lng: 13.404954
         }
       ];
 
-      updateTourMutation.mutate({ 
-        id: tourId, 
+      updateTourMutation.mutate({
+        id: tourId,
         patientIds: updatedPatientIds,
         optimizedRoute: {
           estimatedDuration: updatedWaypoints.length * 30,
@@ -268,65 +278,100 @@ export default function Tours() {
             </Button>
           </div>
 
-          <DndContext 
+          <DndContext
             sensors={sensors}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
             <div className="grid grid-cols-[350px,1fr,350px] gap-6">
-              {/* Left Column - Patient List */}
+              {/* Left Column - Enhanced Patient List */}
               <Card className="shadow-lg">
                 <CardHeader className="pb-3">
                   <div className="space-y-3">
                     <CardTitle className="text-base">Patienten</CardTitle>
+
+                    {/* Enhanced Search */}
                     <div className="relative">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Suchen..."
+                        placeholder="Patient suchen..."
                         className="pl-8"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="urgent"
-                          checked={selectedFilters.urgent}
-                          onCheckedChange={(checked) =>
-                            setSelectedFilters(prev => ({ ...prev, urgent: !!checked }))
-                          }
+
+                    {/* Date Picker */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {format(selectedDate, "PPP", { locale: de })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <CalendarComponent
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
                         />
-                        <label htmlFor="urgent" className="text-sm">Dringend</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="scheduled"
-                          checked={selectedFilters.scheduled}
-                          onCheckedChange={(checked) =>
-                            setSelectedFilters(prev => ({ ...prev, scheduled: !!checked }))
-                          }
-                        />
-                        <label htmlFor="scheduled" className="text-sm">Geplant</label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="completed"
-                          checked={selectedFilters.completed}
-                          onCheckedChange={(checked) =>
-                            setSelectedFilters(prev => ({ ...prev, completed: !!checked }))
-                          }
-                        />
-                        <label htmlFor="completed" className="text-sm">Abgeschlossen</label>
-                      </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* Enhanced Filters */}
+                    <div className="space-y-2">
+                      <Select
+                        value={filters.urgency}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, urgency: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Dringlichkeit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alle</SelectItem>
+                          <SelectItem value="urgent">Dringend</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={filters.careType}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, careType: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pflegeart" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alle</SelectItem>
+                          <SelectItem value="basic">Grundpflege</SelectItem>
+                          <SelectItem value="medical">Medizinische Pflege</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={filters.location}
+                        onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Standort" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Alle Bezirke</SelectItem>
+                          <SelectItem value="north">Nord</SelectItem>
+                          <SelectItem value="south">Süd</SelectItem>
+                          <SelectItem value="east">Ost</SelectItem>
+                          <SelectItem value="west">West</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[calc(100vh-350px)]">
                     {filteredPatients.map((patient) => (
-                      <DraggablePatient 
-                        key={patient.id} 
+                      <DraggablePatient
+                        key={patient.id}
                         patient={patient}
                         isDragging={patient.id === activeId}
                       />
@@ -339,20 +384,20 @@ export default function Tours() {
               <Card className="shadow-lg overflow-hidden">
                 <CardContent className="p-0">
                   <MapContainer
-                    center={[center.lat, center.lng]}
+                    center={center}
                     zoom={13}
                     style={mapContainerStyle}
-                    scrollWheelZoom={true}
+                    scrollWheelZoom
                   >
                     <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
-                    {todaysTours.map((tour) => (
+                    {dateFilteredTours.map((tour) => (
                       tour.optimizedRoute?.waypoints.map((waypoint, index) => (
                         <Marker
                           key={`${tour.id}-${index}`}
-                          position={[waypoint.lat, waypoint.lng]}
+                          position={[waypoint.lat, waypoint.lng] as LatLngExpression}
                           icon={defaultIcon}
                         >
                           <Popup>
@@ -375,7 +420,7 @@ export default function Tours() {
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[calc(100vh-350px)]">
-                    {todaysTours.map((tour) => (
+                    {dateFilteredTours.map((tour) => (
                       <DroppableTour key={tour.id} tour={tour}>
                         <div className="p-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200">
                           <div className="flex items-center justify-between mb-3">
