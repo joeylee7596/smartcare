@@ -2,7 +2,6 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { generateDocumentation } from './ai';
 import { parse } from 'cookie';
-import * as sessionParser from 'express-session';
 import { storage } from './storage';
 
 export function setupWebSocket(server: Server) {
@@ -42,7 +41,7 @@ export function setupWebSocket(server: Server) {
   });
 
   wss.on('connection', (ws) => {
-    console.log('Client connected');
+    console.log('Client connected to WebSocket');
 
     ws.on('message', async (message) => {
       try {
@@ -51,8 +50,8 @@ export function setupWebSocket(server: Server) {
         switch (data.type) {
           case 'VOICE_TRANSCRIPTION':
             try {
-              // Generate AI documentation from transcribed text
               const documentation = await generateDocumentation(data.audioContent);
+              console.log('Generated documentation successfully');
 
               ws.send(JSON.stringify({
                 type: 'TRANSCRIPTION_COMPLETE',
@@ -69,21 +68,24 @@ export function setupWebSocket(server: Server) {
             break;
 
           case 'DOC_STATUS_UPDATE':
-            // Broadcast documentation status updates to all connected clients
+            console.log('Broadcasting status update:', data);
             wss.clients.forEach(client => {
               if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
                   type: 'DOC_STATUS_UPDATED',
                   docId: data.docId,
-                  status: data.status,
-                  reviewNotes: data.reviewNotes
+                  status: data.status
                 }));
               }
             });
             break;
+
+          default:
+            console.log('Received unknown message type:', data.type);
+            break;
         }
       } catch (error) {
-        console.error('WebSocket error:', error);
+        console.error('WebSocket message handling error:', error);
         ws.send(JSON.stringify({
           type: 'ERROR',
           error: error instanceof Error ? error.message : 'Ein unbekannter Fehler ist aufgetreten'
@@ -92,7 +94,13 @@ export function setupWebSocket(server: Server) {
     });
 
     ws.on('close', () => {
-      console.log('Client disconnected');
+      console.log('Client disconnected from WebSocket');
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
     });
   });
+
+  return wss;
 }

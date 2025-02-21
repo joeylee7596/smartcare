@@ -7,23 +7,11 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc, DocumentationStatus } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Mic, Brain, Check, Clock, RefreshCw, Plus } from "lucide-react";
+import { Brain, Check, Clock, RefreshCw, Plus, ArrowRight, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  useDroppable,
-  useDraggable,
-} from "@dnd-kit/core";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
 
@@ -32,21 +20,6 @@ function DocumentationPage() {
   const { user } = useAuth();
   const { sendMessage, subscribe } = useWebSocket();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
-  const [draggedItem, setDraggedItem] = useState<number | null>(null);
-
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 10, // Mindestabstand für Drag-Start
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250, // Verzögerung für Touch-Geräte
-        tolerance: 5,
-      },
-    })
-  );
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -92,31 +65,25 @@ function DocumentationPage() {
     return () => unsubscribe();
   }, [subscribe, toast]);
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    setDraggedItem(active.id as number);
-  };
+  const moveDoc = (docId: number, currentStatus: string, direction: 'forward' | 'backward') => {
+    const statusOrder = [DocumentationStatus.PENDING, DocumentationStatus.REVIEW, DocumentationStatus.COMPLETED];
+    const currentIndex = statusOrder.indexOf(currentStatus);
+    let newStatus: string;
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      const newStatus = over.id as string;
-      const docId = active.id as number;
-
-      updateDocStatusMutation.mutate({
-        id: docId,
-        status: newStatus,
-      });
-
-      sendMessage({
-        type: 'DOC_STATUS_UPDATE',
-        docId,
-        status: newStatus
-      });
+    if (direction === 'forward' && currentIndex < statusOrder.length - 1) {
+      newStatus = statusOrder[currentIndex + 1];
+    } else if (direction === 'backward' && currentIndex > 0) {
+      newStatus = statusOrder[currentIndex - 1];
+    } else {
+      return;
     }
 
-    setDraggedItem(null);
+    updateDocStatusMutation.mutate({ id: docId, status: newStatus });
+    sendMessage({
+      type: 'DOC_STATUS_UPDATE',
+      docId,
+      status: newStatus
+    });
   };
 
   const createDocMutation = useMutation({
@@ -152,9 +119,6 @@ function DocumentationPage() {
     });
   };
 
-  const draggingDoc = draggedItem ? allDocs.find(doc => doc.id === draggedItem) : null;
-  const draggingPatient = draggingDoc ? patients.find(p => p.id === draggingDoc.patientId) : null;
-
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
@@ -170,92 +134,82 @@ function DocumentationPage() {
             </p>
           </div>
 
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <StatusColumn
-                title="Offen"
-                count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
-                status={DocumentationStatus.PENDING}
-              >
-                {activePatientId ? (
-                  <div className="space-y-4">
-                    <VoiceRecorder
-                      onTranscriptionComplete={handleTranscriptionComplete}
-                      className="mb-4"
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatusColumn
+              title="Offen"
+              count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
+            >
+              {activePatientId ? (
+                <div className="space-y-4">
+                  <VoiceRecorder
+                    onTranscriptionComplete={handleTranscriptionComplete}
+                    className="mb-4"
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setActivePatientId(null)}
+                  >
+                    Abbrechen
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {docsByStatus[DocumentationStatus.PENDING]?.map((doc) => (
+                    <DocumentCard
+                      key={doc.id}
+                      doc={doc}
+                      patient={patients.find(p => p.id === doc.patientId)!}
+                      onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
+                      showMoveForward
                     />
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setActivePatientId(null)}
-                    >
-                      Abbrechen
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    {docsByStatus[DocumentationStatus.PENDING]?.map((doc) => (
-                      <DocumentCard
-                        key={doc.id}
-                        doc={doc}
-                        patient={patients.find(p => p.id === doc.patientId)!}
+                  ))}
+                  <div className="pt-4 border-t">
+                    <h3 className="text-sm font-medium mb-3">Neue Dokumentation</h3>
+                    {patients.map((patient) => (
+                      <NewDocumentationCard
+                        key={patient.id}
+                        patient={patient}
+                        onStartRecording={() => setActivePatientId(patient.id)}
                       />
                     ))}
-                    <div className="pt-4 border-t">
-                      <h3 className="text-sm font-medium mb-3">Neue Dokumentation</h3>
-                      {patients.map((patient) => (
-                        <NewDocumentationCard
-                          key={patient.id}
-                          patient={patient}
-                          onStartRecording={() => setActivePatientId(patient.id)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </StatusColumn>
-
-              <StatusColumn
-                title="In Überprüfung"
-                count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
-                status={DocumentationStatus.REVIEW}
-              >
-                {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
-                  <DocumentCard
-                    key={doc.id}
-                    doc={doc}
-                    patient={patients.find(p => p.id === doc.patientId)!}
-                  />
-                ))}
-              </StatusColumn>
-
-              <StatusColumn
-                title="Abgeschlossen"
-                count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
-                status={DocumentationStatus.COMPLETED}
-              >
-                {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
-                  <DocumentCard
-                    key={doc.id}
-                    doc={doc}
-                    patient={patients.find(p => p.id === doc.patientId)!}
-                  />
-                ))}
-              </StatusColumn>
-            </div>
-
-            <DragOverlay dropAnimation={{
-              duration: 200,
-              easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-            }}>
-              {draggedItem && draggingDoc && draggingPatient && (
-                <DocumentCard doc={draggingDoc} patient={draggingPatient} />
+                  </div>
+                </>
               )}
-            </DragOverlay>
-          </DndContext>
+            </StatusColumn>
+
+            <StatusColumn
+              title="In Überprüfung"
+              count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
+            >
+              {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  patient={patients.find(p => p.id === doc.patientId)!}
+                  onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
+                  showMoveForward
+                  showMoveBackward
+                />
+              ))}
+            </StatusColumn>
+
+            <StatusColumn
+              title="Abgeschlossen"
+              count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
+            >
+              {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  patient={patients.find(p => p.id === doc.patientId)!}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
+                  showMoveBackward
+                />
+              ))}
+            </StatusColumn>
+          </div>
         </main>
       </div>
     </div>
@@ -265,27 +219,14 @@ function DocumentationPage() {
 function StatusColumn({
   title,
   count,
-  status,
   children
 }: {
   title: string;
   count: number;
-  status: string;
   children: React.ReactNode;
 }) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: status,
-  });
-
   return (
-    <div
-      ref={setNodeRef}
-      className={`rounded-lg border ${
-        isOver 
-          ? "bg-muted/50 border-primary/50 ring-1 ring-primary/20" 
-          : "bg-card"
-      } transition-all duration-200`}
-    >
+    <div className="rounded-lg border bg-card transition-all duration-200">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
@@ -301,24 +242,25 @@ function StatusColumn({
   );
 }
 
-function DocumentCard({ doc, patient }: { doc: Doc; patient: Patient }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: doc.id,
-  });
-
+function DocumentCard({ 
+  doc, 
+  patient,
+  onMoveForward,
+  onMoveBackward,
+  showMoveForward,
+  showMoveBackward
+}: { 
+  doc: Doc; 
+  patient: Patient;
+  onMoveForward?: () => void;
+  onMoveBackward?: () => void;
+  showMoveForward?: boolean;
+  showMoveBackward?: boolean;
+}) {
   if (!patient) return null;
 
   return (
-    <Card
-      ref={setNodeRef}
-      className={`relative cursor-move transition-all ${
-        isDragging 
-          ? "opacity-50 scale-105 shadow-lg" 
-          : "hover:shadow-md"
-      }`}
-      {...attributes}
-      {...listeners}
-    >
+    <Card className="relative hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center justify-between">
           <span>{patient.name}</span>
@@ -350,6 +292,30 @@ function DocumentCard({ doc, patient }: { doc: Doc; patient: Patient }) {
               <p className="text-sm">{doc.reviewNotes}</p>
             </div>
           )}
+          <div className="flex gap-2 mt-4">
+            {showMoveBackward && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                onClick={onMoveBackward}
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Zurück
+              </Button>
+            )}
+            {showMoveForward && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                onClick={onMoveForward}
+              >
+                Weiter
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

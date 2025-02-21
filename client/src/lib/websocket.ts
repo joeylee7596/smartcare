@@ -8,13 +8,23 @@ export type WebSocketMessage = {
 class WebSocketManager {
   private static instance: WebSocket | null = null;
   private static messageHandlers: Set<(message: WebSocketMessage) => void> = new Set();
+  private static reconnectAttempts = 0;
+  private static maxReconnectAttempts = 5;
+  private static reconnectDelay = 2000;
 
   static getInstance(): WebSocket | null {
-    if (!this.instance) {
+    if (!this.instance || this.instance.readyState === WebSocket.CLOSED) {
       try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/ws`;
+
         this.instance = new WebSocket(wsUrl);
+        this.reconnectAttempts = 0;
+
+        this.instance.onopen = () => {
+          console.log('WebSocket connected successfully');
+          this.reconnectAttempts = 0;
+        };
 
         this.instance.onmessage = (event) => {
           try {
@@ -28,16 +38,22 @@ class WebSocketManager {
         this.instance.onclose = () => {
           console.log('WebSocket disconnected');
           this.instance = null;
-          setTimeout(() => this.getInstance(), 2000);
+
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+            setTimeout(() => this.getInstance(), this.reconnectDelay);
+          } else {
+            toast({
+              title: "Verbindungsfehler",
+              description: "Die Verbindung zum Server konnte nicht wiederhergestellt werden. Bitte laden Sie die Seite neu.",
+              variant: "destructive",
+            });
+          }
         };
 
         this.instance.onerror = (error) => {
           console.error('WebSocket error:', error);
-          toast({
-            title: "Verbindungsfehler",
-            description: "Die Verbindung zum Server wurde unterbrochen. Versuche neu zu verbinden...",
-            variant: "destructive",
-          });
         };
       } catch (error) {
         console.error('Failed to create WebSocket:', error);
@@ -62,14 +78,16 @@ class WebSocketManager {
 
   static subscribe(handler: (message: WebSocketMessage) => void): () => void {
     this.messageHandlers.add(handler);
+    // Ensure WebSocket connection exists
+    this.getInstance();
     return () => {
       this.messageHandlers.delete(handler);
     };
   }
 }
 
-// Initialize WebSocket connection
-WebSocketManager.getInstance();
-
 export const sendMessage = WebSocketManager.sendMessage.bind(WebSocketManager);
 export const subscribe = WebSocketManager.subscribe.bind(WebSocketManager);
+
+// Initialize WebSocket connection
+WebSocketManager.getInstance();
