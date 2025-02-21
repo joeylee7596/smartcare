@@ -43,11 +43,11 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "transition-all duration-300 flex flex-col bg-gradient-to-b from-blue-900 via-blue-800 to-blue-700",
+        "transition-all duration-300 flex flex-col bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800 rounded-r-2xl shadow-xl mr-4 relative",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-16 items-center px-4 border-b border-white/10">
+      <div className="flex h-16 items-center px-4 border-b border-white/10 bg-gradient-to-r from-blue-900/80 to-transparent backdrop-blur-sm">
         {!isCollapsed && (
           <h2 className="text-lg font-semibold text-white/90">
             SmartCare
@@ -57,7 +57,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           className={cn(
-            "ml-auto text-white/80 hover:text-white hover:bg-white/10",
+            "ml-auto text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300",
             isCollapsed && "rotate-180"
           )}
           onClick={() => setIsCollapsed(!isCollapsed)}

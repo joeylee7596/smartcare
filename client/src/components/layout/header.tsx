@@ -13,15 +13,15 @@ export function Header() {
   const { user, logoutMutation } = useAuth();
 
   return (
-    <header className="border-b border-border/40 bg-gradient-to-r from-blue-600/90 via-blue-500/80 to-blue-400/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
       <div className="flex h-16 items-center px-4 gap-4">
         <div className="ml-auto flex items-center gap-4">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="relative hover:scale-105 transition-all duration-300 text-white/90 hover:text-white hover:bg-white/10 rounded-xl"
+            className="relative hover:scale-105 transition-all duration-300 hover:bg-blue-50 rounded-xl"
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-5 w-5 text-gray-600" />
             <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white shadow-lg animate-pulse">
               3
             </span>
@@ -31,10 +31,10 @@ export function Header() {
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="ghost" 
-                className="relative h-10 w-10 rounded-xl hover:scale-105 transition-all duration-300 hover:shadow-xl"
+                className="relative h-10 w-10 rounded-xl hover:scale-105 transition-all duration-300 hover:bg-blue-50"
               >
-                <Avatar className="h-10 w-10 border-2 border-white/20 shadow-lg transition-all duration-300">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-blue-600 text-white font-medium">
+                <Avatar className="h-10 w-10 border-2 border-blue-100 shadow-lg transition-all duration-300">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-800 text-white font-medium">
                     {user?.name?.[0]}
                   </AvatarFallback>
                 </Avatar>
@@ -43,7 +43,7 @@ export function Header() {
             <DropdownMenuContent align="end" className="w-56 mt-2 rounded-xl border border-blue-100 shadow-xl animate-in slide-in-from-top-1">
               <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg m-1 focus:bg-blue-50">
                 <Avatar className="h-10 w-10 border-2 border-blue-100 shadow-md">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-blue-600 text-white font-medium">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-blue-800 text-white font-medium">
                     {user?.name?.[0]}
                   </AvatarFallback>
                 </Avatar>
