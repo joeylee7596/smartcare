@@ -58,14 +58,12 @@ export const documentation = pgTable("documentation", {
   aiGenerated: boolean("ai_generated").default(false),
   verified: boolean("verified").default(false),
   audioRecordingUrl: text("audio_recording_url"),
-  // Neue Felder für den Workflow
   status: text("status").notNull().default("pending"),
   reviewerId: integer("reviewer_id"),
   reviewNotes: text("review_notes"),
   reviewDate: timestamp("review_date"),
 });
 
-// New tables for advanced features
 export const workflowTemplates = pgTable("workflow_templates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
@@ -96,15 +94,17 @@ export const insuranceBilling = pgTable("insurance_billing", {
   insuranceResponse: text("insurance_response"),
 });
 
-// Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertPatientSchema = createInsertSchema(patients);
-export const insertTourSchema = createInsertSchema(tours);
+export const insertTourSchema = createInsertSchema(tours).extend({
+  date: z.string().or(z.date()).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
 export const insertDocSchema = createInsertSchema(documentation);
 export const insertWorkflowSchema = createInsertSchema(workflowTemplates);
 export const insertBillingSchema = createInsertSchema(insuranceBilling);
 
-// Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Patient = typeof patients.$inferSelect;
@@ -118,7 +118,6 @@ export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type InsuranceBilling = typeof insuranceBilling.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
 
-// Status-Typen für die Frontend-Validierung
 export const DocumentationStatus = {
   PENDING: "pending",
   REVIEW: "review",

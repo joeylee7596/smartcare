@@ -110,14 +110,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTour(tour: InsertTour): Promise<Tour> {
-    const [created] = await db.insert(tours).values([tour]).returning();
+    // Ensure date is properly formatted for PostgreSQL
+    const formattedTour = {
+      ...tour,
+      date: new Date(tour.date),
+      actualStartTime: tour.actualStartTime ? new Date(tour.actualStartTime) : null,
+      actualEndTime: tour.actualEndTime ? new Date(tour.actualEndTime) : null,
+    };
+
+    const [created] = await db.insert(tours).values([formattedTour]).returning();
     return created;
   }
 
   async updateTour(id: number, tour: Partial<InsertTour>): Promise<Tour> {
+    // Format dates if they exist in the update
+    const formattedTour = {
+      ...tour,
+      date: tour.date ? new Date(tour.date) : undefined,
+      actualStartTime: tour.actualStartTime ? new Date(tour.actualStartTime) : undefined,
+      actualEndTime: tour.actualEndTime ? new Date(tour.actualEndTime) : undefined,
+    };
+
     const [updated] = await db
       .update(tours)
-      .set(tour)
+      .set(formattedTour)
       .where(eq(tours.id, id))
       .returning();
     return updated;
