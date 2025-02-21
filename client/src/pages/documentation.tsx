@@ -5,17 +5,35 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Patient, Documentation as Doc } from "@shared/schema";
+import { Patient, Documentation as Doc, DocumentationStatus } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Mic, Sparkles, Clock, Brain } from "lucide-react";
+import { Mic, Brain, Check, Clock, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Documentation() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor),
+    useSensor(TouchSensor)
+  );
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -25,26 +43,47 @@ export default function Documentation() {
     queryKey: ["/api/docs"],
   });
 
-  // Group docs by patient ID
-  const docsByPatient = allDocs.reduce((acc, doc) => {
-    if (!acc[doc.patientId]) {
-      acc[doc.patientId] = [];
+  // Group docs by status
+  const docsByStatus = allDocs.reduce((acc, doc) => {
+    if (!acc[doc.status]) {
+      acc[doc.status] = [];
     }
-    acc[doc.patientId].push(doc);
+    acc[doc.status].push(doc);
     return acc;
-  }, {} as Record<number, Doc[]>);
+  }, {} as Record<string, Doc[]>);
 
-  // AI suggestions based on time and context
-  const getAISuggestions = (patientId: number, time: Date) => {
-    const hour = time.getHours();
-    if (hour >= 6 && hour < 10) {
-      return "Morgenpflege durchgeführt, Medikamente verabreicht";
-    } else if (hour >= 11 && hour < 14) {
-      return "Mittagessen assistiert, Vitalzeichen kontrolliert";
-    } else if (hour >= 17 && hour < 20) {
-      return "Abendpflege durchgeführt, Medikamente verabreicht";
+  const updateDocStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/docs/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      toast({
+        title: "Status aktualisiert",
+        description: "Die Dokumentation wurde erfolgreich aktualisiert.",
+      });
+    },
+  });
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setDraggedItem(event.active.id as number);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const newStatus = over.id as string;
+      const docId = active.id as number;
+
+      updateDocStatusMutation.mutate({
+        id: docId,
+        status: newStatus,
+      });
     }
-    return "Routinecheck durchgeführt, keine Besonderheiten";
+
+    setDraggedItem(null);
   };
 
   const createDocMutation = useMutation({
@@ -55,6 +94,7 @@ export default function Documentation() {
         type: data.type || "Sprachaufnahme",
         aiGenerated: false,
         verified: false,
+        status: DocumentationStatus.PENDING,
       });
       return res.json();
     },
@@ -74,20 +114,11 @@ export default function Documentation() {
     createDocMutation.mutate({
       content: text,
       patientId: activePatientId,
-      type: "Sprachaufnahme",
+      type: "KI-Dokumentation",
     });
   };
 
-  const handleAISuggestion = (patientId: number) => {
-    const suggestion = getAISuggestions(patientId, new Date());
-    createDocMutation.mutate({
-      content: suggestion,
-      patientId,
-      type: "KI-Vorschlag",
-    });
-  };
-
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | Date) => {
     try {
       return format(new Date(date), "dd.MM.yyyy HH:mm", { locale: de });
     } catch (error) {
@@ -97,95 +128,152 @@ export default function Documentation() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1">
         <Header />
         <main className="p-8">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">Dokumentation</h1>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Brain className="h-4 w-4 text-primary" />
-                <span>KI-gestützte Dokumentation & Analyse</span>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">
+              Dokumentation
+            </h1>
+            <p className="text-muted-foreground">
+              Verwalten Sie hier alle Patientendokumentationen
+            </p>
+          </div>
+
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Pending Documents */}
+              <div
+                className="space-y-4"
+                id={DocumentationStatus.PENDING}
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Offen</h2>
+                  <span className="text-sm text-muted-foreground">
+                    {docsByStatus[DocumentationStatus.PENDING]?.length || 0}
+                  </span>
+                </div>
+                <ScrollArea className="h-[calc(100vh-250px)]">
+                  <div className="space-y-4 pr-4">
+                    {patients.map((patient) => (
+                      <Card
+                        key={patient.id}
+                        className="relative"
+                        draggable
+                      >
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base">{patient.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {activePatientId === patient.id ? (
+                            <VoiceRecorder
+                              onTranscriptionComplete={handleTranscriptionComplete}
+                              className="mb-4"
+                            />
+                          ) : (
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => setActivePatientId(patient.id)}
+                            >
+                              <Mic className="mr-2 h-4 w-4" />
+                              Sprachaufnahme
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* In Review Documents */}
+              <div
+                className="space-y-4"
+                id={DocumentationStatus.REVIEW}
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">In Überprüfung</h2>
+                  <span className="text-sm text-muted-foreground">
+                    {docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
+                  </span>
+                </div>
+                <ScrollArea className="h-[calc(100vh-250px)]">
+                  <div className="space-y-4 pr-4">
+                    {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
+                      <Card key={doc.id} className="relative">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center justify-between">
+                            <span>Patient #{doc.patientId}</span>
+                            <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Erstellt am</span>
+                              <span>{formatDate(doc.date)}</span>
+                            </div>
+                            <p className="text-sm line-clamp-3">{doc.content}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* Completed Documents */}
+              <div
+                className="space-y-4"
+                id={DocumentationStatus.COMPLETED}
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Abgeschlossen</h2>
+                  <span className="text-sm text-muted-foreground">
+                    {docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
+                  </span>
+                </div>
+                <ScrollArea className="h-[calc(100vh-250px)]">
+                  <div className="space-y-4 pr-4">
+                    {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
+                      <Card key={doc.id} className="relative">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center justify-between">
+                            <span>Patient #{doc.patientId}</span>
+                            <Check className="h-4 w-4 text-green-600" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Abgeschlossen am</span>
+                              <span>{formatDate(doc.reviewDate || doc.date)}</span>
+                            </div>
+                            <p className="text-sm line-clamp-3">{doc.content}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             </div>
-          </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {patients.map((patient) => (
-              <Card key={patient.id} className="relative">
-                <CardHeader>
-                  <CardTitle className="flex justify-between items-center">
-                    <span>{patient.name}</span>
-                    <Button variant="ghost" size="sm" className="text-xs">
-                      <Clock className="mr-1 h-3 w-3" />
-                      Zeitleiste
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[300px]">
-                    {activePatientId === patient.id ? (
-                      <VoiceRecorder
-                        onTranscriptionComplete={handleTranscriptionComplete}
-                        className="mb-4"
-                      />
-                    ) : (
-                      <Button
-                        variant="outline"
-                        className="w-full mb-4"
-                        onClick={() => setActivePatientId(patient.id)}
-                      >
-                        <Mic className="mr-2 h-4 w-4" />
-                        Sprachaufnahme
-                      </Button>
-                    )}
-
-                    <div className="space-y-4">
-                      {/* AI Suggestion Card */}
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <div className="flex items-center text-sm text-blue-700 mb-2">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          KI-Vorschlag
-                        </div>
-                        <p className="text-sm text-blue-900">
-                          {getAISuggestions(patient.id, new Date())}
-                        </p>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="mt-2 text-xs text-blue-700"
-                          onClick={() => handleAISuggestion(patient.id)}
-                        >
-                          Übernehmen
-                        </Button>
-                      </div>
-
-                      {(docsByPatient[patient.id] || [])
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map((doc) => (
-                          <div
-                            key={doc.id}
-                            className="p-4 border rounded-lg space-y-2 hover:bg-gray-50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                {doc.type}
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {formatDate(doc.date)}
-                              </span>
-                            </div>
-                            <p className="text-sm">{doc.content}</p>
-                          </div>
-                        ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            <DragOverlay>
+              {draggedItem && (
+                <div className="bg-background p-4 rounded-lg shadow-lg border">
+                  Dokument wird verschoben...
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
         </main>
       </div>
     </div>

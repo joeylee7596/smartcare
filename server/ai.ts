@@ -6,15 +6,17 @@ export async function generateDocumentation(text: string): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const prompt = `Als medizinischer Dokumentationsassistent, formatiere den folgenden Text in eine professionelle Patientendokumentation im deutschen Pflegestandard. Behalte alle wichtigen medizinischen Details bei, strukturiere sie klar und verwende medizinische Fachsprache wo angemessen:
+    const prompt = `Als medizinischer Dokumentationsassistent, formatiere den folgenden Text in eine professionelle Patientendokumentation im deutschen Pflegestandard. Verwende NUR die Informationen, die im Text gegeben sind. Füge KEINE zusätzlichen Informationen oder Annahmen hinzu.
 
 ${text}
 
-Formatiere die Dokumentation in folgende Abschnitte:
-- Allgemeiner Zustand
-- Durchgeführte Maßnahmen
-- Beobachtungen
-- Empfehlungen (falls zutreffend)`;
+Formatiere die Dokumentation NUR in die folgenden Abschnitte, wenn dazu Informationen im Text vorhanden sind:
+- Allgemeiner Zustand (nur wenn beschrieben)
+- Durchgeführte Maßnahmen (nur wenn beschrieben)
+- Beobachtungen (nur wenn beschrieben)
+- Empfehlungen (nur wenn explizit genannt)
+
+Wenn zu einem der Abschnitte keine Informationen vorliegen, lasse diesen Abschnitt komplett weg.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;

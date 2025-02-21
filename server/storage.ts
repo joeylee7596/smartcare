@@ -31,8 +31,9 @@ export interface IStorage {
   deleteTour(id: number): Promise<void>;
 
   // Documentation
-  getDocs(patientId: number): Promise<Documentation[]>;
+  getDocs(patientId?: number): Promise<Documentation[]>;
   createDoc(doc: InsertDoc): Promise<Documentation>;
+  updateDoc(id: number, updates: Partial<Documentation>): Promise<Documentation>;
 
   // New methods for advanced features
   getWorkflowTemplates(): Promise<WorkflowTemplate[]>;
@@ -127,17 +128,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Documentation methods
-  async getDocs(patientId: number): Promise<Documentation[]> {
+  async getDocs(patientId?: number): Promise<Documentation[]> {
+    if (patientId) {
+      return db
+        .select()
+        .from(documentation)
+        .where(eq(documentation.patientId, patientId))
+        .orderBy(desc(documentation.date));
+    }
     return db
       .select()
       .from(documentation)
-      .where(eq(documentation.patientId, patientId))
       .orderBy(desc(documentation.date));
   }
 
   async createDoc(doc: InsertDoc): Promise<Documentation> {
     const [created] = await db.insert(documentation).values([doc]).returning();
     return created;
+  }
+
+  async updateDoc(id: number, updates: Partial<Documentation>): Promise<Documentation> {
+    const [updated] = await db
+      .update(documentation)
+      .set(updates)
+      .where(eq(documentation.id, id))
+      .returning();
+    return updated;
   }
 
   // New methods implementation

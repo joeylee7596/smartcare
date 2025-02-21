@@ -27,6 +27,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json(doc);
   });
 
+  app.patch("/api/docs/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid document ID" });
+    }
+
+    const { status, reviewNotes } = req.body;
+    const doc = await storage.updateDoc(id, {
+      status,
+      reviewNotes,
+      reviewerId: status === "completed" ? req.user?.id : undefined,
+      reviewDate: status === "completed" ? new Date() : undefined,
+    });
+
+    res.json(doc);
+  });
+
   // Patients
   app.get("/api/patients", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

@@ -58,6 +58,11 @@ export const documentation = pgTable("documentation", {
   aiGenerated: boolean("ai_generated").default(false),
   verified: boolean("verified").default(false),
   audioRecordingUrl: text("audio_recording_url"),
+  // Neue Felder für den Workflow
+  status: text("status").notNull().default("pending"),
+  reviewerId: integer("reviewer_id"),
+  reviewNotes: text("review_notes"),
+  reviewDate: timestamp("review_date"),
 });
 
 // New tables for advanced features
@@ -112,3 +117,12 @@ export type WorkflowTemplate = typeof workflowTemplates.$inferSelect;
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type InsuranceBilling = typeof insuranceBilling.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
+
+// Status-Typen für die Frontend-Validierung
+export const DocumentationStatus = {
+  PENDING: "pending",
+  REVIEW: "review",
+  COMPLETED: "completed",
+} as const;
+
+export type DocumentationStatusType = typeof DocumentationStatus[keyof typeof DocumentationStatus];
