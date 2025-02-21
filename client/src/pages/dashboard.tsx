@@ -9,27 +9,42 @@ import { Patient, Tour, Documentation } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 
 function DashboardCard({ 
   title, 
   value, 
   description, 
   icon: Icon,
-  className 
+  className,
+  gradient = false
 }: { 
   title: string;
   value: number | string;
   description: string;
   icon: React.ComponentType<any>;
   className?: string;
+  gradient?: boolean;
 }) {
   return (
-    <Card className={className}>
+    <Card className={cn(
+      "transition-all hover:shadow-md",
+      gradient && "bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20",
+      className
+    )}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
-          <Icon className="h-8 w-8 text-muted-foreground" />
+          <div className={cn(
+            "p-2 rounded-lg",
+            gradient ? "bg-primary/10" : "bg-muted"
+          )}>
+            <Icon className={cn(
+              "h-8 w-8",
+              gradient ? "text-primary" : "text-muted-foreground"
+            )} />
+          </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">{value}</div>
+            <div className="text-2xl font-bold tracking-tight">{value}</div>
             <div className="text-xs text-muted-foreground mt-1">{description}</div>
           </div>
         </div>
@@ -88,21 +103,21 @@ export default function Dashboard() {
               value={patients.length}
               description={`${criticalPatients.length} kritische Fälle`}
               icon={Users}
-              className="bg-blue-50 border-blue-100"
+              gradient
             />
             <DashboardCard
               title="Heutige Touren"
               value={todaysTours.length}
               description={`Nächste: ${todaysTours[0] ? format(new Date(todaysTours[0].date), "HH:mm") : '--:--'}`}
               icon={CalendarDays}
-              className="bg-green-50 border-green-100"
+              gradient
             />
             <DashboardCard
               title="Dokumentation"
               value={pendingDocs.length}
               description="Ausstehende Berichte"
               icon={ClipboardList}
-              className="bg-amber-50 border-amber-100"
+              gradient
             />
             <DashboardCard
               title="Warnungen"
@@ -116,7 +131,7 @@ export default function Dashboard() {
           {/* Main Content Area */}
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Left Column: Active Tours */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 border-primary/20">
               <CardHeader>
                 <CardTitle>Aktive Touren</CardTitle>
               </CardHeader>
@@ -126,7 +141,7 @@ export default function Dashboard() {
                     <p className="text-muted-foreground">Keine Touren für heute geplant</p>
                   ) : (
                     todaysTours.map((tour) => (
-                      <div key={tour.id} className="p-4 rounded-lg border bg-card">
+                      <div key={tour.id} className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="font-medium">Tour #{tour.id}</h3>
@@ -151,26 +166,26 @@ export default function Dashboard() {
             </Card>
 
             {/* Right Column: Quick Actions */}
-            <Card>
+            <Card className="border-primary/20">
               <CardHeader>
                 <CardTitle>Schnellzugriff</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <Link href="/patients/new">
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
                       <Users className="mr-2 h-4 w-4" />
                       Patient aufnehmen
                     </Button>
                   </Link>
                   <Link href="/tours/new">
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
                       <CalendarDays className="mr-2 h-4 w-4" />
                       Tour planen
                     </Button>
                   </Link>
                   <Link href="/documentation/new">
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button variant="outline" className="w-full justify-start hover:bg-primary/5 hover:text-primary hover:border-primary/20">
                       <ClipboardList className="mr-2 h-4 w-4" />
                       Dokumentation erstellen
                     </Button>
