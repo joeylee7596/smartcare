@@ -120,24 +120,25 @@ function DocumentationPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
       <Sidebar />
       <div className="flex-1">
         <Header />
         <main className="p-8">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
+            <h1 className="text-4xl font-bold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
               Dokumentation
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-lg">
               Verwalten Sie hier alle Patientendokumentationen
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <StatusColumn
               title="Offen"
               count={docsByStatus[DocumentationStatus.PENDING]?.length || 0}
+              color="blue"
             >
               {activePatientId ? (
                 <div className="space-y-4">
@@ -181,6 +182,7 @@ function DocumentationPage() {
             <StatusColumn
               title="In Überprüfung"
               count={docsByStatus[DocumentationStatus.REVIEW]?.length || 0}
+              color="amber"
             >
               {docsByStatus[DocumentationStatus.REVIEW]?.map((doc) => (
                 <DocumentCard
@@ -198,6 +200,7 @@ function DocumentationPage() {
             <StatusColumn
               title="Abgeschlossen"
               count={docsByStatus[DocumentationStatus.COMPLETED]?.length || 0}
+              color="green"
             >
               {docsByStatus[DocumentationStatus.COMPLETED]?.map((doc) => (
                 <DocumentCard
@@ -219,18 +222,29 @@ function DocumentationPage() {
 function StatusColumn({
   title,
   count,
-  children
+  children,
+  color
 }: {
   title: string;
   count: number;
   children: React.ReactNode;
+  color: 'blue' | 'amber' | 'green';
 }) {
+  const colorClasses = {
+    blue: 'bg-blue-50/50 border-blue-100 shadow-blue-100/20',
+    amber: 'bg-amber-50/50 border-amber-100 shadow-amber-100/20',
+    green: 'bg-green-50/50 border-green-100 shadow-green-100/20'
+  };
+
   return (
-    <div className="rounded-lg border bg-card transition-all duration-200">
-      <div className="p-4 border-b">
+    <div className={`rounded-xl border backdrop-blur-sm ${colorClasses[color]} shadow-lg transition-all duration-200`}>
+      <div className="p-4 border-b border-opacity-50">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary/10 text-primary">
+          <span className={`px-3 py-1 text-sm font-medium rounded-full 
+            ${color === 'blue' ? 'bg-blue-100 text-blue-700' : 
+              color === 'amber' ? 'bg-amber-100 text-amber-700' : 
+              'bg-green-100 text-green-700'}`}>
             {count}
           </span>
         </div>
@@ -260,7 +274,7 @@ function DocumentCard({
   if (!patient) return null;
 
   return (
-    <Card className="relative hover:shadow-md transition-shadow">
+    <Card className="group relative hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center justify-between">
           <span>{patient.name}</span>
@@ -287,17 +301,17 @@ function DocumentCard({
           </div>
           <p className="text-sm line-clamp-3">{doc.content}</p>
           {doc.reviewNotes && (
-            <div className="mt-2 p-2 bg-muted rounded-sm">
+            <div className="mt-2 p-2 rounded-lg bg-muted/50 border">
               <p className="text-xs text-muted-foreground">Anmerkungen:</p>
               <p className="text-sm">{doc.reviewNotes}</p>
             </div>
           )}
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
             {showMoveBackward && (
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="flex-1"
+                className="flex-1 hover:bg-muted"
                 onClick={onMoveBackward}
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
@@ -308,7 +322,7 @@ function DocumentCard({
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="flex-1"
+                className="flex-1 hover:bg-muted"
                 onClick={onMoveForward}
               >
                 Weiter
@@ -324,7 +338,7 @@ function DocumentCard({
 
 function NewDocumentationCard({ patient, onStartRecording }: { patient: Patient; onStartRecording: () => void }) {
   return (
-    <Card className="relative hover:shadow-md transition-shadow">
+    <Card className="relative hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
       <CardContent className="pt-4">
         <Button
           variant="outline"

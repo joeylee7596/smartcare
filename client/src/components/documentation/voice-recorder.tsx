@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -27,7 +27,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   const [error, setError] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { sendMessage, subscribe } = useWebSocket();
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
     return subscribe((message) => {
@@ -36,6 +36,9 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
           setIsProcessing(false);
           setFinalDocumentation(message.documentation);
           onTranscriptionComplete(message.documentation);
+          if (recognitionRef.current) {
+            recognitionRef.current.stop();
+          }
           break;
         case 'TRANSCRIPTION_ERROR':
           setIsProcessing(false);
@@ -102,7 +105,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
         setIsRecording(false);
       };
 
-      setRecognition(recognition);
+      recognitionRef.current = recognition;
       recognition.start();
 
     } catch (error) {
@@ -111,9 +114,9 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   };
 
   const stopRecording = () => {
-    if (recognition) {
-      recognition.stop();
-      setRecognition(null);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
     setIsRecording(false);
   };
@@ -127,7 +130,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
   };
 
   return (
-    <Card className={cn("relative overflow-hidden", className)}>
+    <Card className={cn("relative overflow-hidden hover:shadow-lg transition-all duration-300", className)}>
       <CardContent className="p-4 space-y-4">
         {isRecording ? (
           <div className="space-y-4">
@@ -149,7 +152,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
         ) : (
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full hover:bg-primary/5"
             onClick={startRecording}
             disabled={isProcessing}
           >
@@ -173,7 +176,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             )}
 
             {error && (
-              <div className="p-3 bg-red-50 rounded-lg border border-red-100">
+              <div className="p-3 rounded-lg bg-red-50 border border-red-100">
                 <p className="text-sm text-red-700">
                   {error}
                 </p>
@@ -186,11 +189,11 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
                 <Textarea
                   value={editableText}
                   onChange={(e) => setEditableText(e.target.value)}
-                  className="min-h-[100px]"
+                  className="min-h-[100px] bg-muted/50"
                   placeholder="Text bearbeiten..."
                 />
                 <Button 
-                  className="w-full" 
+                  className="w-full bg-primary hover:bg-primary/90" 
                   onClick={handleConfirm}
                   disabled={isProcessing}
                 >
@@ -201,7 +204,7 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
             )}
 
             {finalDocumentation && (
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+              <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
                 <div className="flex items-center gap-2 mb-2">
                   <Brain className="h-4 w-4 text-blue-700" />
                   <p className="text-sm font-medium text-blue-700">KI-Dokumentation:</p>
