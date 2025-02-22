@@ -3,25 +3,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import {
-  LayoutGrid,
-  Users,
-  CalendarDays,
-  ClipboardList,
-  Settings,
-  ChevronLeft,
-} from "lucide-react";
+  House,
+  UsersThree,
+  Path,
+  ClipboardText,
+  Gear,
+  CaretLeft
+} from "phosphor-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const primaryNavigation = [
-  { name: "Dashboard", href: "/", icon: LayoutGrid },
-  { name: "Patienten", href: "/patients", icon: Users },
-  { name: "Touren", href: "/tours", icon: CalendarDays },
-  { name: "Dokumentation", href: "/documentation", icon: ClipboardList },
+  { name: "Dashboard", href: "/", icon: House, description: "Übersicht und Statistiken" },
+  { name: "Patienten", href: "/patients", icon: UsersThree, description: "Patientenverwaltung" },
+  { name: "Touren", href: "/tours", icon: Path, description: "Tourenplanung" },
+  { name: "Dokumentation", href: "/documentation", icon: ClipboardText, description: "Dokumentationsverwaltung" },
 ];
 
 const secondaryNavigation = [
-  { name: "Einstellungen", href: "/settings", icon: Settings },
+  { name: "Einstellungen", href: "/settings", icon: Gear, description: "System Einstellungen" },
 ];
 
 export function Sidebar() {
@@ -61,11 +61,12 @@ export function Sidebar() {
             size="icon"
             className={cn(
               "ml-auto text-white/70 hover:text-white hover:bg-white/5 transition-all duration-500",
+              "hover:scale-105 active:scale-95",
               isCollapsed && "rotate-180"
             )}
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <CaretLeft weight="bold" className="h-5 w-5" />
           </Button>
         </div>
 
@@ -88,18 +89,27 @@ export function Sidebar() {
                         variant={isActive ? "sidebar" : "ghost"}
                         className={cn(
                           "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
+                          "hover:scale-[1.02] active:scale-[0.98]",
                           isActive 
                             ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
                             : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
-                          isCollapsed && "justify-center p-2"
+                          isCollapsed ? "justify-center p-2" : "px-3 py-2.5"
                         )}
                       >
-                        <Icon className={cn(
-                          "h-4 w-4",
-                          !isCollapsed && "mr-2",
-                          "transition-transform duration-300 group-hover:scale-110"
-                        )} />
-                        {!isCollapsed && <span className="transition-opacity duration-500">{item.name}</span>}
+                        <Icon 
+                          weight={isActive ? "fill" : "regular"} 
+                          className={cn(
+                            "transition-all duration-300",
+                            isCollapsed ? "h-6 w-6" : "h-5 w-5 mr-3",
+                            "group-hover:scale-110 group-hover:rotate-3"
+                          )} 
+                        />
+                        {!isCollapsed && (
+                          <div className="flex flex-col items-start">
+                            <span className="transition-opacity duration-500">{item.name}</span>
+                            <span className="text-xs text-white/40 font-normal">{item.description}</span>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
                     </Link>
@@ -125,18 +135,27 @@ export function Sidebar() {
                         variant={isActive ? "sidebar" : "ghost"}
                         className={cn(
                           "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
+                          "hover:scale-[1.02] active:scale-[0.98]",
                           isActive 
                             ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
                             : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
-                          isCollapsed && "justify-center p-2"
+                          isCollapsed ? "justify-center p-2" : "px-3 py-2.5"
                         )}
                       >
-                        <Icon className={cn(
-                          "h-4 w-4",
-                          !isCollapsed && "mr-2",
-                          "transition-transform duration-300 group-hover:scale-110"
-                        )} />
-                        {!isCollapsed && <span className="transition-opacity duration-500">{item.name}</span>}
+                        <Icon 
+                          weight={isActive ? "fill" : "regular"}
+                          className={cn(
+                            "transition-all duration-300",
+                            isCollapsed ? "h-6 w-6" : "h-5 w-5 mr-3",
+                            "group-hover:scale-110 group-hover:rotate-3"
+                          )} 
+                        />
+                        {!isCollapsed && (
+                          <div className="flex flex-col items-start">
+                            <span className="transition-opacity duration-500">{item.name}</span>
+                            <span className="text-xs text-white/40 font-normal">{item.description}</span>
+                          </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
                     </Link>
