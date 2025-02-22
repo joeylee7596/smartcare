@@ -28,7 +28,12 @@ import {
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
 import AddTourDialog from "@/components/tours/add-tour-dialog";
-
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const WORKING_HOURS = {
   start: 6,
@@ -80,18 +85,49 @@ interface TimelineEventProps {
   employeeColor: typeof EMPLOYEE_COLORS[0];
 }
 
+function getRandomDuration(careLevel: number): number {
+  const baseDuration = 20 + (careLevel * 5);
+  const variation = baseDuration * 0.15;
+  return Math.round(baseDuration + (Math.random() * variation * 2 - variation));
+}
+
+function calculateTravelTime(from: string, to: string): number {
+  const [fromLat, fromLng] = from.split(',').map(parseFloat);
+  const [toLat, toLng] = to.split(',').map(parseFloat);
+
+  if (!fromLat || !fromLng || !toLat || !toLng) return 15;
+
+  const dx = Math.abs(fromLat - toLat);
+  const dy = Math.abs(fromLng - toLng);
+  const distance = Math.sqrt(dx * dx + dy * dy) * 111; 
+
+  const baseTime = Math.round(distance * 2); 
+  const trafficVariation = Math.round(baseTime * 0.3 * (Math.random() - 0.5)); 
+
+  return Math.max(5, Math.min(60, baseTime + trafficVariation)); 
+}
+
 function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
   const hourWidth = 60;
   const baseDate = parseISO(tour.date.toString());
 
   const visits = tour.patientIds.map((patientId, index) => {
     const patient = patients.find(p => p.id === patientId);
-    const visitStart = addMinutes(baseDate, index * 45);
-    const visitDuration = 30;
+    const visitDuration = patient ? getRandomDuration(patient.careLevel) : 30;
+
+    let visitStart = baseDate;
+    if (index > 0) {
+      const prevPatient = patients.find(p => p.id === tour.patientIds[index - 1]);
+      if (prevPatient && patient) {
+        const travelTime = calculateTravelTime(prevPatient.address, patient.address);
+        visitStart = addMinutes(visitStart, travelTime);
+      }
+    }
 
     return {
       patient,
       start: visitStart,
+      duration: visitDuration,
       end: addMinutes(visitStart, visitDuration)
     };
   });
@@ -104,11 +140,15 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
         const startX = ((visit.end.getHours() + visit.end.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
         const nextVisit = visits[index + 1];
         const endX = ((nextVisit.start.getHours() + nextVisit.start.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
+        const travelTime = calculateTravelTime(
+          visit.patient?.address || '',
+          nextVisit.patient?.address || ''
+        );
 
         return (
           <div
             key={`connection-${index}`}
-            className="absolute h-0 border-t-2 border-dashed border-gray-300"
+            className="absolute h-0 border-t-2 border-dashed border-gray-300 group"
             style={{
               left: `${startX}px`,
               top: '50%',
@@ -116,45 +156,75 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               transform: 'translateY(-50%)',
               zIndex: 0
             }}
-          />
+          >
+            <div className="absolute top-0 left-1/2 -translate-y-full -translate-x-1/2 
+              opacity-0 group-hover:opacity-100 transition-opacity duration-200
+              bg-white px-2 py-1 rounded shadow-lg text-xs text-gray-600">
+              {travelTime} Min. Fahrzeit
+            </div>
+          </div>
         );
       })}
 
       {visits.map((visit, index) => {
         const startHour = visit.start.getHours() + (visit.start.getMinutes() / 60);
-        const duration = (visit.end.getTime() - visit.start.getTime()) / (1000 * 60 * 60);
+        const duration = visit.duration / 60; 
 
         const left = (startHour - WORKING_HOURS.start) * hourWidth;
         const width = duration * hourWidth;
 
         return (
-          <div
-            key={`visit-${index}`}
-            className={cn(
-              "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
-              "transition-all duration-300 group cursor-pointer",
-              "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
-              employeeColor.light,
-              employeeColor.border
-            )}
-            style={{
-              left: `${left}px`,
-              width: `${width}px`,
-              zIndex: 1
-            }}
-          >
-            <div className="h-full flex flex-col justify-center overflow-hidden">
-              <div className="flex items-center gap-1">
-                <Clock className={cn("h-3 w-3", employeeColor.text)} />
-                <span className="text-xs font-medium text-gray-900">
-                  {format(visit.start, "HH:mm")}
-                </span>
-              </div>
-              <div className={cn("text-xs font-medium truncate", employeeColor.text)}>
-                {visit.patient?.name}
-              </div>
-            </div>
-          </div>
+          <TooltipProvider key={`visit-${index}`}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
+                    "transition-all duration-300 group cursor-pointer",
+                    "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
+                    employeeColor.light,
+                    employeeColor.border
+                  )}
+                  style={{
+                    left: `${left}px`,
+                    width: `${width}px`,
+                    zIndex: 1
+                  }}
+                >
+                  <div className="h-full flex flex-col justify-center overflow-hidden">
+                    <div className="flex items-center gap-1">
+                      <Clock className={cn("h-3 w-3", employeeColor.text)} />
+                      <span className="text-xs font-medium text-gray-900">
+                        {format(visit.start, "HH:mm")}
+                      </span>
+                    </div>
+                    <div className={cn("text-xs font-medium truncate", employeeColor.text)}>
+                      {visit.patient?.name}
+                    </div>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-white p-3 rounded-xl shadow-xl border border-gray-200">
+                <div className="space-y-2">
+                  <div className="font-medium">{visit.patient?.name}</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <div className="text-gray-500">Pflegegrad:</div>
+                    <div className="font-medium">{visit.patient?.careLevel}</div>
+                    <div className="text-gray-500">Besuchsdauer:</div>
+                    <div className="font-medium">{visit.duration} Min.</div>
+                    <div className="text-gray-500">Adresse:</div>
+                    <div className="font-medium">{visit.patient?.address}</div>
+                    {visit.patient?.notes && (
+                      <>
+                        <div className="text-gray-500">Notizen:</div>
+                        <div className="font-medium">{visit.patient.notes}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         );
       })}
     </>
