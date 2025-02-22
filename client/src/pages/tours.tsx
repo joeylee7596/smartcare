@@ -528,7 +528,10 @@ export default function Tours() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px] rounded-xl overflow-hidden border border-gray-200">
+                  <div className="h-[300px] rounded-xl overflow-hidden border border-gray-200 relative">
+                    {showAddTourDialog && (
+                      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-30" />
+                    )}
                     <TourMap
                       patientIds={dateFilteredTours.flatMap((t) => t.patientIds)}
                       selectedEmployeeId={selectedEmployee}

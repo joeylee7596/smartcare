@@ -174,7 +174,7 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] relative z-50">
+      <DialogContent className="sm:max-w-[600px] relative z-[100]">
         <DialogHeader>
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
