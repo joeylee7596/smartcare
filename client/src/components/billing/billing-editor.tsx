@@ -55,7 +55,20 @@ const getServiceSuggestions = (careLevel: number) => {
   return [...serviceCatalog, ...suggestions];
 };
 
-export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) {
+export function BillingEditor({ patient, onSave }: BillingEditorProps) {
+  const [serviceEntries, setServiceEntries] = useState<Array<{
+    code: string;
+    description: string;
+    amount: number;
+  }>>([]); 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    services: ServiceSuggestion[];
+  } | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const { toast } = useToast();
+
   // Automatically fetch suggestions when date changes
   useEffect(() => {
     if (selectedDate && patient.id) {
@@ -63,31 +76,22 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
     }
   }, [selectedDate, patient.id]);
 
-  const [serviceEntries, setServiceEntries] = useState(billing?.services || []);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(
-    billing?.date ? format(new Date(billing.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")
-  );
-  const [aiSuggestions, setAiSuggestions] = useState<{
-    services: ServiceSuggestion[];
-  } | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const { toast } = useToast();
-
   const suggestedServices = getServiceSuggestions(patient.careLevel);
 
   const addServiceEntry = () => {
-    setServiceEntries([...serviceEntries, { code: "", description: "", amount: 0 }]);
+    setServiceEntries(prev => [...prev, { code: "", description: "", amount: 0 }]);
   };
 
   const removeServiceEntry = (index: number) => {
-    setServiceEntries(serviceEntries.filter((_, i) => i !== index));
+    setServiceEntries(prev => prev.filter((_, i) => i !== index));
   };
 
-  const updateServiceEntry = (index: number, field: string, value: any) => {
-    const newEntries = [...serviceEntries];
-    newEntries[index] = { ...newEntries[index], [field]: value };
-    setServiceEntries(newEntries);
+  const updateServiceEntry = (index: number, field: keyof typeof serviceEntries[0], value: string | number) => {
+    setServiceEntries(prev => {
+      const newEntries = [...prev];
+      newEntries[index] = { ...newEntries[index], [field]: value };
+      return newEntries;
+    });
   };
 
   // AI assistance for documentation completeness
@@ -208,22 +212,36 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
       return;
     }
 
-    // Convert all amounts to proper numeric values
-    const validatedServices = serviceEntries.map(service => ({
-      code: service.code || "",
-      description: service.description || "",
-      amount: Number(service.amount) || 0,
-    }));
+    try {
+      // Validate and format services
+      const validatedServices = serviceEntries.map(service => ({
+        code: service.code || "",
+        description: service.description || "",
+        amount: Number(service.amount) || 0,
+      }));
 
-    const totalAmount = validatedServices.reduce((sum, service) => sum + service.amount, 0);
+      // Calculate total amount
+      const totalAmount = validatedServices.reduce(
+        (sum, service) => sum + (Number(service.amount) || 0),
+        0
+      );
 
-    onSave({
-      patientId: patient.id,
-      date: selectedDate, // This will be converted to ISO string in the parent component
-      services: validatedServices,
-      totalAmount: totalAmount.toString(),
-      status: "pending",
-    });
+      // Call onSave with validated data
+      onSave({
+        patientId: patient.id,
+        date: selectedDate,
+        services: validatedServices,
+        totalAmount: totalAmount.toString(),
+        status: "pending",
+      });
+    } catch (error) {
+      console.error('Validation Error:', error);
+      toast({
+        title: "Fehler",
+        description: "Bitte überprüfen Sie die eingegebenen Daten.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
