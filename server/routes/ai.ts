@@ -336,23 +336,19 @@ router.post("/suggest-services", async (req, res) => {
 
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const prompt = `Als KI-Assistent für Pflegeabrechnungen, analysiere bitte die folgende Pflegedokumentation und schlage passende Leistungen vor.
+    const prompt = `Analyze the following nursing documentation and create a JSON response with suggested billable services.
 
-Patient:
+Patient Information:
 - Name: ${patient.name}
-- Pflegegrad: ${patient.careLevel}
-- Versicherung: ${patient.insuranceProvider}
+- Care Level: ${patient.careLevel}
+- Insurance: ${patient.insuranceProvider}
 
-Dokumentation vom ${new Date(date).toLocaleDateString('de-DE')}:
+Documentation from ${new Date(date).toLocaleDateString('de-DE')}:
 ${dayDocs.map(doc => `- ${doc.content}`).join('\n')}
 
-Basierend auf dieser Dokumentation:
-1. Identifiziere die erbrachten Pflegeleistungen
-2. Ordne sie den entsprechenden Abrechnungscodes zu
-3. Schlage angemessene Beträge vor
-4. Berücksichtige den Pflegegrad bei der Auswahl
+IMPORTANT: You must respond ONLY with a valid JSON object and no additional text.
+The JSON must follow this exact structure:
 
-Gib die Vorschläge strikt im folgenden JSON-Format zurück, ohne zusätzlichen Text:
 {
   "services": [
     {
@@ -363,27 +359,32 @@ Gib die Vorschläge strikt im folgenden JSON-Format zurück, ohne zusätzlichen 
       "based_on": "string"
     }
   ]
+}
+
+If no services can be suggested, return an empty services array:
+{
+  "services": []
 }`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
 
     try {
-      // Extract JSON from the response
+      // Try to extract JSON if there's any additional text
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Konnte keine gültigen JSON-Daten aus der KI-Antwort extrahieren");
+      if (jsonMatch) {
+        text = jsonMatch[0];
       }
 
-      const suggestions = JSON.parse(jsonMatch[0]);
+      const suggestions = JSON.parse(text);
 
-      // Validate the format
+      // Validate the structure
       if (!suggestions.services || !Array.isArray(suggestions.services)) {
-        throw new Error("Ungültiges Antwortformat: Services-Array fehlt");
+        throw new Error("Invalid response format: missing services array");
       }
 
-      // Validate each service
+      // Validate and sanitize each service
       suggestions.services = suggestions.services.map(service => ({
         code: String(service.code || ''),
         description: String(service.description || ''),
@@ -394,10 +395,18 @@ Gib die Vorschläge strikt im folgenden JSON-Format zurück, ohne zusätzlichen 
 
       res.json(suggestions);
     } catch (parseError) {
-      console.error("Parse Error:", parseError, "Raw Text:", text);
+      console.error("Parse Error:", parseError, "Raw Response:", text);
+
+      // If the AI couldn't suggest any services, return an empty list
+      if (text.toLowerCase().includes("keine leistungen") || 
+          text.toLowerCase().includes("no services") ||
+          text.toLowerCase().includes("cannot suggest")) {
+        return res.json({ services: [] });
+      }
+
       res.status(422).json({
         error: "Fehler bei der Analyse der Dokumentation",
-        details: "Die KI-Antwort konnte nicht korrekt verarbeitet werden. Bitte versuchen Sie es erneut."
+        details: "Die KI-Antwort konnte nicht verarbeitet werden. Bitte versuchen Sie es später erneut."
       });
     }
   } catch (error) {
