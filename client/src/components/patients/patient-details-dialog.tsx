@@ -41,12 +41,6 @@ export function PatientDetailsDialog({ patient, open, onOpenChange }: PatientDet
             <Badge variant={patient.careLevel >= 4 ? "destructive" : "secondary"}>
               Pflegegrad {patient.careLevel}
             </Badge>
-            {careAnalysis?.riskAreas?.length > 0 && (
-              <Badge variant="destructive" className="flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                Risikobereiche
-              </Badge>
-            )}
           </DialogTitle>
           <DialogDescription>Patientenübersicht und KI-Analyse</DialogDescription>
         </DialogHeader>
@@ -89,7 +83,6 @@ export function PatientDetailsDialog({ patient, open, onOpenChange }: PatientDet
                 </div>
               </Card>
 
-              {/* Quick Actions */}
               <div className="grid grid-cols-3 gap-2">
                 <Button variant="outline" className="h-20 flex-col">
                   <FileText className="h-5 w-5 mb-2" />
@@ -145,7 +138,6 @@ export function PatientDetailsDialog({ patient, open, onOpenChange }: PatientDet
           <TabsContent value="analysis">
             {careAnalysis ? (
               <div className="space-y-6">
-                {/* Care Trends */}
                 {careAnalysis.trends?.length > 0 && (
                   <Card className="p-4">
                     <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -163,7 +155,6 @@ export function PatientDetailsDialog({ patient, open, onOpenChange }: PatientDet
                   </Card>
                 )}
 
-                {/* Care Suggestions */}
                 {careAnalysis.suggestions?.length > 0 && (
                   <Card className="p-4">
                     <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -175,24 +166,6 @@ export function PatientDetailsDialog({ patient, open, onOpenChange }: PatientDet
                         <li key={i} className="text-sm flex items-center gap-2">
                           <div className="w-1 h-1 rounded-full bg-amber-400" />
                           {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
-
-                {/* Risk Areas */}
-                {careAnalysis.riskAreas?.length > 0 && (
-                  <Card className="p-4 border-red-200/20">
-                    <h3 className="text-sm font-medium mb-3 flex items-center gap-2 text-red-500">
-                      <AlertTriangle className="h-4 w-4" />
-                      Risikobereiche
-                    </h3>
-                    <ul className="space-y-2">
-                      {careAnalysis.riskAreas.map((risk, i) => (
-                        <li key={i} className="text-sm flex items-center gap-2 text-red-600">
-                          <div className="w-1 h-1 rounded-full bg-red-400" />
-                          {risk}
                         </li>
                       ))}
                     </ul>

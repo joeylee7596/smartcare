@@ -56,7 +56,7 @@ export default function BillingPage() {
   const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
     .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
-  // Updated save handling
+  // Updated save handling with better cache invalidation
   const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
     try {
       if (!billing.date || !billing.services || !billing.totalAmount) {
@@ -85,9 +85,13 @@ export default function BillingPage() {
         throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
       }
 
-      await queryClient.invalidateQueries({ 
-        queryKey: ["/api/billings", selectedPatient?.id] 
-      });
+      // Invalidate both billings and patients queries to refresh the data
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/billings"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
+      ]);
+
+      // Refetch the data
       await refetchBillings();
       setIsNewBillingOpen(false);
 
