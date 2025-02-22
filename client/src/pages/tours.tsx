@@ -25,6 +25,9 @@ import {
   ChevronLeft,
   ChevronRight,
   MapIcon,
+  Activity,
+  Heart,
+  AlertTriangle
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
 import AddTourDialog from "@/components/tours/add-tour-dialog";
@@ -41,12 +44,12 @@ const WORKING_HOURS = {
 };
 
 const EMPLOYEE_COLORS = [
-  { light: "bg-blue-100 hover:bg-blue-200", border: "border-blue-200", text: "text-blue-700" },
-  { light: "bg-purple-100 hover:bg-purple-200", border: "border-purple-200", text: "text-purple-700" },
-  { light: "bg-green-100 hover:bg-green-200", border: "border-green-200", text: "text-green-700" },
-  { light: "bg-amber-100 hover:bg-amber-200", border: "border-amber-200", text: "text-amber-700" },
-  { light: "bg-red-100 hover:bg-red-200", border: "border-red-200", text: "text-red-700" },
-  { light: "bg-indigo-100 hover:bg-indigo-200", border: "border-indigo-200", text: "text-indigo-700" },
+  { light: "bg-gradient-to-br from-blue-100 to-blue-200", border: "border-blue-200", text: "text-blue-700" },
+  { light: "bg-gradient-to-br from-purple-100 to-purple-200", border: "border-purple-200", text: "text-purple-700" },
+  { light: "bg-gradient-to-br from-green-100 to-green-200", border: "border-green-200", text: "text-green-700" },
+  { light: "bg-gradient-to-br from-amber-100 to-amber-200", border: "border-amber-200", text: "text-amber-700" },
+  { light: "bg-gradient-to-br from-red-100 to-red-200", border: "border-red-200", text: "text-red-700" },
+  { light: "bg-gradient-to-br from-indigo-100 to-indigo-200", border: "border-indigo-200", text: "text-indigo-700" },
 ];
 
 function formatHour(hour: number) {
@@ -162,7 +165,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
         return (
           <div
             key={`connection-${index}`}
-            className="absolute h-0 border-t-2 border-dashed border-gray-300 group"
+            className="absolute group"
             style={{
               left: `${startX}px`,
               top: "50%",
@@ -171,8 +174,14 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               zIndex: 0,
             }}
           >
-            <div className="absolute top-0 left-1/2 -translate-y-full -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-2 py-1 rounded shadow-lg text-xs text-gray-600">
-              {travelTime} Min. Fahrzeit
+            {/* Travel time indicator */}
+            <div className="h-0.5 w-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full 
+              opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:-translate-y-6
+              bg-white rounded-xl shadow-lg p-2 text-xs flex items-center gap-2"
+            >
+              <MapPin className="h-3 w-3 text-gray-500" />
+              <span className="font-medium text-gray-700">{travelTime} Min. Fahrzeit</span>
             </div>
           </div>
         );
@@ -191,11 +200,12 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               <TooltipTrigger asChild>
                 <div
                   className={cn(
-                    "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
-                    "transition-all duration-300 group cursor-pointer",
-                    "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
+                    "absolute h-[calc(100%-8px)] m-1 rounded-xl p-2",
+                    "transition-all duration-500 group cursor-pointer",
+                    "hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:z-10",
                     employeeColor.light,
-                    employeeColor.border
+                    "border border-white/40 backdrop-blur-sm",
+                    "hover:scale-[1.02]"
                   )}
                   style={{
                     left: `${left}px`,
@@ -204,32 +214,56 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                   }}
                 >
                   <div className="h-full flex flex-col justify-center overflow-hidden">
-                    <div className="flex items-center gap-1">
-                      <Clock className={cn("h-3 w-3", employeeColor.text)} />
-                      <span className="text-xs font-medium text-gray-900">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className={cn("h-3.5 w-3.5", employeeColor.text)} />
+                      <span className="text-sm font-medium text-gray-900">
                         {format(visit.start, "HH:mm")}
                       </span>
                     </div>
-                    <div className={cn("text-xs font-medium truncate", employeeColor.text)}>
-                      {visit.patient.name}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Heart className={cn("h-3.5 w-3.5", employeeColor.text)} />
+                      <span className={cn("text-sm font-medium truncate", employeeColor.text)}>
+                        {visit.patient.name}
+                      </span>
                     </div>
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="top" className="bg-white p-3 rounded-xl shadow-xl border border-gray-200">
-                <div className="space-y-2">
-                  <div className="font-medium">{visit.patient.name}</div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <div className="text-gray-500">Pflegegrad:</div>
+              <TooltipContent 
+                side="top" 
+                className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-xl border border-white/40"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Heart className={cn("h-5 w-5", employeeColor.text)} />
+                    <span className="text-lg font-medium">{visit.patient.name}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <Activity className="h-4 w-4" />
+                      <span>Pflegegrad:</span>
+                    </div>
                     <div className="font-medium">{visit.patient.careLevel}</div>
-                    <div className="text-gray-500">Besuchsdauer:</div>
+
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <Clock className="h-4 w-4" />
+                      <span>Besuchsdauer:</span>
+                    </div>
                     <div className="font-medium">{visit.duration} Min.</div>
-                    <div className="text-gray-500">Adresse:</div>
+
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <MapPin className="h-4 w-4" />
+                      <span>Adresse:</span>
+                    </div>
                     <div className="font-medium">{visit.patient.address}</div>
+
                     {visit.patient.notes && (
                       <>
-                        <div className="text-gray-500">Notizen:</div>
-                        <div className="font-medium">{visit.patient.notes}</div>
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>Notizen:</span>
+                        </div>
+                        <div className="font-medium text-amber-600">{visit.patient.notes}</div>
                       </>
                     )}
                   </div>
