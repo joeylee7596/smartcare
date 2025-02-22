@@ -42,6 +42,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { EmployeeTourDetails } from "@/components/tours/employee-tour-details";
 
 const WORKING_HOURS = {
   start: 6,
@@ -373,6 +374,8 @@ export default function Tours() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [showAddTourDialog, setShowAddTourDialog] = useState(false);
+  const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
+  const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<Employee | null>(null);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
@@ -387,6 +390,11 @@ export default function Tours() {
   });
 
   const dateFilteredTours = tours.filter((tour) => isSameDay(parseISO(tour.date.toString()), selectedDate));
+
+  const handleEmployeeClick = (employee: Employee) => {
+    setSelectedEmployeeForDetails(employee);
+    setShowEmployeeDetails(true);
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -467,9 +475,10 @@ export default function Tours() {
                     {employees.map((employee) => (
                       <div
                         key={employee.id}
-                        onClick={() =>
-                          setSelectedEmployee(selectedEmployee === employee.id ? null : employee.id)
-                        }
+                        onClick={() => {
+                          setSelectedEmployee(selectedEmployee === employee.id ? null : employee.id);
+                          handleEmployeeClick(employee);
+                        }}
                         className={cn(
                           "p-3 rounded-lg cursor-pointer",
                           "transition-all duration-200",
@@ -584,6 +593,15 @@ export default function Tours() {
               onOpenChange={setShowAddTourDialog}
               selectedDate={selectedDate}
               selectedEmployeeId={selectedEmployee}
+            />
+          )}
+
+          {showEmployeeDetails && selectedEmployeeForDetails && (
+            <EmployeeTourDetails
+              open={showEmployeeDetails}
+              onOpenChange={setShowEmployeeDetails}
+              employee={selectedEmployeeForDetails}
+              initialDate={selectedDate}
             />
           )}
         </main>
