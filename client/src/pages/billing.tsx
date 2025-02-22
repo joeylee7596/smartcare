@@ -19,6 +19,7 @@ import { BillingEditor } from "@/components/billing/billing-editor";
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isNewBillingOpen, setIsNewBillingOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch data
@@ -152,16 +153,45 @@ export default function BillingPage() {
                             </p>
                           </div>
                         </div>
-                        <Button onClick={() => {
-                          // TODO: Implement new service dialog
-                          toast({
-                            title: "Neue Leistung",
-                            description: "Dialog zum Erfassen neuer Leistungen wird implementiert.",
-                          });
-                        }}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Neue Leistung
-                        </Button>
+                        <Dialog open={isNewBillingOpen} onOpenChange={setIsNewBillingOpen}>
+                          <DialogTrigger asChild>
+                            <Button>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Neue Leistung
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl">
+                            <DialogHeader>
+                              <DialogTitle>Neue Leistung erfassen</DialogTitle>
+                            </DialogHeader>
+                            <BillingEditor
+                              patient={selectedPatient}
+                              onSave={async (billing) => {
+                                try {
+                                  const response = await fetch('/api/billings', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(billing),
+                                  });
+                                  if (!response.ok) throw new Error('Fehler beim Speichern');
+
+                                  queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
+                                  setIsNewBillingOpen(false);
+                                  toast({
+                                    title: 'Gespeichert',
+                                    description: 'Die Abrechnung wurde erfolgreich erstellt.',
+                                  });
+                                } catch (error) {
+                                  toast({
+                                    title: 'Fehler',
+                                    description: 'Die Abrechnung konnte nicht erstellt werden.',
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }}
+                            />
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </CardHeader>
                   </Card>
