@@ -1,7 +1,7 @@
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO, isSameDay } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState, useEffect } from "react";
@@ -47,8 +47,13 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { EmployeeTourDetails } from "@/components/tours/employee-tour-details";
+import { TourCalendar } from "@/components/tours/tour-calendar";
+import { apiRequest } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Tours() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
   const [showAddTourDialog, setShowAddTourDialog] = useState(false);
@@ -84,7 +89,9 @@ export default function Tours() {
     queryKey: ["/api/employees"],
   });
 
-  const dateFilteredTours = tours.filter((tour) => isSameDay(parseISO(tour.date.toString()), selectedDate));
+  const dateFilteredTours = tours.filter((tour) => 
+    isSameDay(parseISO(tour.date.toString()), selectedDate)
+  );
 
   const handleEmployeeClick = (employee: Employee) => {
     setSelectedEmployeeForDetails(employee);
@@ -301,9 +308,35 @@ export default function Tours() {
                           <CardTitle>Kalenderansicht</CardTitle>
                         </CardHeader>
                         <CardContent>
-                          {/* Calendar view implementation */}
-                          <div className="h-[calc(100vh-400px)] flex items-center justify-center text-gray-500">
-                            Kalenderansicht wird geladen...
+                          <div className="h-[calc(100vh-400px)]">
+                            <TourCalendar
+                              tours={dateFilteredTours}
+                              employees={employees}
+                              selectedDate={selectedDate}
+                              onTourUpdate={async (tourId: number, newTime: Date) => {
+                                const tour = tours.find(t => t.id === tourId);
+                                if (!tour) return;
+
+                                try {
+                                  await apiRequest('PATCH', `/api/tours/${tourId}`, {
+                                    ...tour,
+                                    date: newTime.toISOString()
+                                  });
+
+                                  queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
+                                  toast({
+                                    title: "Tour aktualisiert",
+                                    description: "Die Tour wurde erfolgreich neu geplant.",
+                                  });
+                                } catch (error) {
+                                  toast({
+                                    title: "Fehler",
+                                    description: "Die Tour konnte nicht aktualisiert werden.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            />
                           </div>
                         </CardContent>
                       </Card>
