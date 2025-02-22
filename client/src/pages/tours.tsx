@@ -36,7 +36,8 @@ import {
   PenTool,
   ListIcon,
   Calendar as CalendarIcon,
-  Map
+  Map,
+  Users
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
 import AddTourDialog from "@/components/tours/add-tour-dialog";
@@ -50,6 +51,8 @@ import { EmployeeTourDetails } from "@/components/tours/employee-tour-details";
 import { TourCalendar } from "@/components/tours/tour-calendar";
 import { apiRequest } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { DailyRoster } from "@/components/tours/daily-roster"; // Fixed import
+
 
 export default function Tours() {
   const { toast } = useToast();
@@ -59,7 +62,7 @@ export default function Tours() {
   const [showAddTourDialog, setShowAddTourDialog] = useState(false);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<Employee | null>(null);
-  const [activeView, setActiveView] = useState<'list' | 'calendar' | 'map'>('list');
+  const [activeView, setActiveView] = useState<'roster' | 'calendar' | 'list' | 'map'>('roster'); // Changed default to roster view
 
   // Get patientId from URL if provided
   useEffect(() => {
@@ -89,7 +92,7 @@ export default function Tours() {
     queryKey: ["/api/employees"],
   });
 
-  const dateFilteredTours = tours.filter((tour) => 
+  const dateFilteredTours = tours.filter((tour) =>
     isSameDay(parseISO(tour.date.toString()), selectedDate)
   );
 
@@ -157,12 +160,12 @@ export default function Tours() {
             <div className="flex gap-4">
               <div className="flex rounded-lg border bg-card p-1">
                 <Button
-                  variant={activeView === 'list' ? 'default' : 'ghost'}
+                  variant={activeView === 'roster' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setActiveView('list')}
+                  onClick={() => setActiveView('roster')}
                 >
-                  <ListIcon className="h-4 w-4 mr-1" />
-                  Liste
+                  <Users className="h-4 w-4 mr-1" />
+                  Dienstplan
                 </Button>
                 <Button
                   variant={activeView === 'calendar' ? 'default' : 'ghost'}
@@ -171,6 +174,14 @@ export default function Tours() {
                 >
                   <CalendarIcon className="h-4 w-4 mr-1" />
                   Kalender
+                </Button>
+                <Button
+                  variant={activeView === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('list')}
+                >
+                  <ListIcon className="h-4 w-4 mr-1" />
+                  Liste
                 </Button>
                 <Button
                   variant={activeView === 'map' ? 'default' : 'ghost'}
@@ -249,6 +260,54 @@ export default function Tours() {
               <Card className="border-none shadow-none bg-transparent">
                 <CardContent className="p-0">
                   <Tabs value={activeView} className="w-full">
+                    <TabsContent value="roster" className="mt-0">
+                      <DailyRoster
+                        employees={employees}
+                        tours={dateFilteredTours}
+                        selectedDate={selectedDate}
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="calendar" className="mt-0">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Kalenderansicht</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-[calc(100vh-400px)]">
+                            <TourCalendar
+                              tours={dateFilteredTours}
+                              employees={employees}
+                              selectedDate={selectedDate}
+                              onTourUpdate={async (tourId: number, newTime: Date) => {
+                                const tour = tours.find(t => t.id === tourId);
+                                if (!tour) return;
+
+                                try {
+                                  await apiRequest('PATCH', `/api/tours/${tourId}`, {
+                                    ...tour,
+                                    date: newTime.toISOString()
+                                  });
+
+                                  queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
+                                  toast({
+                                    title: "Tour aktualisiert",
+                                    description: "Die Tour wurde erfolgreich neu geplant.",
+                                  });
+                                } catch (error) {
+                                  toast({
+                                    title: "Fehler",
+                                    description: "Die Tour konnte nicht aktualisiert werden.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
                     <TabsContent value="list" className="mt-0">
                       <Card>
                         <CardHeader>
@@ -298,46 +357,6 @@ export default function Tours() {
                                 })}
                             </div>
                           </ScrollArea>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-
-                    <TabsContent value="calendar" className="mt-0">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Kalenderansicht</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="h-[calc(100vh-400px)]">
-                            <TourCalendar
-                              tours={dateFilteredTours}
-                              employees={employees}
-                              selectedDate={selectedDate}
-                              onTourUpdate={async (tourId: number, newTime: Date) => {
-                                const tour = tours.find(t => t.id === tourId);
-                                if (!tour) return;
-
-                                try {
-                                  await apiRequest('PATCH', `/api/tours/${tourId}`, {
-                                    ...tour,
-                                    date: newTime.toISOString()
-                                  });
-
-                                  queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
-                                  toast({
-                                    title: "Tour aktualisiert",
-                                    description: "Die Tour wurde erfolgreich neu geplant.",
-                                  });
-                                } catch (error) {
-                                  toast({
-                                    title: "Fehler",
-                                    description: "Die Tour konnte nicht aktualisiert werden.",
-                                    variant: "destructive",
-                                  });
-                                }
-                              }}
-                            />
-                          </div>
                         </CardContent>
                       </Card>
                     </TabsContent>
