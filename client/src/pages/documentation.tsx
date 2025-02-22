@@ -96,15 +96,21 @@ function DocumentationPage() {
         verified: false,
         employeeId: user?.id,
       });
+      if (!res.ok) {
+        throw new Error("Fehler beim Erstellen der Dokumentation");
+      }
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      setActivePatientId(null); // Close recording window
+
       toast({
         title: "Dokumentation erstellt",
-        description: "Die Dokumentation wurde erfolgreich gespeichert.",
+        description: data.status === DocumentationStatus.REVIEW 
+          ? "Die Dokumentation wurde zur Überprüfung weitergeleitet."
+          : "Die Dokumentation wurde erfolgreich gespeichert.",
       });
-      setActivePatientId(null);
 
       // Send WebSocket message for real-time updates
       sendMessage({
@@ -113,17 +119,29 @@ function DocumentationPage() {
         status: data.status
       });
     },
+    onError: (error) => {
+      toast({
+        title: "Fehler",
+        description: "Die Dokumentation konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+      console.error("Documentation creation error:", error);
+    },
   });
 
-  const handleTranscriptionComplete = (text: string, sendToReview: boolean) => {
+  const handleTranscriptionComplete = async (text: string, sendToReview: boolean) => {
     if (!activePatientId) return;
 
-    createDocMutation.mutate({
-      content: text,
-      patientId: activePatientId,
-      type: "KI-Dokumentation",
-      status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
-    });
+    try {
+      await createDocMutation.mutateAsync({
+        content: text,
+        patientId: activePatientId,
+        type: "KI-Dokumentation",
+        status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
+      });
+    } catch (error) {
+      console.error("Failed to create documentation:", error);
+    }
   };
 
   return (
