@@ -11,7 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MapPin, Plus, X, Clock, Euro, Calculator, PhoneCall } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +20,16 @@ interface AddTourDialogProps {
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
   selectedEmployeeId: number | null;
+  tourToEdit?: InsertTour & { id: number };
 }
 
-export default function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmployeeId }: AddTourDialogProps) {
+export default function AddTourDialog({ 
+  open, 
+  onOpenChange, 
+  selectedDate, 
+  selectedEmployeeId,
+  tourToEdit 
+}: AddTourDialogProps) {
   const { toast } = useToast();
   const [selectedPatients, setSelectedPatients] = useState<Patient[]>([]);
   const queryClient = useQueryClient();
@@ -58,6 +65,15 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
       }
     },
   });
+
+  // Load tour data when editing
+  useEffect(() => {
+    if (tourToEdit) {
+      form.reset(tourToEdit);
+      const tourPatients = patients.filter(p => tourToEdit.patientIds.includes(p.id));
+      setSelectedPatients(tourPatients);
+    }
+  }, [tourToEdit, patients, form]);
 
   const addPatient = (patientId: string) => {
     const patient = patients.find(p => p.id.toString() === patientId);
@@ -122,20 +138,26 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
 
   const mutation = useMutation({
     mutationFn: async (data: InsertTour) => {
-      const res = await apiRequest("POST", "/api/tours", {
-        ...data,
-        date: data.date.toISOString()
-      });
+      const res = await apiRequest(
+        tourToEdit ? "PATCH" : "POST",
+        tourToEdit ? `/api/tours/${tourToEdit.id}` : "/api/tours",
+        {
+          ...data,
+          date: data.date.toISOString()
+        }
+      );
       if (!res.ok) {
-        throw new Error('Failed to create tour');
+        throw new Error('Failed to save tour');
       }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tours"] });
       toast({
-        title: "Tour erfolgreich angelegt",
-        description: "Die neue Tour wurde in den Tagesplan aufgenommen.",
+        title: tourToEdit ? "Tour aktualisiert" : "Tour erfolgreich angelegt",
+        description: tourToEdit 
+          ? "Die Änderungen wurden gespeichert."
+          : "Die neue Tour wurde in den Tagesplan aufgenommen.",
       });
       form.reset();
       setSelectedPatients([]);
@@ -144,7 +166,7 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
     onError: () => {
       toast({
         title: "Fehler",
-        description: "Die Tour konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
+        description: `Die Tour konnte nicht ${tourToEdit ? 'aktualisiert' : 'angelegt'} werden. Bitte versuchen Sie es erneut.`,
         variant: "destructive",
       });
     },
@@ -165,7 +187,7 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Neue Tour planen</DialogTitle>
+          <DialogTitle>{tourToEdit ? 'Tour bearbeiten' : 'Neue Tour planen'}</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
@@ -369,10 +391,10 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
             {mutation.isPending ? (
               <>
                 <Clock className="mr-2 h-4 w-4 animate-spin" />
-                Tour wird angelegt...
+                {tourToEdit ? 'Änderungen werden gespeichert...' : 'Tour wird angelegt...'}
               </>
             ) : (
-              "Tour planen"
+              tourToEdit ? 'Änderungen speichern' : 'Tour planen'
             )}
           </Button>
         </div>

@@ -123,6 +123,7 @@ function calculateTravelTime(from: string, to: string): number {
 }
 
 function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const hourWidth = 60;
   const baseDate = parseISO(tour.date.toString());
 
@@ -217,6 +218,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                     width: `${width}px`,
                     zIndex: 1,
                   }}
+                  onClick={() => setShowEditDialog(true)}
                 >
                   <div className="h-full flex flex-col justify-center overflow-hidden">
                     <div className="flex items-center gap-1.5">
@@ -278,7 +280,6 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                       </>
                     )}
 
-                    {/* Add new mobile documentation status */}
                     <div className="flex items-center gap-2 text-gray-500">
                       <PhoneCall className="h-4 w-4" />
                       <span>Mobile Doku:</span>
@@ -310,6 +311,16 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
           </TooltipProvider>
         );
       })}
+
+      {showEditDialog && (
+        <AddTourDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          selectedDate={parseISO(tour.date.toString())}
+          selectedEmployeeId={tour.employeeId}
+          tourToEdit={tour}
+        />
+      )}
     </>
   );
 }
