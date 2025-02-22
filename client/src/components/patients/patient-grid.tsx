@@ -159,77 +159,74 @@ export function PatientGrid({ patients }: PatientGridProps) {
                         </Badge>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-10 w-10 rounded-xl transition-all duration-300
-                            hover:bg-blue-50 hover:text-blue-600
-                            hover:scale-110 hover:rotate-12"
+                    <div className="relative z-50">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 rounded-xl transition-all duration-300
+                              hover:bg-blue-50 hover:text-blue-600
+                              hover:scale-110 hover:rotate-12
+                              relative z-50"
+                          >
+                            <MoreVertical className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-56 rounded-xl border border-white/40 bg-white/80
+                            backdrop-blur-sm shadow-xl z-50"
                         >
-                          <MoreVertical className="h-5 w-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="w-56 rounded-xl border border-white/40 bg-white/80
-                          backdrop-blur-sm shadow-xl"
-                      >
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPatient(patient);
-                            setShowEditDialog(true);
-                          }}
-                          className="rounded-lg transition-all duration-300
-                            hover:bg-blue-50 hover:text-blue-600 focus:bg-blue-50 focus:text-blue-600
-                            hover:pl-6"
-                        >
-                          <Edit className="mr-2 h-5 w-5" />
-                          Bearbeiten
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPatient(patient);
-                            getAIInsights(patient);
-                          }}
-                          disabled={aiLoading}
-                          className="rounded-lg transition-all duration-300
-                            hover:bg-purple-50 hover:text-purple-600 focus:bg-purple-50 focus:text-purple-600
-                            hover:pl-6"
-                        >
-                          <Brain className="mr-2 h-5 w-5" />
-                          KI-Analyse
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPatient(patient);
-                            setShowCarePrediction(true);
-                          }}
-                          className="rounded-lg transition-all duration-300
-                            hover:bg-green-50 hover:text-green-600 focus:bg-green-50 focus:text-green-600
-                            hover:pl-6"
-                        >
-                          <Brain className="mr-2 h-5 w-5" />
-                          Pflegebedarfsprognose
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive rounded-lg transition-all duration-300
-                            hover:bg-red-50 focus:bg-red-50
-                            hover:pl-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteMutation.mutate(patient.id);
-                          }}
-                        >
-                          <Trash2 className="mr-2 h-5 w-5" />
-                          Löschen
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setShowEditDialog(true);
+                            }}
+                            className="rounded-lg transition-all duration-300
+                              hover:bg-blue-50 hover:text-blue-600 focus:bg-blue-50 focus:text-blue-600
+                              hover:pl-6"
+                          >
+                            <Edit className="mr-2 h-5 w-5" />
+                            Bearbeiten
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              getAIInsights(patient);
+                            }}
+                            disabled={aiLoading}
+                            className="rounded-lg transition-all duration-300
+                              hover:bg-purple-50 hover:text-purple-600 focus:bg-purple-50 focus:text-purple-600
+                              hover:pl-6"
+                          >
+                            <Brain className="mr-2 h-5 w-5" />
+                            KI-Analyse
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedPatient(patient);
+                              setShowCarePrediction(true);
+                            }}
+                            className="rounded-lg transition-all duration-300
+                              hover:bg-green-50 hover:text-green-600 focus:bg-green-50 focus:text-green-600
+                              hover:pl-6"
+                          >
+                            <Brain className="mr-2 h-5 w-5" />
+                            Pflegebedarfsprognose
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive rounded-lg transition-all duration-300
+                              hover:bg-red-50 focus:bg-red-50
+                              hover:pl-6"
+                            onClick={() => deleteMutation.mutate(patient.id)}
+                          >
+                            <Trash2 className="mr-2 h-5 w-5" />
+                            Löschen
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardHeader>
 
