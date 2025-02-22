@@ -30,7 +30,7 @@ export default function BillingPage() {
     queryKey: ["/api/patients"],
   });
 
-  const { data: billings = [] } = useQuery<InsuranceBilling[]>({
+  const { data: billings = [], refetch: refetchBillings } = useQuery<InsuranceBilling[]>({
     queryKey: ["/api/billings", selectedPatient?.id],
     enabled: !!selectedPatient?.id,
   });
@@ -224,8 +224,12 @@ export default function BillingPage() {
                                     throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
                                   }
 
-                                  queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
+                                  await queryClient.invalidateQueries({ 
+                                    queryKey: ["/api/billings", selectedPatient?.id] 
+                                  });
+                                  await refetchBillings();
                                   setIsNewBillingOpen(false);
+
                                   toast({
                                     title: 'Gespeichert',
                                     description: 'Die Abrechnung wurde erfolgreich erstellt.',
