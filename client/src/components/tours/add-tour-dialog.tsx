@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { InsertTour, insertTourSchema, Patient, Employee } from "@shared/schema";
@@ -65,8 +66,7 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
       setSelectedPatients(newPatients);
       form.setValue("patientIds", newPatients.map(p => p.id));
 
-      // Update economic calculations
-      const personnelCosts = newPatients.length * 45; // Base cost per patient
+      const personnelCosts = newPatients.length * 45;
       const vehicleCosts = calculateVehicleCosts(newPatients);
       const specialServiceFees = calculateSpecialServiceFees(newPatients);
       const totalCosts = personnelCosts + vehicleCosts + specialServiceFees;
@@ -92,7 +92,6 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
     setSelectedPatients(newPatients);
     form.setValue("patientIds", newPatients.map(p => p.id));
 
-    // Recalculate economics after removing patient
     if (newPatients.length === 0) {
       const defaultEconomicCalculation = {
         personnelCosts: 0,
@@ -105,30 +104,20 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
       form.setValue("economicCalculation", defaultEconomicCalculation);
       form.setValue("economicIndicator", "yellow");
     } else {
-      // Trigger recalculation logic
       addPatient(newPatients[newPatients.length - 1].id.toString());
     }
   };
 
   const calculateVehicleCosts = (patients: Patient[]): number => {
-    // Simplified calculation - in reality would use actual distances and rates
-    return patients.length * 15; // Average vehicle cost per patient
+    return patients.length * 15;
   };
 
   const calculateSpecialServiceFees = (patients: Patient[]): number => {
-    return patients.reduce((total, patient) => {
-      // Add fees based on care level and special requirements
-      return total + (patient.careLevel * 10);
-    }, 0);
+    return patients.reduce((total, patient) => total + (patient.careLevel * 10), 0);
   };
 
   const calculateExpectedRevenue = (patients: Patient[]): number => {
-    return patients.reduce((total, patient) => {
-      // Base rate plus care level multiplier
-      const baseRate = 60;
-      const careLevelMultiplier = patient.careLevel * 15;
-      return total + baseRate + careLevelMultiplier;
-    }, 0);
+    return patients.reduce((total, patient) => total + 60 + (patient.careLevel * 15), 0);
   };
 
   const mutation = useMutation({
@@ -174,217 +163,219 @@ export default function AddTourDialog({ open, onOpenChange, selectedDate, select
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-6">
-            {/* Employee Selection */}
-            <FormField
-              control={form.control}
-              name="employeeId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mitarbeiter auswählen</FormLabel>
-                  <Select
-                    value={field.value?.toString()}
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Mitarbeiter auswählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {employees.map((employee) => (
-                        <SelectItem key={employee.id} value={employee.id.toString()}>
-                          {employee.name}
-                          {employee.qualifications.nursingDegree && " (Examiniert)"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
 
-            {/* Patient Selection - Only show when employee is selected */}
-            {selectedEmployee && (
+        <ScrollArea className="flex-1 pr-4">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-6">
               <FormField
                 control={form.control}
-                name="patientIds"
+                name="employeeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Patienten zur Tour hinzufügen</FormLabel>
-                    <div className="space-y-4">
-                      <Select
-                        onValueChange={addPatient}
-                        value=""
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Patient auswählen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {patients
-                            .filter(p => !selectedPatients.find(sp => sp.id === p.id))
-                            .map((patient) => (
-                              <SelectItem key={patient.id} value={patient.id.toString()}>
-                                {patient.name}
-                                {" - Pflegegrad " + patient.careLevel}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-
-                      <div className="space-y-2">
-                        <AnimatePresence>
-                          {selectedPatients.map((patient) => (
-                            <motion.div
-                              key={patient.id}
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: "auto" }}
-                              exit={{ opacity: 0, height: 0 }}
-                              className="flex items-center justify-between p-3 rounded-lg bg-accent"
-                            >
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <div>
-                                  <span className="font-medium">{patient.name}</span>
-                                  <span className="ml-2 text-sm text-muted-foreground">
-                                    Pflegegrad {patient.careLevel}
-                                  </span>
-                                </div>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removePatient(patient.id)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                    </div>
+                    <FormLabel>Mitarbeiter auswählen</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Mitarbeiter auswählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees.map((employee) => (
+                          <SelectItem key={employee.id} value={employee.id.toString()}>
+                            {employee.name}
+                            {employee.qualifications.nursingDegree && " (Examiniert)"}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormItem>
                 )}
               />
-            )}
 
-            {/* Economic Indicators - Show when patients are selected */}
-            {selectedPatients.length > 0 && (
-              <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
-                <h3 className="font-medium flex items-center gap-2">
-                  <Calculator className="h-4 w-4 text-primary" />
-                  Wirtschaftlichkeitsberechnung
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Personalkosten</p>
-                    <p className="font-medium">{economicCalculation.personnelCosts.toFixed(2)} €</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Fahrzeugkosten</p>
-                    <p className="font-medium">{economicCalculation.vehicleCosts.toFixed(2)} €</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Erwarteter Umsatz</p>
-                    <p className="font-medium">{economicCalculation.expectedRevenue.toFixed(2)} €</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Gewinnmarge</p>
-                    <p className={cn(
-                      "font-medium",
-                      economicCalculation.profitMargin >= 20 ? "text-green-600" :
-                        economicCalculation.profitMargin >= 10 ? "text-amber-600" : "text-red-600"
-                    )}>
-                      {economicCalculation.profitMargin.toFixed(1)}%
-                    </p>
+              {selectedEmployee && (
+                <FormField
+                  control={form.control}
+                  name="patientIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Patienten zur Tour hinzufügen</FormLabel>
+                      <div className="space-y-4">
+                        <Select
+                          onValueChange={addPatient}
+                          value=""
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Patient auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {patients
+                              .filter(p => !selectedPatients.find(sp => sp.id === p.id))
+                              .map((patient) => (
+                                <SelectItem key={patient.id} value={patient.id.toString()}>
+                                  {patient.name}
+                                  {" - Pflegegrad " + patient.careLevel}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                          <AnimatePresence>
+                            {selectedPatients.map((patient) => (
+                              <motion.div
+                                key={patient.id}
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="flex items-center justify-between p-3 rounded-lg bg-accent"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                                  <div>
+                                    <span className="font-medium">{patient.name}</span>
+                                    <span className="ml-2 text-sm text-muted-foreground">
+                                      Pflegegrad {patient.careLevel}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removePatient(patient.id)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {selectedPatients.length > 0 && (
+                <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
+                  <h3 className="font-medium flex items-center gap-2">
+                    <Calculator className="h-4 w-4 text-primary" />
+                    Wirtschaftlichkeitsberechnung
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Personalkosten</p>
+                      <p className="font-medium">{economicCalculation.personnelCosts.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Fahrzeugkosten</p>
+                      <p className="font-medium">{economicCalculation.vehicleCosts.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Erwarteter Umsatz</p>
+                      <p className="font-medium">{economicCalculation.expectedRevenue.toFixed(2)} €</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Gewinnmarge</p>
+                      <p className={cn(
+                        "font-medium",
+                        economicCalculation.profitMargin >= 20 ? "text-green-600" :
+                          economicCalculation.profitMargin >= 10 ? "text-amber-600" : "text-red-600"
+                      )}>
+                        {economicCalculation.profitMargin.toFixed(1)}%
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Mobile Documentation Settings */}
-            <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
-              <h3 className="font-medium flex items-center gap-2">
-                <PhoneCall className="h-4 w-4 text-primary" />
-                Mobile Dokumentation
-              </h3>
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="mobileDocumentation.offlineCapable"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <FormLabel>Offline-Modus</FormLabel>
-                        <FormDescription>
-                          Ermöglicht die Dokumentation ohne Internetverbindung
-                        </FormDescription>
-                      </div>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="mobileDocumentation.gpsTracking"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <FormLabel>GPS-Tracking</FormLabel>
-                        <FormDescription>
-                          Erfasst automatisch die Position bei Leistungserbringung
-                        </FormDescription>
-                      </div>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="mobileDocumentation.signatureRequired"
-                  render={({ field }) => (
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <FormLabel>Unterschrift erforderlich</FormLabel>
-                        <FormDescription>
-                          Fordert eine digitale Unterschrift des Patienten an
-                        </FormDescription>
-                      </div>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </div>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={!selectedEmployee || selectedPatients.length === 0 || mutation.isPending}
-              className="w-full"
-            >
-              {mutation.isPending ? (
-                <>
-                  <Clock className="mr-2 h-4 w-4 animate-spin" />
-                  Tour wird angelegt...
-                </>
-              ) : (
-                "Tour planen"
               )}
-            </Button>
-          </form>
-        </Form>
+
+              <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
+                <h3 className="font-medium flex items-center gap-2">
+                  <PhoneCall className="h-4 w-4 text-primary" />
+                  Mobile Dokumentation
+                </h3>
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="mobileDocumentation.offlineCapable"
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <FormLabel>Offline-Modus</FormLabel>
+                          <FormDescription>
+                            Ermöglicht die Dokumentation ohne Internetverbindung
+                          </FormDescription>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </div>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="mobileDocumentation.gpsTracking"
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <FormLabel>GPS-Tracking</FormLabel>
+                          <FormDescription>
+                            Erfasst automatisch die Position bei Leistungserbringung
+                          </FormDescription>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </div>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="mobileDocumentation.signatureRequired"
+                    render={({ field }) => (
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <FormLabel>Unterschrift erforderlich</FormLabel>
+                          <FormDescription>
+                            Fordert eine digitale Unterschrift des Patienten an
+                          </FormDescription>
+                        </div>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </div>
+                    )}
+                  />
+                </div>
+              </div>
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <div className="pt-4 border-t">
+          <Button
+            type="submit"
+            onClick={form.handleSubmit((data) => mutation.mutate(data))}
+            disabled={!selectedEmployee || selectedPatients.length === 0 || mutation.isPending}
+            className="w-full"
+          >
+            {mutation.isPending ? (
+              <>
+                <Clock className="mr-2 h-4 w-4 animate-spin" />
+                Tour wird angelegt...
+              </>
+            ) : (
+              "Tour planen"
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
