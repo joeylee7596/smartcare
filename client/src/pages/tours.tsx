@@ -23,6 +23,9 @@ import type { LatLngExpression } from 'leaflet';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PatientDetailsDialog } from "@/components/patients/patient-details-dialog";
+import {cn} from "@/lib/utils";
+import {UsersIcon, Path, Brain} from "@/components/ui/icons";
+
 
 // Fix for default marker icon
 const defaultIcon = new Icon({
@@ -172,6 +175,62 @@ function formatQualification(key: string): string {
     firstAid: "Erste Hilfe"
   };
   return mapping[key] || key;
+}
+
+function DashboardCard({ 
+  title,
+  value,
+  description,
+  icon: Icon,
+  className,
+  onClick
+}: { 
+  title: string;
+  value: number | string;
+  description: string;
+  icon: React.ComponentType<any>;
+  className?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <Card 
+      className={cn(
+        "relative overflow-hidden transition-all duration-500",
+        "hover:scale-[1.02] hover:-translate-y-1",
+        "rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]",
+        "hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)]",
+        "border border-white/20 backdrop-blur-sm",
+        "bg-gradient-to-br from-blue-500/[0.08] via-blue-400/[0.05] to-transparent",
+        "cursor-pointer",
+        className
+      )}
+      onClick={onClick}
+    >
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 
+            text-white shadow-lg shadow-blue-500/25 
+            transition-transform duration-500 group-hover:scale-110">
+            <Icon weight="fill" className="h-8 w-8 transition-all duration-500 
+              group-hover:scale-110 group-hover:rotate-6" />
+          </div>
+          <div className="text-right">
+            <div className="text-3xl font-bold tracking-tight bg-gradient-to-r 
+              from-blue-600 to-blue-400 bg-clip-text text-transparent">
+              {value}
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{description}</div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <h3 className="font-medium text-sm text-gray-600">{title}</h3>
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 
+          via-blue-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 
+          transition-opacity duration-500" />
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function Tours() {
@@ -467,240 +526,180 @@ export default function Tours() {
                 {format(selectedDate, "EEEE, dd. MMMM yyyy", { locale: de })}
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => window.location.reload()}
-              className="rounded-xl bg-white/80 backdrop-blur-sm border border-white/40
-                hover:bg-blue-50 hover:border-blue-200
-                shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
-                hover:-translate-y-0.5 hover:scale-105
-                transition-all duration-500 group"
-            >
-              <RotateCw className="mr-2 h-4 w-4 transition-transform duration-500
-                group-hover:scale-110 group-hover:rotate-180" />
-              Aktualisieren
-            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="rounded-xl bg-white/80 backdrop-blur-sm border border-white/40
+                    hover:bg-blue-50 hover:border-blue-200
+                    shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                    hover:-translate-y-0.5 hover:scale-105
+                    transition-all duration-500 group"
+                >
+                  <Calendar className="mr-2 h-4 w-4 transition-transform duration-500
+                    group-hover:scale-110 group-hover:rotate-12" />
+                  {format(selectedDate, "dd. MMMM yyyy", { locale: de })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 rounded-xl border border-white/40
+                bg-white/80 backdrop-blur-sm shadow-xl">
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => date && setSelectedDate(date)}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div className="grid grid-cols-[350px,1fr,350px] gap-6">
+          {/* Overview Cards */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <DashboardCard
+              title="Aktive Touren"
+              value={employeeTours.length}
+              description={`${employeeTours.filter(t => t.status === 'active').length} laufende Touren`}
+              icon={Path}
+            />
+            <DashboardCard
+              title="Verfügbare Mitarbeiter"
+              value={employees.filter(e => e.status === 'active').length}
+              description="Einsatzbereit"
+              icon={UserCheck}
+            />
+            <DashboardCard
+              title="Patienten"
+              value={patients.length}
+              description={`${patientsInTours.length} eingeplant`}
+              icon={UsersIcon}
+            />
+            <DashboardCard
+              title="Durchschnittliche Auslastung"
+              value={`${Math.round(employees.reduce((acc, emp) => acc + calculateWorkload(emp.id), 0) / employees.length)}%`}
+              description="Aller Mitarbeiter"
+              icon={Brain}
+            />
+          </div>
+
+          {/* Main Content Area */}
+          <div className="grid grid-cols-[300px,1fr,300px] gap-6">
+            {/* Left Sidebar: Staff Selection */}
+            <Card className="rounded-2xl border border-white/40 bg-white/80
+              backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+              hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+              transition-all duration-500 h-[calc(100vh-280px)]">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
+                  bg-clip-text text-transparent">Mitarbeiter</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-full px-4">
+                  <div className="space-y-3">
+                    {employees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className={cn(
+                          "p-4 rounded-xl transition-all duration-300 cursor-pointer",
+                          "border border-white/40 hover:border-blue-200",
+                          "bg-gradient-to-r from-white to-blue-50/50",
+                          "hover:from-blue-50 hover:to-blue-100/50",
+                          "shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20",
+                          "hover:-translate-y-0.5 hover:scale-[1.02]",
+                          "group",
+                          employee.id === selectedEmployee && "from-blue-50 to-blue-100/50 border-blue-200"
+                        )}
+                        onClick={() => setSelectedEmployee(employee.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 
+                            text-white shadow-lg shadow-blue-500/25 
+                            transition-transform duration-500 group-hover:scale-110">
+                            <UserCheck className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-gray-900">{employee.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge 
+                                variant={calculateWorkload(employee.id) > 80 ? "destructive" : "secondary"}
+                                className="text-xs rounded-lg font-medium px-2 py-0.5"
+                              >
+                                {calculateWorkload(employee.id)}% Auslastung
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            {/* Center: Map and Route Overview */}
             <div className="space-y-6">
               <Card className="rounded-2xl border border-white/40 bg-white/80
                 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
                 hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
                 transition-all duration-500">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
-                    bg-clip-text text-transparent">Mitarbeiter</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[300px]">
-                    {employees.map((employee) => (
-                      <EmployeeCard
-                        key={employee.id}
-                        employee={employee}
-                        onSelect={setSelectedEmployee}
-                        isSelected={employee.id === selectedEmployee}
-                        workload={calculateWorkload(employee.id)}
-                      />
-                    ))}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-              <Card className="rounded-2xl border border-white/40 bg-white/80
-                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
-                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
-                transition-all duration-500">
-                <CardHeader className="pb-3">
-                  <div className="space-y-3">
-                    <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
-                      bg-clip-text text-transparent">Patienten</CardTitle>
-
-                    <div className="relative group">
-                      <div className="absolute left-3 top-3 text-gray-400 transition-all duration-300
-                        group-focus-within:scale-110 group-focus-within:text-blue-500">
-                        <Search className="h-4 w-4" />
-                      </div>
-                      <Input
-                        placeholder="Patient suchen..."
-                        className="pl-10 h-12 rounded-xl bg-white/80 backdrop-blur-sm
-                          border-white/40 hover:border-blue-200 focus:border-blue-300
-                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
-                          focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
-                          transition-all duration-300"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-
-                    <Popover>
-                      <PopoverTrigger asChild>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
+                      bg-clip-text text-transparent">Routenübersicht</CardTitle>
+                    <Dialog>
+                      <DialogTrigger asChild>
                         <Button
-                          variant="outline"
-                          className="w-full justify-start text-left h-12 rounded-xl
-                            bg-gradient-to-r from-white to-blue-50/50
-                            hover:from-blue-50 hover:to-blue-100/50
-                            border border-white/40 hover:border-blue-200
-                            shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
-                            hover:-translate-y-0.5 hover:scale-[1.02]
-                            transition-all duration-500 group"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-lg transition-all duration-300
+                            hover:bg-blue-50 hover:text-blue-600
+                            hover:scale-110 hover:rotate-12"
                         >
-                          <Calendar className="mr-2 h-4 w-4 transition-transform duration-500
-                            group-hover:scale-110 group-hover:rotate-12" />
-                          {format(selectedDate, "PPP", { locale: de })}
+                          <Maximize2 className="h-4 w-4" />
                         </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 rounded-xl border border-white/40
-                        bg-white/80 backdrop-blur-sm shadow-xl" style={{ zIndex: 100 }}>
-                        <CalendarComponent
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-
-                    <div className="space-y-2">
-                      <Select
-                        value={filters.urgency}
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, urgency: value }))}
-                      >
-                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
-                          border-white/40 hover:border-blue-200
-                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
-                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
-                          transition-all duration-300">
-                          <SelectValue placeholder="Dringlichkeit" />
-                        </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
-                          bg-white/80 backdrop-blur-sm shadow-xl">
-                          <SelectItem value="all">Alle</SelectItem>
-                          <SelectItem value="urgent">Dringend</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={filters.careType}
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, careType: value }))}
-                      >
-                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
-                          border-white/40 hover:border-blue-200
-                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
-                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
-                          transition-all duration-300">
-                          <SelectValue placeholder="Pflegeart" />
-                        </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
-                          bg-white/80 backdrop-blur-sm shadow-xl">
-                          <SelectItem value="all">Alle</SelectItem>
-                          <SelectItem value="basic">Grundpflege</SelectItem>
-                          <SelectItem value="medical">Medizinische Pflege</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={filters.location}
-                        onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
-                      >
-                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
-                          border-white/40 hover:border-blue-200
-                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
-                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
-                          transition-all duration-300">
-                          <SelectValue placeholder="Standort" />
-                        </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
-                          bg-white/80 backdrop-blur-sm shadow-xl">
-                          <SelectItem value="all">Alle Bezirke</SelectItem>
-                          <SelectItem value="north">Nord</SelectItem>
-                          <SelectItem value="south">Süd</SelectItem>
-                          <SelectItem value="east">Ost</SelectItem>
-                          <SelectItem value="west">West</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] rounded-2xl
+                        border border-white/40 bg-white/80 backdrop-blur-sm
+                        shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)]">
+                        <MapContainer
+                          center={center}
+                          zoom={13}
+                          style={expandedMapStyle}
+                          scrollWheelZoom
+                        >
+                          <TileLayer
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                          />
+                          {employeeTours.map((tour) => (
+                            tour.optimizedRoute?.waypoints.map((waypoint, index) => (
+                              <Marker
+                                key={`${tour.id}-${index}`}
+                                position={[waypoint.lat, waypoint.lng]}
+                                icon={defaultIcon}
+                              >
+                                <Popup>
+                                  <div className="p-2">
+                                    <p className="font-medium">Stop {index + 1}</p>
+                                    <p className="text-sm text-gray-500">
+                                      {patients.find(p => p.id === waypoint.patientId)?.name}
+                                    </p>
+                                  </div>
+                                </Popup>
+                              </Marker>
+                            ))
+                          ))}
+                        </MapContainer>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <ScrollArea className="h-[calc(100vh-350px)]">
-                    {filteredPatients.map((patient) => (
-                      <PatientCard
-                        key={patient.id}
-                        patient={patient}
-                        onAdd={handleAddToTour}
-                        isInTour={patientsInTours.includes(patient.id)}
-                        onSelect={setSelectedPatient}
-                      />
-                    ))}
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="rounded-2xl border border-white/40 bg-white/80
-              backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
-              hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
-              transition-all duration-500 overflow-hidden relative">
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
-                  bg-clip-text text-transparent">Karte</CardTitle>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-lg transition-all duration-300
-                        hover:bg-blue-50 hover:text-blue-600
-                        hover:scale-110 hover:rotate-12"
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] rounded-2xl
-                    border border-white/40 bg-white/80 backdrop-blur-sm
-                    shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)]" style={{ zIndex: 1000 }}>
-                    <div className="relative w-full h-full">
-                      <MapContainer
-                        center={center}
-                        zoom={13}
-                        style={expandedMapStyle}
-                        scrollWheelZoom
-                        className="relative"
-                      >
-                        <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                        />
-                        {employeeTours.map((tour) => (
-                          tour.optimizedRoute?.waypoints.map((waypoint, index) => (
-                            <Marker
-                              key={`${tour.id}-${index}`}
-                              position={[waypoint.lat, waypoint.lng] as LatLngExpression}
-                              icon={defaultIcon}
-                            >
-                              <Popup>
-                                <div className="p-2">
-                                  <p className="font-medium">Stop {index + 1}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {patients.find(p => p.id === waypoint.patientId)?.name || `Patient #${waypoint.patientId}`}
-                                  </p>
-                                </div>
-                              </Popup>
-                            </Marker>
-                          ))
-                        ))}
-                      </MapContainer>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="relative" style={{ zIndex: 0 }}>
+                <CardContent className="p-0">
                   <MapContainer
                     center={center}
                     zoom={13}
                     style={compactMapStyle}
                     scrollWheelZoom
-                    className="relative"
                   >
                     <TileLayer
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -710,14 +709,14 @@ export default function Tours() {
                       tour.optimizedRoute?.waypoints.map((waypoint, index) => (
                         <Marker
                           key={`${tour.id}-${index}`}
-                          position={[waypoint.lat, waypoint.lng] as LatLngExpression}
+                          position={[waypoint.lat, waypoint.lng]}
                           icon={defaultIcon}
                         >
-                          <Popup className="leaflet-popup-content-wrapper">
+                          <Popup>
                             <div className="p-2">
                               <p className="font-medium">Stop {index + 1}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {patients.find(p => p.id === waypoint.patientId)?.name || `Patient #${waypoint.patientId}`}
+                              <p className="text-sm text-gray-500">
+                                {patients.find(p => p.id === waypoint.patientId)?.name}
                               </p>
                             </div>
                           </Popup>
@@ -725,135 +724,222 @@ export default function Tours() {
                       ))
                     ))}
                   </MapContainer>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
+              {/* Tour List */}
+              <Card className="rounded-2xl border border-white/40 bg-white/80
+                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+                transition-all duration-500">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
+                      bg-clip-text text-transparent">
+                      Aktive Touren
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-red-500 hover:text-red-600 
+                        hover:bg-red-50 transition-all duration-300
+                        hover:scale-110"
+                      onClick={() => {
+                        const tourIds = employeeTours.map(tour => tour.id);
+                        tourIds.forEach(id => {
+                          updateTourMutation.mutate({
+                            id,
+                            patientIds: []
+                          });
+                        });
+                      }}
+                      disabled={employeeTours.length === 0}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[300px]">
+                    <div className="space-y-3">
+                      {employeeTours.map((tour) => (
+                        <div
+                          key={tour.id}
+                          className="p-4 rounded-xl bg-gradient-to-r from-white to-blue-50/50
+                            border border-white/40 hover:border-blue-200
+                            shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                            hover:-translate-y-1 hover:scale-[1.02]
+                            transition-all duration-500 group"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-blue-50 text-blue-500
+                                transition-all duration-500 group-hover:scale-110 group-hover:rotate-12">
+                                <Clock className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-900">
+                                  {format(parseISO(tour.date.toString()), "HH:mm")}
+                                </span>
+                                <div className="text-sm text-gray-500">
+                                  {tour.optimizedRoute?.estimatedDuration} min
+                                </div>
+                              </div>
+                            </div>
+                            <Badge variant="secondary" className="font-medium">
+                              {tour.patientIds.length} Patienten
+                            </Badge>
+                          </div>
+
+                          <div className="space-y-2">
+                            {tour.optimizedRoute?.waypoints.map((waypoint, index) => {
+                              const patient = patients.find(p => p.id === waypoint.patientId);
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-3 p-2 rounded-lg
+                                    hover:bg-blue-50/50 transition-all duration-300
+                                    cursor-pointer"
+                                  onClick={() => setSelectedPatient(patient || null)}
+                                >
+                                  <div className="w-6 h-6 rounded-lg bg-blue-100 
+                                    flex items-center justify-center text-blue-500 
+                                    text-xs font-medium transition-all duration-300
+                                    group-hover:scale-110 group-hover:rotate-12">
+                                    {index + 1}
+                                  </div>
+                                  <span className="flex-1 text-gray-700 font-medium">
+                                    {patient?.name || `Patient #${waypoint.patientId}`}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 rounded-lg hover:bg-red-50 
+                                      hover:text-red-500 transition-all duration-300"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateTourMutation.mutate({
+                                        id: tour.id,
+                                        patientIds: tour.patientIds.filter(
+                                          id => id !== waypoint.patientId
+                                        )
+                                      });
+                                    }}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+
+                      {employeeTours.length === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Clock className="mx-auto h-12 w-12 mb-3 opacity-50" />
+                          <p>Keine Touren geplant</p>
+                          <p className="text-sm">
+                            Wählen Sie Patienten aus, um eine neue Tour zu erstellen
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Sidebar: Patient Selection */}
             <Card className="rounded-2xl border border-white/40 bg-white/80
               backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
               hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
-              transition-all duration-500">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
-                    bg-clip-text text-transparent">
-                    {selectedEmployee
-                      ? `Zeitplan: ${employees.find(e => e.id === selectedEmployee)?.name}`
-                      : "Zeitplan: Alle Mitarbeiter"}
-                  </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-500 hover:text-red-600 hover:bg-red-50
-                      rounded-lg transition-all duration-300
-                      hover:scale-110"
-                    onClick={() => {
-                      const tourIds = employeeTours.map(tour => tour.id);
-                      tourIds.forEach(id => {
-                        updateTourMutation.mutate({
-                          id,
-                          patientIds: []
-                        });
-                      });
-
-                      toast({
-                        title: "Zeitplan gelöscht",
-                        description: "Alle Touren für diesen Tag wurden entfernt.",
-                      });
-                    }}
-                    disabled={employeeTours.length === 0}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+              transition-all duration-500 h-[calc(100vh-280px)]">
+              <CardHeader className="pb-3">
+                <div className="space-y-3">
+                  <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
+                    bg-clip-text text-transparent">Patienten</CardTitle>
+                  <div className="relative group">
+                    <div className="absolute left-3 top-3 text-gray-400 transition-all 
+                      duration-300 group-focus-within:scale-110 group-focus-within:text-blue-500">
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <Input
+                      placeholder="Patient suchen..."
+                      className="pl-10 h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                        border-white/40 hover:border-blue-200 focus:border-blue-300
+                        shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                        focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                        transition-all duration-300"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[calc(100vh-350px)]">
-                  {employeeTours.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Clock className="mx-auto h-12 w-12 mb-3 opacity-50" />
-                      <p>Keine Touren für {selectedEmployee ? "diesen Mitarbeiter" : "diesen Tag"} geplant</p>
-                      <p className="text-sm">
-                        {selectedEmployee
-                          ? "Fügen Sie Patienten hinzu, um eine neue Tour zu erstellen"
-                          : "Wählen Sie einen Mitarbeiter aus und fügen Sie Patienten hinzu"}
-                      </p>
-                    </div>
-                  ) : (
-                    employeeTours.map((tour) => (
+              <CardContent className="p-0">
+                <ScrollArea className="h-full px-4">
+                  <div className="space-y-3 py-2">
+                    {filteredPatients.map((patient) => (
                       <div
-                        key={tour.id}
-                        className="p-4 mb-4 rounded-xl bg-gradient-to-r from-white to-blue-50/50
-                          border border-white/40 hover:border-blue-200
-                          shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
-                          hover:-translate-y-1 hover:scale-[1.02]
-                          transition-all duration-500 group"
+                        key={patient.id}
+                        className={cn(
+                          "p-4 rounded-xl transition-all duration-300 cursor-pointer",
+                          "border border-white/40 hover:border-blue-200",
+                          "bg-gradient-to-r from-white to-blue-50/50",
+                          "hover:from-blue-50 hover:to-blue-100/50",
+                          "shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20",
+                          "hover:-translate-y-0.5 hover:scale-[1.02]",
+                          "group"
+                        )}
+                        onClick={() => setSelectedPatient(patient)}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-blue-50 text-blue-500
-                              transition-all duration-500 group-hover:scale-110 group-hover:rotate-12">
-                              <Clock className="h-4 w-4" />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-gradient-to-br 
+                              from-blue-50 to-blue-100
+                              text-blue-500 shadow-lg shadow-blue-500/10 
+                              transition-transform duration-500 group-hover:scale-110">
+                              <UsersIcon className="h-5 w-5" />
                             </div>
-                            <span className="font-medium">
-                              {format(parseISO(tour.date.toString()), "HH:mm")}
-                            </span>
-                          </div>
-                          <span className="text-sm text-gray-500">
-                            {tour.optimizedRoute?.estimatedDuration} min
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {tour.optimizedRoute?.waypoints.map((waypoint, index) => {
-                            const patient = patients.find(p => p.id === waypoint.patientId);
-                            return (
-                              <div
-                                key={index}
-                                className="flex items-center gap-2 text-sm cursor-pointer
-                                  hover:bg-blue-50/50 p-2 rounded-lg
-                                  transition-all duration-300"
-                                onClick={() => setSelectedPatient(patient || null)}
-                              >
-                                <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center
-                                  text-blue-500 text-xs font-medium transition-all duration-300
-                                  group-hover:scale-110 group-hover:rotate-12">
-                                  {index + 1}
-                                </div>
-                                <span className="flex-1 truncate text-gray-700">
-                                  {patient?.name || `Patient #${waypoint.patientId}`}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 rounded-lg hover:bg-red-50 hover:text-red-500
-                                    transition-all duration-300"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    updateTourMutation.mutate({
-                                      id: tour.id,
-                                      patientIds: tour.patientIds.filter(id => id !== waypoint.patientId)
-                                    });
-                                  }}
+                            <div>
+                              <h3 className="font-medium text-gray-900">{patient.name}</h3>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge 
+                                  variant={patient.careLevel >= 4 ? "destructive" : "secondary"}
+                                  className="text-xs rounded-lg font-medium px-2 py-0.5"
                                 >
-                                  <X className="h-3 w-3" />
-                                </Button>
+                                  PG {patient.careLevel}
+                                </Badge>
                               </div>
-                            );
-                          })}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg transition-all duration-300
+                              hover:bg-blue-50 hover:text-blue-600
+                              hover:scale-110 hover:rotate-12"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToTour(patient.id);
+                            }}
+                            disabled={patientsInTours.includes(patient.id)}
+                          >
+                            {patientsInTours.includes(patient.id) ? (
+                              <X className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
                       </div>
-                    ))
-                  )}
+                    ))}
+                  </div>
                 </ScrollArea>
               </CardContent>
             </Card>
           </div>
-
-          <PatientDetailsDialog
-            patient={selectedPatient}
-            open={!!selectedPatient}
-            onOpenChange={(open) => !open && setSelectedPatient(null)}
-          />
         </main>
       </div>
     </div>

@@ -25,7 +25,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -159,8 +158,8 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="icon"
                           className="h-10 w-10 rounded-xl transition-all duration-300
                             hover:bg-blue-50 hover:text-blue-600
@@ -169,9 +168,9 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           <MoreVertical className="h-5 w-5" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent 
+                      <DropdownMenuContent
                         align="end"
-                        className="w-56 rounded-xl border border-white/40 bg-white/80 
+                        className="w-56 rounded-xl border border-white/40 bg-white/80
                           backdrop-blur-sm shadow-xl"
                       >
                         <DropdownMenuItem
@@ -270,7 +269,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-12 rounded-xl 
+                        className="flex-1 h-12 rounded-xl
                           bg-gradient-to-r from-white to-blue-50/50
                           hover:from-blue-50 hover:to-blue-100/50
                           border border-white/40 hover:border-blue-200
@@ -279,14 +278,14 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           transition-all duration-500 group"
                         onClick={() => setLocation(`/documentation/${patient.id}`)}
                       >
-                        <FileText className="h-5 w-5 mr-2 transition-transform duration-500 
+                        <FileText className="h-5 w-5 mr-2 transition-transform duration-500
                           group-hover:scale-110 group-hover:rotate-6" />
                         <span className="font-medium">Dokumentation</span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-12 rounded-xl 
+                        className="flex-1 h-12 rounded-xl
                           bg-gradient-to-r from-white to-purple-50/50
                           hover:from-purple-50 hover:to-purple-100/50
                           border border-white/40 hover:border-purple-200
@@ -295,7 +294,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           transition-all duration-500 group"
                         onClick={() => setLocation(`/tours/${patient.id}`)}
                       >
-                        <Calendar className="h-5 w-5 mr-2 transition-transform duration-500 
+                        <Calendar className="h-5 w-5 mr-2 transition-transform duration-500
                           group-hover:scale-110 group-hover:rotate-6" />
                         <span className="font-medium">Termine</span>
                       </Button>
@@ -303,10 +302,10 @@ export function PatientGrid({ patients }: PatientGridProps) {
 
                     {patient.notes && (
                       <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50/80 to-amber-100/50
-                        border border-amber-200/50 
+                        border border-amber-200/50
                         shadow-lg shadow-amber-500/5
                         flex items-center gap-3 text-sm">
-                        <div className="p-2 rounded-lg bg-gradient-to-br from-amber-100 to-amber-200/80 
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-amber-100 to-amber-200/80
                           shadow-md shadow-amber-500/10">
                           <AlertTriangle className="h-5 w-5 text-amber-600" />
                         </div>
@@ -317,7 +316,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
                 </CardContent>
 
                 {/* Hover overlay with gradient effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.02] to-transparent 
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.02] to-transparent
                   opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </Card>
             </motion.div>

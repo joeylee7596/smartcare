@@ -37,7 +37,7 @@ export default function Patients() {
     {
       title: "Vitalzeichen",
       icon: Pulse,
-      description: "Automatische Überwachung",
+      description: "Überwachung & Analyse",
       color: "bg-gradient-to-br from-blue-50/80 to-blue-100/50 text-blue-600 hover:from-blue-100/80 hover:to-blue-200/50",
       onClick: () => {
         toast({
@@ -56,25 +56,26 @@ export default function Patients() {
     {
       title: "Termine",
       icon: CalendarPlus,
-      description: "KI-optimierte Planung",
+      description: "Intelligente Planung",
       color: "bg-gradient-to-br from-purple-50/80 to-purple-100/50 text-purple-600 hover:from-purple-100/80 hover:to-purple-200/50",
       onClick: () => navigate("/tours/new"),
     },
     {
       title: "Berichte",
       icon: Note,
-      description: "Automatische Dokumentation",
+      description: "KI-Dokumentation",
       color: "bg-gradient-to-br from-orange-50/80 to-orange-100/50 text-orange-600 hover:from-orange-100/80 hover:to-orange-200/50",
       onClick: () => navigate("/documentation"),
     },
   ];
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-blue-50/20 to-white">
       <Sidebar />
       <div className="flex-1">
         <Header />
-        <main className="p-8">
+        <main className="p-8 max-w-[1920px] mx-auto">
+          {/* Header Section */}
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
@@ -94,9 +95,9 @@ export default function Patients() {
                     hover:shadow-xl hover:shadow-blue-500/30
                     hover:-translate-y-0.5 transition-all duration-300 group"
                 >
-                  <UserPlus weight="regular" 
+                  <UserPlus weight="fill" 
                     className="mr-2 h-5 w-5 transition-transform duration-300 
-                      group-hover:scale-110 group-hover:rotate-6" 
+                      group-hover:scale-110 group-hover:rotate-12" 
                   />
                   Patient hinzufügen
                 </Button>
@@ -104,6 +105,7 @@ export default function Patients() {
             </div>
           </div>
 
+          {/* Quick Actions Grid */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
             {quickActions.map((action) => (
               <Card 
@@ -120,11 +122,11 @@ export default function Patients() {
                   action.color
                 )}>
                   <action.icon 
-                    weight="regular" 
-                    className="h-8 w-8 mb-4 transition-all duration-500 
-                      group-hover:scale-110 group-hover:rotate-6" 
+                    weight="fill" 
+                    className="h-10 w-10 mb-4 transition-all duration-500 
+                      group-hover:scale-110 group-hover:rotate-12" 
                   />
-                  <h3 className="font-semibold mb-1">{action.title}</h3>
+                  <h3 className="text-lg font-semibold mb-1">{action.title}</h3>
                   <p className="text-sm opacity-90">{action.description}</p>
                   <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 </CardContent>
@@ -132,10 +134,11 @@ export default function Patients() {
             ))}
           </div>
 
-          <div className="mb-6">
+          {/* Search Bar */}
+          <div className="mb-8">
             <div className="relative max-w-md">
-              <div className="absolute left-3 top-3 text-gray-400 transition-transform duration-300 group-focus-within:scale-110">
-                <MagnifyingGlass weight="regular" className="h-5 w-5" />
+              <div className="absolute left-3 top-3.5 text-gray-400 transition-transform duration-300 group-focus-within:scale-110">
+                <MagnifyingGlass weight="bold" className="h-5 w-5" />
               </div>
               <Input
                 placeholder="Patienten suchen..."
@@ -145,11 +148,12 @@ export default function Patients() {
                   border-white/40 hover:border-blue-200 focus:border-blue-300
                   shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
                   focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
-                  transition-all duration-300 group"
+                  transition-all duration-300 text-base group"
               />
             </div>
           </div>
 
+          {/* Patient Grid */}
           <PatientGrid patients={filteredPatients} />
         </main>
       </div>
