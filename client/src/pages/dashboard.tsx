@@ -4,7 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { Users, CalendarDays, ClipboardList, AlertTriangle } from "lucide-react";
+import { 
+  Users as UsersIcon,
+  ClipboardText,
+  Path,
+  FirstAidKit,
+  CaretRight
+} from "phosphor-react";
 import { Patient, Tour, Documentation } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -38,10 +44,13 @@ function DashboardCard({
             "p-4 rounded-xl shadow-lg",
             gradient ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" : "bg-white"
           )}>
-            <Icon className={cn(
-              "h-8 w-8",
-              !gradient && "text-blue-500"
-            )} />
+            <Icon 
+              weight={gradient ? "fill" : "regular"} 
+              className={cn(
+                "h-8 w-8 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3",
+                !gradient && "text-blue-500"
+              )} 
+            />
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
@@ -61,7 +70,6 @@ function DashboardCard({
 export default function Dashboard() {
   const { user } = useAuth();
 
-  // Fetch data 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
@@ -103,28 +111,28 @@ export default function Dashboard() {
               title="Aktive Patienten"
               value={patients.length}
               description={`${criticalPatients.length} kritische Fälle`}
-              icon={Users}
+              icon={UsersIcon}
               gradient
             />
             <DashboardCard
               title="Heutige Touren"
               value={todaysTours.length}
               description={`Nächste: ${todaysTours[0] ? format(new Date(todaysTours[0].date), "HH:mm") : '--:--'}`}
-              icon={CalendarDays}
+              icon={Path}
               gradient
             />
             <DashboardCard
               title="Dokumentation"
               value={pendingDocs.length}
               description="Ausstehende Berichte"
-              icon={ClipboardList}
+              icon={ClipboardText}
               gradient
             />
             <DashboardCard
               title="Warnungen"
               value={criticalPatients.length}
               description="Kritische Patienten"
-              icon={AlertTriangle}
+              icon={FirstAidKit}
               className="bg-gradient-to-br from-red-500/10 via-red-400/5 to-transparent"
             />
           </div>
@@ -144,7 +152,7 @@ export default function Dashboard() {
                     todaysTours.map((tour) => (
                       <div 
                         key={tour.id} 
-                        className="p-4 rounded-xl border bg-white hover:bg-blue-50 transition-colors duration-300 hover:shadow-lg group"
+                        className="p-4 rounded-xl border bg-white hover:bg-blue-50 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group"
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -181,8 +189,9 @@ export default function Dashboard() {
                       variant="outline" 
                       className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
                     >
-                      <Users className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 transition-transform duration-300" />
-                      <span className="font-medium text-gray-700">Patient aufnehmen</span>
+                      <UsersIcon weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <span className="font-medium text-gray-700 flex-1">Patient aufnehmen</span>
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
                     </Button>
                   </Link>
                   <Link href="/tours/new">
@@ -190,8 +199,9 @@ export default function Dashboard() {
                       variant="outline" 
                       className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
                     >
-                      <CalendarDays className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 transition-transform duration-300" />
-                      <span className="font-medium text-gray-700">Tour planen</span>
+                      <Path weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <span className="font-medium text-gray-700 flex-1">Tour planen</span>
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
                     </Button>
                   </Link>
                   <Link href="/documentation/new">
@@ -199,8 +209,9 @@ export default function Dashboard() {
                       variant="outline" 
                       className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
                     >
-                      <ClipboardList className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 transition-transform duration-300" />
-                      <span className="font-medium text-gray-700">Dokumentation erstellen</span>
+                      <ClipboardText weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <span className="font-medium text-gray-700 flex-1">Dokumentation erstellen</span>
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
                     </Button>
                   </Link>
                 </div>

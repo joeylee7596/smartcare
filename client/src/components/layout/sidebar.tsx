@@ -14,14 +14,14 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const primaryNavigation = [
-  { name: "Dashboard", href: "/", icon: House, description: "Übersicht und Statistiken" },
-  { name: "Patienten", href: "/patients", icon: UsersThree, description: "Patientenverwaltung" },
-  { name: "Touren", href: "/tours", icon: Path, description: "Tourenplanung" },
-  { name: "Dokumentation", href: "/documentation", icon: ClipboardText, description: "Dokumentationsverwaltung" },
+  { name: "Dashboard", href: "/", icon: House },
+  { name: "Patienten", href: "/patients", icon: UsersThree },
+  { name: "Touren", href: "/tours", icon: Path },
+  { name: "Dokumentation", href: "/documentation", icon: ClipboardText },
 ];
 
 const secondaryNavigation = [
-  { name: "Einstellungen", href: "/settings", icon: Gear, description: "System Einstellungen" },
+  { name: "Einstellungen", href: "/settings", icon: Gear },
 ];
 
 export function Sidebar() {
@@ -105,10 +105,7 @@ export function Sidebar() {
                           )} 
                         />
                         {!isCollapsed && (
-                          <div className="flex flex-col items-start">
-                            <span className="transition-opacity duration-500">{item.name}</span>
-                            <span className="text-xs text-white/40 font-normal">{item.description}</span>
-                          </div>
+                          <span className="transition-opacity duration-500">{item.name}</span>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
@@ -151,10 +148,7 @@ export function Sidebar() {
                           )} 
                         />
                         {!isCollapsed && (
-                          <div className="flex flex-col items-start">
-                            <span className="transition-opacity duration-500">{item.name}</span>
-                            <span className="text-xs text-white/40 font-normal">{item.description}</span>
-                          </div>
+                          <span className="transition-opacity duration-500">{item.name}</span>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </Button>
