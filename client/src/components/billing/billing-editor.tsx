@@ -126,9 +126,12 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
 
     onSave({
       patientId: patient.id,
-      date: selectedDate,
-      services: serviceEntries,
-      totalAmount: totalAmount,
+      date: new Date(selectedDate).toISOString(),
+      services: serviceEntries.map(service => ({
+        ...service,
+        amount: service.amount?.toString() || "0"
+      })),
+      totalAmount: totalAmount.toString(),
       status: "pending"
     });
   };

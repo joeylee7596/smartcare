@@ -221,4 +221,87 @@ Die Empfehlungen sollen praktisch umsetzbar sein und die Effizienz sowie Mitarbe
   }
 });
 
+const billingAssistSchema = z.object({
+  patient: z.object({
+    name: z.string(),
+    careLevel: z.number(),
+    insuranceProvider: z.string(),
+  }),
+  services: z.array(z.object({
+    code: z.string(),
+    description: z.string(),
+    amount: z.number(),
+  })),
+  careLevel: z.number(),
+  date: z.string(),
+});
+
+router.post("/billing-assist", async (req, res) => {
+  try {
+    const { patient, services, careLevel, date } = billingAssistSchema.parse(req.body);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const prompt = `Als KI-Assistent für Pflegedokumentation, überprüfe und verbessere die folgenden Leistungsbeschreibungen für die Krankenkassenabrechnung. Die Beschreibungen sollen präzise, professionell und den Anforderungen der Krankenkassen entsprechend sein.
+
+Patient:
+- Name: ${patient.name}
+- Pflegegrad: ${careLevel}
+- Versicherung: ${patient.insuranceProvider}
+- Datum: ${date}
+
+Aktuelle Leistungsbeschreibungen:
+${services.map(s => `- ${s.code}: ${s.description} (${s.amount}€)`).join('\n')}
+
+Bitte optimiere die Beschreibungen unter Berücksichtigung:
+1. Pflegerelevanter Fachbegriffe
+2. Präziser Beschreibung der durchgeführten Maßnahmen
+3. Dokumentation des Pflegebedarfs
+4. Berücksichtigung des Pflegegrads
+5. Abrechnungsrelevante Details
+
+Gib die verbesserten Beschreibungen im JSON-Format zurück, wobei du für jede Leistung eine optimierte Version vorschlägst.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Parse the AI response to extract suggestions
+    const suggestions = services.map((service, index) => {
+      try {
+        const enhancedDescription = text
+          .split('\n')
+          .find(line => line.includes(service.code))
+          ?.split(':')[1]
+          ?.trim() || service.description;
+
+        return {
+          code: service.code,
+          enhancedDescription
+        };
+      } catch (e) {
+        return {
+          code: service.code,
+          enhancedDescription: service.description
+        };
+      }
+    });
+
+    res.json({ suggestions });
+  } catch (error) {
+    console.error("Billing Assist Error:", error);
+    if (error instanceof Error) {
+      res.status(500).json({ 
+        error: "Leistungsbeschreibungen konnten nicht optimiert werden",
+        details: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        error: "Leistungsbeschreibungen konnten nicht optimiert werden",
+        details: "Unbekannter Fehler"
+      });
+    }
+  }
+});
+
 export default router;
