@@ -7,7 +7,28 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc, DocumentationStatus } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Brain, Check, Clock, RefreshCw, Plus, ArrowRight, ArrowLeft, AlertTriangle, Sparkles } from "lucide-react";
+import { 
+  Brain, 
+  Check, 
+  Clock, 
+  RefreshCw, 
+  Plus, 
+  ArrowRight, 
+  ArrowLeft, 
+  AlertTriangle, 
+  Sparkles,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Search,
+  Calendar,
+  FileText,
+  MessageSquare,
+  Heart,
+  History,
+  Trash2,
+  MoreVertical
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
@@ -15,8 +36,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ConfirmationDialog } from "@/components/documentation/confirmation-dialog";
 import { useLocation } from 'wouter';
+import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function DocumentationPage() {
   const { toast } = useToast();
@@ -24,6 +61,10 @@ function DocumentationPage() {
   const { sendMessage, subscribe } = useWebSocket();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<DocumentationStatus | "all">("all");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedDoc, setSelectedDoc] = useState<Doc | null>(null);
   const [, params] = useLocation();
 
   // Get patientId from URL if provided
@@ -53,7 +94,21 @@ function DocumentationPage() {
     enabled: !!activePatientId,
   });
 
-  const docsByStatus = allDocs.reduce((acc, doc) => {
+  // Filter and sort docs
+  const filteredDocs = allDocs
+    .filter(doc => {
+      const matchesSearch = doc.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        patients.find(p => p.id === doc.patientId)?.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    });
+
+  const docsByStatus = filteredDocs.reduce((acc, doc) => {
     if (!acc[doc.status]) {
       acc[doc.status] = [];
     }
@@ -147,7 +202,6 @@ function DocumentationPage() {
     if (!activePatientId) return;
 
     try {
-      // Create the documentation first
       const newDoc = await createDocMutation.mutateAsync({
         content: text,
         patientId: activePatientId,
@@ -155,12 +209,8 @@ function DocumentationPage() {
         status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
       });
 
-      // Only continue if the mutation was successful
       if (newDoc) {
-        // Close the patient box
         setActivePatientId(null);
-
-        // Show success toast and update UI
         toast({
           title: "Dokumentation erstellt",
           description: sendToReview 
@@ -168,14 +218,12 @@ function DocumentationPage() {
             : "Die Dokumentation wurde gespeichert.",
         });
 
-        // Notify other clients about the status change
         sendMessage({
           type: 'DOC_STATUS_UPDATE',
           docId: newDoc.id,
           status: newDoc.status
         });
 
-        // Invalidate queries to refresh the UI
         queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
       }
     } catch (error) {
@@ -202,16 +250,26 @@ function DocumentationPage() {
       if (newDoc) {
         setActivePatientId(null);
         setSelectedTemplate("");
-        toast({ title: "Vorlage angewendet", description: "Die Vorlage wurde erfolgreich angewendet." });
-        sendMessage({ type: 'DOC_STATUS_UPDATE', docId: newDoc.id, status: newDoc.status });
+        toast({ 
+          title: "Vorlage angewendet", 
+          description: "Die Vorlage wurde erfolgreich angewendet." 
+        });
+        sendMessage({ 
+          type: 'DOC_STATUS_UPDATE', 
+          docId: newDoc.id, 
+          status: newDoc.status 
+        });
         queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
       }
     } catch (error) {
       console.error("Failed to use template:", error);
-      toast({ title: "Fehler", description: error instanceof Error ? error.message : "Die Vorlage konnte nicht angewendet werden.", variant: "destructive" });
+      toast({ 
+        title: "Fehler", 
+        description: error instanceof Error ? error.message : "Die Vorlage konnte nicht angewendet werden.", 
+        variant: "destructive" 
+      });
     }
   };
-
 
   const activePatient = patients.find(p => p.id === activePatientId);
 
@@ -221,13 +279,44 @@ function DocumentationPage() {
       <div className="flex-1">
         <Header />
         <main className="p-8 max-w-[1920px] mx-auto">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-              Dokumentation
-            </h1>
-            <p className="text-lg text-gray-500">
-              Intelligente Dokumentationsverwaltung mit KI-Unterstützung
-            </p>
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+                Dokumentation
+              </h1>
+              <p className="text-lg text-gray-500">
+                Intelligente Dokumentationsverwaltung mit KI-Unterstützung
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Dokumentation suchen..."
+                  className="pl-10 w-64"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as DocumentationStatus | "all")}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle Status</SelectItem>
+                  <SelectItem value={DocumentationStatus.PENDING}>Offen</SelectItem>
+                  <SelectItem value={DocumentationStatus.REVIEW}>In Überprüfung</SelectItem>
+                  <SelectItem value={DocumentationStatus.COMPLETED}>Abgeschlossen</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSortOrder(current => current === "asc" ? "desc" : "asc")}
+              >
+                {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -238,101 +327,99 @@ function DocumentationPage() {
               color="blue"
             >
               {activePatientId ? (
-                <div className="space-y-4">
-                  <Card className="p-4 border-blue-200/20">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-medium">{activePatient?.name}</h3>
-                        <div className="flex gap-2 mt-1">
-                          <Badge variant="outline">Pflegegrad {activePatient?.careLevel}</Badge>
-                          {careAnalysis?.riskAreas?.length > 0 && (
-                            <Badge variant="destructive">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Risikobereiche
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setActivePatientId(null)}
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {careAnalysis && (
-                      <div className="mb-4 p-3 rounded-lg bg-blue-50/50 border border-blue-200/20">
-                        <h4 className="font-medium mb-2 flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-blue-500" />
-                          KI-Analyse
-                        </h4>
-                        {careAnalysis.suggestions.length > 0 && (
-                          <ul className="text-sm space-y-1 text-gray-600">
-                            {careAnalysis.suggestions.map((suggestion, i) => (
-                              <li key={i} className="flex items-center gap-2">
-                                <div className="w-1 h-1 rounded-full bg-blue-400" />
-                                {suggestion}
-                              </li>
-                            ))}
-                          </ul>
+                <Card className="p-4 border-blue-200/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-medium">{activePatient?.name}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant="outline">Pflegegrad {activePatient?.careLevel}</Badge>
+                        {careAnalysis?.riskAreas?.length > 0 && (
+                          <Badge variant="destructive">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Risikobereiche
+                          </Badge>
                         )}
                       </div>
-                    )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setActivePatientId(null)}
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  </div>
 
-                    <Tabs defaultValue="voice" className="mb-4">
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="voice">Spracheingabe</TabsTrigger>
-                        <TabsTrigger value="templates">Vorlagen</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="voice">
-                        <VoiceRecorder
-                          onTranscriptionComplete={handleTranscriptionComplete}
-                          patientContext={{
-                            careLevel: activePatient?.careLevel,
-                            lastVisit: activePatient?.lastVisit,
-                          }}
-                        />
-                      </TabsContent>
-                      <TabsContent value="templates">
-                        <div className="space-y-2">
-                          {loadingTemplates ? (
-                            <p>Lade Vorlagen...</p>
-                          ) : templates.length === 0 ? (
-                            <p>Keine Vorlagen verfügbar.</p>
-                          ) : (
-                            templates.map((template, i) => (
-                              <Button
-                                key={i}
-                                variant="outline"
-                                className="w-full justify-start text-left"
-                                onClick={() => setSelectedTemplate(template.content)}
-                              >
-                                <div>
-                                  <div className="font-medium">{template.type}</div>
-                                  <div className="text-sm text-gray-500">
-                                    ~{template.suggestedDuration} Min.
-                                  </div>
+                  {careAnalysis && (
+                    <div className="mb-4 p-3 rounded-lg bg-blue-50/50 border border-blue-200/20">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-blue-500" />
+                        KI-Analyse
+                      </h4>
+                      {careAnalysis.suggestions?.length > 0 && (
+                        <ul className="text-sm space-y-1 text-gray-600">
+                          {careAnalysis.suggestions.map((suggestion, i) => (
+                            <li key={i} className="flex items-center gap-2">
+                              <div className="w-1 h-1 rounded-full bg-blue-400" />
+                              {suggestion}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  <Tabs defaultValue="voice" className="mb-4">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="voice">Spracheingabe</TabsTrigger>
+                      <TabsTrigger value="templates">Vorlagen</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="voice">
+                      <VoiceRecorder
+                        onTranscriptionComplete={handleTranscriptionComplete}
+                        patientContext={{
+                          careLevel: activePatient?.careLevel,
+                          lastVisit: activePatient?.lastVisit,
+                        }}
+                      />
+                    </TabsContent>
+                    <TabsContent value="templates">
+                      <div className="space-y-2">
+                        {loadingTemplates ? (
+                          <p>Lade Vorlagen...</p>
+                        ) : templates.length === 0 ? (
+                          <p>Keine Vorlagen verfügbar.</p>
+                        ) : (
+                          templates.map((template: any, i) => (
+                            <Button
+                              key={i}
+                              variant="outline"
+                              className="w-full justify-start text-left"
+                              onClick={() => setSelectedTemplate(template.content)}
+                            >
+                              <div>
+                                <div className="font-medium">{template.type}</div>
+                                <div className="text-sm text-gray-500">
+                                  ~{template.suggestedDuration} Min.
                                 </div>
-                              </Button>
-                            ))
-                          )}
-                        </div>
-                      </TabsContent>
-                    </Tabs>
+                              </div>
+                            </Button>
+                          ))
+                        )}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
 
-                    {selectedTemplate && (
-                      <Button
-                        variant="default"
-                        className="w-full"
-                        onClick={() => handleTemplateUse(selectedTemplate)}
-                      >
-                        Vorlage verwenden
-                      </Button>
-                    )}
-                  </Card>
-                </div>
+                  {selectedTemplate && (
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      onClick={() => handleTemplateUse(selectedTemplate)}
+                    >
+                      Vorlage verwenden
+                    </Button>
+                  )}
+                </Card>
               ) : (
                 <>
                   {docsByStatus[DocumentationStatus.PENDING]?.map((doc) => (
@@ -343,6 +430,7 @@ function DocumentationPage() {
                       onMoveForward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'forward')}
                       showMoveForward
                       color="blue"
+                      onSelect={() => setSelectedDoc(doc)}
                     />
                   ))}
                   <div className="pt-4 border-t border-white/20">
@@ -375,6 +463,7 @@ function DocumentationPage() {
                   showMoveForward
                   showMoveBackward
                   color="amber"
+                  onSelect={() => setSelectedDoc(doc)}
                 />
               ))}
             </Column>
@@ -393,10 +482,30 @@ function DocumentationPage() {
                   onMoveBackward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'backward')}
                   showMoveBackward
                   color="green"
+                  onSelect={() => setSelectedDoc(doc)}
                 />
               ))}
             </Column>
           </div>
+
+          <AnimatePresence>
+            {selectedDoc && (
+              <ConfirmationDialog
+                key="confirmation-dialog"
+                isOpen={!!selectedDoc}
+                onClose={() => setSelectedDoc(null)}
+                documentation={selectedDoc.content}
+                onConfirm={(text, sendToReview) => {
+                  moveDoc(
+                    selectedDoc.id,
+                    selectedDoc.status as typeof DocumentationStatus,
+                    sendToReview ? 'forward' : 'backward'
+                  );
+                  setSelectedDoc(null);
+                }}
+              />
+            )}
+          </AnimatePresence>
         </main>
       </div>
     </div>
@@ -469,6 +578,7 @@ interface DocumentCardProps {
   showMoveForward?: boolean;
   showMoveBackward?: boolean;
   color: "blue" | "amber" | "green";
+  onSelect: () => void;
 }
 
 function DocumentCard({ 
@@ -478,7 +588,8 @@ function DocumentCard({
   onMoveBackward,
   showMoveForward,
   showMoveBackward,
-  color
+  color,
+  onSelect
 }: DocumentCardProps) {
   if (!patient) return null;
 
@@ -517,63 +628,101 @@ function DocumentCard({
       hover:-translate-y-1 hover:scale-[1.02] ${variant.bg}`}>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-medium bg-gradient-to-r from-gray-900 to-gray-600 
-            bg-clip-text text-transparent">{patient.name}</h3>
-          <div className={`p-2 rounded-lg ${variant.iconBg} ${variant.icon}
-            transition-all duration-500 group-hover:scale-110 group-hover:rotate-12`}>
-            {doc.status === DocumentationStatus.COMPLETED ? (
-              <Check className="h-4 w-4" />
-            ) : doc.status === DocumentationStatus.REVIEW ? (
-              <RefreshCw className="h-4 w-4" />
-            ) : (
-              <Clock className="h-4 w-4" />
-            )}
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg ${variant.iconBg} ${variant.icon}
+              transition-all duration-500 group-hover:scale-110 group-hover:rotate-12`}>
+              <Heart className="h-4 w-4" />
+            </div>
+            <div>
+              <h3 className="font-medium">{patient.name}</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={patient.careLevel >= 4 ? "destructive" : "secondary"}>
+                  Pflegegrad {patient.careLevel}
+                </Badge>
+                {doc.aiGenerated && (
+                  <Badge variant="outline" className="bg-blue-50">
+                    <Brain className="h-3 w-3 mr-1" />
+                    KI
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onSelect}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {}}>
+                <History className="h-4 w-4 mr-2" />
+                Verlauf
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {}} className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Löschen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-
-        <p className="text-sm text-gray-500">
-          {format(new Date(doc.reviewDate || doc.date), "dd.MM.yyyy HH:mm", { locale: de })}
-        </p>
 
         <div className="bg-gray-50/80 rounded-lg p-3">
           <p className="text-sm line-clamp-3 text-gray-600">{doc.content}</p>
         </div>
 
-        {doc.reviewNotes && (
-          <div className="text-xs p-3 rounded-lg bg-amber-50/50 border border-amber-200/20">
-            <p className="text-amber-700 font-medium mb-1">Anmerkungen:</p>
-            <p className="text-amber-600">{doc.reviewNotes}</p>
+        <div className="flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span>{format(new Date(doc.date), "dd.MM.yyyy HH:mm", { locale: de })}</span>
           </div>
-        )}
-
-        <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-all duration-500">
-          {showMoveBackward && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className={`h-9 text-sm flex-1 rounded-lg
-                hover:bg-gray-50 transition-all duration-300 group/btn`}
-              onClick={onMoveBackward}
-            >
-              <ArrowLeft className="w-4 h-4 mr-1 transition-transform duration-300 
-                group-hover/btn:scale-110 group-hover/btn:-translate-x-1" />
-              Zurück
-            </Button>
-          )}
-          {showMoveForward && (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className={`h-9 text-sm flex-1 rounded-lg
-                hover:bg-gray-50 transition-all duration-300 group/btn`}
-              onClick={onMoveForward}
-            >
-              Weiter
-              <ArrowRight className="w-4 h-4 ml-1 transition-transform duration-300 
-                group-hover/btn:scale-110 group-hover/btn:translate-x-1" />
-            </Button>
+          {doc.type && (
+            <Badge variant="outline" className="bg-gray-50">
+              {doc.type}
+            </Badge>
           )}
         </div>
+
+        <AnimatePresence>
+          <motion.div 
+            key="action-buttons"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="flex gap-2 mt-3"
+          >
+            {showMoveBackward && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={`h-9 text-sm flex-1 rounded-lg
+                  hover:bg-gray-50 transition-all duration-300 group/btn`}
+                onClick={onMoveBackward}
+              >
+                <ArrowLeft className="w-4 h-4 mr-1 transition-transform duration-300 
+                  group-hover/btn:scale-110 group-hover/btn:-translate-x-1" />
+                Zurück
+              </Button>
+            )}
+            {showMoveForward && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className={`h-9 text-sm flex-1 rounded-lg
+                  hover:bg-gray-50 transition-all duration-300 group/btn`}
+                onClick={onMoveForward}
+              >
+                Weiter
+                <ArrowRight className="w-4 h-4 ml-1 transition-transform duration-300 
+                  group-hover/btn:scale-110 group-hover/btn:translate-x-1" />
+              </Button>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </CardContent>
     </Card>
   );
