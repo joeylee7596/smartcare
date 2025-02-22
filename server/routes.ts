@@ -211,10 +211,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/billings", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertBillingSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json(parsed.error);
-    const billing = await storage.createBilling(parsed.data);
-    res.status(201).json(billing);
+    try {
+      const parsed = insertBillingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        console.error("Validation Error:", parsed.error);
+        return res.status(400).json({
+          error: "Ungültige Abrechnungsdaten",
+          details: parsed.error.issues
+        });
+      }
+      const billing = await storage.createBilling(parsed.data);
+      res.status(201).json(billing);
+    } catch (error) {
+      console.error("Billing Creation Error:", error);
+      res.status(500).json({
+        error: "Die Abrechnung konnte nicht erstellt werden",
+        details: error instanceof Error ? error.message : "Unbekannter Fehler"
+      });
+    }
   });
 
   app.patch("/api/billings/:id", async (req, res) => {

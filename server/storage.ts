@@ -246,8 +246,16 @@ export class DatabaseStorage implements IStorage {
 
   async createBilling(billing: InsertBilling): Promise<InsuranceBilling> {
     const [created] = await db.insert(insuranceBilling).values({
-      ...billing,
-      services: Array.isArray(billing.services) ? billing.services : [],
+      patientId: billing.patientId,
+      employeeId: billing.employeeId,
+      date: new Date(billing.date),
+      totalAmount: billing.totalAmount.toString(),
+      services: billing.services.map(service => ({
+        code: service.code,
+        description: service.description,
+        amount: Number(service.amount)
+      })),
+      status: billing.status || "pending",
     }).returning();
     return created;
   }
