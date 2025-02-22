@@ -2,7 +2,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { format, parseISO, startOfDay, endOfDay, addHours, isSameDay } from "date-fns";
+import { format, parseISO, startOfDay, endOfDay, addHours, isSameDay, addMinutes } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import { Tour, Patient, Employee } from "@shared/schema";
@@ -64,47 +64,89 @@ interface TimelineEventProps {
 }
 
 function TimelineEvent({ tour, patients }: TimelineEventProps) {
-  const startTime = parseISO(tour.date.toString());
-  const endTime = addHours(startTime, tour.optimizedRoute?.estimatedDuration || 1);
+  const hourWidth = 60; // Breite pro Stunde in Pixeln
+  const baseDate = parseISO(tour.date.toString());
 
-  const startHour = startTime.getHours() + (startTime.getMinutes() / 60);
-  const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+  // Beispielhafte Besuchszeiten (später durch echte Daten ersetzen)
+  const visits = tour.patientIds.map((patientId, index) => {
+    const patient = patients.find(p => p.id === patientId);
+    const visitStart = addMinutes(baseDate, index * 45); // 45 Minuten zwischen Besuchen
+    const visitDuration = 30; // 30 Minuten pro Besuch
 
-  const hourWidth = 60; // Reduzierte Breite pro Stunde
-  const left = (startHour - WORKING_HOURS.start) * hourWidth;
-  const width = duration * hourWidth;
+    return {
+      patient,
+      start: visitStart,
+      end: addMinutes(visitStart, visitDuration)
+    };
+  });
 
   return (
-    <div
-      className={cn(
-        "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
-        "transition-all duration-300 group cursor-pointer",
-        "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
-        {
-          "bg-green-100 border border-green-200 hover:bg-green-200": tour.status === "active",
-          "bg-blue-100 border border-blue-200 hover:bg-blue-200": tour.status === "completed",
-          "bg-amber-100 border border-amber-200 hover:bg-amber-200": tour.status === "scheduled"
-        }
-      )}
-      style={{
-        left: `${left}px`,
-        width: `${width}px`,
-      }}
-    >
-      <div className="h-full flex flex-col justify-center overflow-hidden">
-        <div className="flex items-center gap-1">
-          <Clock className="h-3 w-3 text-gray-500" />
-          <span className="text-xs font-medium text-gray-700">
-            {format(startTime, "HH:mm")}
-          </span>
-        </div>
-        <div className="text-xs font-medium text-gray-700 truncate">
-          {tour.patientIds.map(id => 
-            patients.find(p => p.id === id)?.name
-          ).join(", ")}
-        </div>
-      </div>
-    </div>
+    <>
+      {/* Verbindungslinien zwischen den Besuchen */}
+      {visits.map((visit, index) => {
+        if (index === visits.length - 1) return null;
+
+        const startX = ((visit.end.getHours() + visit.end.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
+        const nextVisit = visits[index + 1];
+        const endX = ((nextVisit.start.getHours() + nextVisit.start.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
+
+        return (
+          <div
+            key={`connection-${index}`}
+            className="absolute h-0 border-t-2 border-dashed border-gray-300"
+            style={{
+              left: `${startX}px`,
+              top: '50%',
+              width: `${endX - startX}px`,
+              transform: 'translateY(-50%)',
+              zIndex: 0
+            }}
+          />
+        );
+      })}
+
+      {/* Besuchsbalken */}
+      {visits.map((visit, index) => {
+        const startHour = visit.start.getHours() + (visit.start.getMinutes() / 60);
+        const duration = (visit.end.getTime() - visit.start.getTime()) / (1000 * 60 * 60);
+
+        const left = (startHour - WORKING_HOURS.start) * hourWidth;
+        const width = duration * hourWidth;
+
+        return (
+          <div
+            key={`visit-${index}`}
+            className={cn(
+              "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
+              "transition-all duration-300 group cursor-pointer",
+              "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
+              {
+                "bg-green-100 border border-green-200 hover:bg-green-200": tour.status === "active",
+                "bg-blue-100 border border-blue-200 hover:bg-blue-200": tour.status === "completed",
+                "bg-amber-100 border border-amber-200 hover:bg-amber-200": tour.status === "scheduled"
+              }
+            )}
+            style={{
+              left: `${left}px`,
+              width: `${width}px`,
+              zIndex: 1
+            }}
+          >
+            <div className="h-full flex flex-col justify-center overflow-hidden">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3 text-gray-500" />
+                <span className="text-xs font-medium text-gray-700">
+                  {format(visit.start, "HH:mm")}
+                </span>
+              </div>
+              <div className="text-xs font-medium text-gray-700 truncate">
+                {visit.patient?.name}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 }
 
