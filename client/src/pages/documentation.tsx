@@ -35,11 +35,11 @@ function DocumentationPage() {
     }
     acc[doc.status].push(doc);
     return acc;
-  }, {} as Record<string, Doc[]>);
+  }, {} as Record<DocumentationStatus, Doc[]>);
 
   const updateDocStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await apiRequest("PATCH", `/api/docs/${id}`, { status });
+    mutationFn: async ({ id, status, reviewNotes }: { id: number; status: DocumentationStatus; reviewNotes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/docs/${id}`, { status, reviewNotes });
       return res.json();
     },
     onSuccess: () => {
@@ -65,10 +65,10 @@ function DocumentationPage() {
     return () => unsubscribe();
   }, [subscribe, toast]);
 
-  const moveDoc = (docId: number, currentStatus: string, direction: 'forward' | 'backward') => {
+  const moveDoc = (docId: number, currentStatus: DocumentationStatus, direction: 'forward' | 'backward') => {
     const statusOrder = [DocumentationStatus.PENDING, DocumentationStatus.REVIEW, DocumentationStatus.COMPLETED];
     const currentIndex = statusOrder.indexOf(currentStatus);
-    let newStatus: string;
+    let newStatus: DocumentationStatus;
 
     if (direction === 'forward' && currentIndex < statusOrder.length - 1) {
       newStatus = statusOrder[currentIndex + 1];
@@ -87,24 +87,31 @@ function DocumentationPage() {
   };
 
   const createDocMutation = useMutation({
-    mutationFn: async (data: { content: string; patientId: number; type?: string; status: string }) => {
+    mutationFn: async (data: { content: string; patientId: number; type?: string; status: DocumentationStatus }) => {
       const res = await apiRequest("POST", "/api/docs", {
         ...data,
         date: new Date().toISOString(),
         type: data.type || "Sprachaufnahme",
         aiGenerated: true,
         verified: false,
-        caregiverId: user?.id,
+        employeeId: user?.id,
       });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
       toast({
         title: "Dokumentation erstellt",
         description: "Die Dokumentation wurde erfolgreich gespeichert.",
       });
       setActivePatientId(null);
+
+      // Send WebSocket message for real-time updates
+      sendMessage({
+        type: 'DOC_STATUS_UPDATE',
+        docId: data.id,
+        status: data.status
+      });
     },
   });
 
@@ -115,7 +122,7 @@ function DocumentationPage() {
       content: text,
       patientId: activePatientId,
       type: "KI-Dokumentation",
-      status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.COMPLETED,
+      status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
     });
   };
 
@@ -170,7 +177,7 @@ function DocumentationPage() {
                       key={doc.id}
                       doc={doc}
                       patient={patients.find(p => p.id === doc.patientId)!}
-                      onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
+                      onMoveForward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'forward')}
                       showMoveForward
                       color="blue"
                     />
@@ -200,8 +207,8 @@ function DocumentationPage() {
                   key={doc.id}
                   doc={doc}
                   patient={patients.find(p => p.id === doc.patientId)!}
-                  onMoveForward={() => moveDoc(doc.id, doc.status, 'forward')}
-                  onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
+                  onMoveForward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'forward')}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'backward')}
                   showMoveForward
                   showMoveBackward
                   color="amber"
@@ -220,7 +227,7 @@ function DocumentationPage() {
                   key={doc.id}
                   doc={doc}
                   patient={patients.find(p => p.id === doc.patientId)!}
-                  onMoveBackward={() => moveDoc(doc.id, doc.status, 'backward')}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'backward')}
                   showMoveBackward
                   color="green"
                 />
