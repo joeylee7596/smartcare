@@ -35,7 +35,26 @@ export default function BillingPage() {
     enabled: !!selectedPatient?.id,
   });
 
-  // Other functions remain unchanged...
+  // Filter patients based on search
+  const filteredPatients = searchQuery
+    ? patients.filter(p =>
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.insuranceNumber.includes(searchQuery) ||
+        p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : patients;
+
+  // Group billings by month
+  const groupedBillings = billings.reduce((acc, billing) => {
+    const month = format(new Date(billing.date), "yyyy-MM");
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(billing);
+    return acc;
+  }, {} as Record<string, InsuranceBilling[]>);
+
+  // Calculate total amount for selected month
+  const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
+    .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
   // Updated save handling
   const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
