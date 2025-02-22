@@ -110,38 +110,14 @@ function DocumentationPage() {
       }
 
       return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-      setActivePatientId(null); 
-
-      toast({
-        title: "Dokumentation erstellt",
-        description: data.status === DocumentationStatus.REVIEW 
-          ? "Die Dokumentation wurde zur Überprüfung weitergeleitet."
-          : "Die Dokumentation wurde erfolgreich gespeichert.",
-      });
-
-      sendMessage({
-        type: 'DOC_STATUS_UPDATE',
-        docId: data.id,
-        status: data.status
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Die Dokumentation konnte nicht erstellt werden.",
-        variant: "destructive",
-      });
-      console.error("Documentation creation error:", error);
-    },
+    }
   });
 
   const handleTranscriptionComplete = async (text: string, sendToReview: boolean) => {
     if (!activePatientId) return;
 
     try {
+      // Create the documentation first
       const newDoc = await createDocMutation.mutateAsync({
         content: text,
         patientId: activePatientId,
@@ -149,21 +125,29 @@ function DocumentationPage() {
         status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
       });
 
-      setActivePatientId(null);
+      // Only continue if the mutation was successful
+      if (newDoc) {
+        // Close the patient box
+        setActivePatientId(null);
 
-      toast({
-        title: "Dokumentation erstellt",
-        description: sendToReview 
-          ? "Die Dokumentation wurde zur Überprüfung weitergeleitet."
-          : "Die Dokumentation wurde gespeichert.",
-      });
+        // Show success toast and update UI
+        toast({
+          title: "Dokumentation erstellt",
+          description: sendToReview 
+            ? "Die Dokumentation wurde zur Überprüfung weitergeleitet."
+            : "Die Dokumentation wurde gespeichert.",
+        });
 
-      sendMessage({
-        type: 'DOC_STATUS_UPDATE',
-        docId: newDoc.id,
-        status: newDoc.status
-      });
+        // Notify other clients about the status change
+        sendMessage({
+          type: 'DOC_STATUS_UPDATE',
+          docId: newDoc.id,
+          status: newDoc.status
+        });
 
+        // Invalidate queries to refresh the UI
+        queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      }
     } catch (error) {
       console.error("Failed to create documentation:", error);
       toast({
