@@ -2,6 +2,7 @@ import { Router } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { storage } from "../storage";
+import { patientSchema } from "@shared/schema";
 
 const router = Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -80,12 +81,12 @@ Bitte halte die Analyse sachlich und professionell.`;
   } catch (error) {
     console.error("AI Analysis Error:", error);
     if (error instanceof Error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "KI-Analyse konnte nicht durchgeführt werden",
-        details: error.message 
+        details: error.message
       });
     } else {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "KI-Analyse konnte nicht durchgeführt werden",
         details: "Unbekannter Fehler"
       });
@@ -147,12 +148,12 @@ Die Prognose soll als Entscheidungshilfe für die Pflegeplanung dienen.`;
   } catch (error) {
     console.error("Care Prediction Error:", error);
     if (error instanceof Error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Pflegebedarfsprognose konnte nicht erstellt werden",
-        details: error.message 
+        details: error.message
       });
     } else {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Pflegebedarfsprognose konnte nicht erstellt werden",
         details: "Unbekannter Fehler"
       });
@@ -209,12 +210,12 @@ Die Empfehlungen sollen praktisch umsetzbar sein und die Effizienz sowie Mitarbe
   } catch (error) {
     console.error("Shift Optimization Error:", error);
     if (error instanceof Error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Schichtoptimierung konnte nicht durchgeführt werden",
-        details: error.message 
+        details: error.message
       });
     } else {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Schichtoptimierung konnte nicht durchgeführt werden",
         details: "Unbekannter Fehler"
       });
@@ -292,12 +293,12 @@ Gib die verbesserten Beschreibungen im JSON-Format zurück, wobei du für jede L
   } catch (error) {
     console.error("Billing Assist Error:", error);
     if (error instanceof Error) {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Leistungsbeschreibungen konnten nicht optimiert werden",
-        details: error.message 
+        details: error.message
       });
     } else {
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Leistungsbeschreibungen konnten nicht optimiert werden",
         details: "Unbekannter Fehler"
       });
@@ -322,13 +323,13 @@ router.post("/suggest-services", async (req, res) => {
 
     // Get documentation for the specified date
     const docs = await storage.getDocs(patientId);
-    const dayDocs = docs.filter(doc => 
+    const dayDocs = docs.filter(doc =>
       new Date(doc.date).toISOString().split('T')[0] === new Date(date).toISOString().split('T')[0]
     );
 
     if (dayDocs.length === 0) {
-      return res.status(404).json({ 
-        error: "Keine Dokumentation für dieses Datum gefunden" 
+      return res.status(404).json({
+        error: "Keine Dokumentation für dieses Datum gefunden"
       });
     }
 
@@ -379,17 +380,99 @@ Gib die Vorschläge im folgenden JSON-Format zurück:
       res.json(suggestions);
     } catch (error) {
       // Fallback für den Fall, dass die KI kein valides JSON zurückgibt
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Fehler bei der Analyse der Dokumentation",
         details: "Konnte keine gültigen Vorschläge generieren"
       });
     }
   } catch (error) {
     console.error("Service Suggestion Error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Fehler bei der Analyse der Dokumentation",
       details: error instanceof Error ? error.message : "Unbekannter Fehler"
     });
+  }
+});
+
+const documentExtractionSchema = z.object({
+  documentImage: z.string(), // Base64 encoded image
+});
+
+router.post("/extract-patient-data", async (req, res) => {
+  try {
+    const { documentImage } = documentExtractionSchema.parse(req.body);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+
+    const prompt = `Analyze this medical document or patient record and extract relevant patient information. 
+    Please identify and extract the following details in a structured format:
+    - Full name of the patient
+    - Care level (Pflegegrad) if mentioned
+    - Address
+    - Emergency contact information
+    - Insurance provider and number
+    - Any medications listed
+    - Important medical notes
+
+    Please provide the information in the following JSON format:
+    {
+      "name": "string",
+      "careLevel": number,
+      "address": "string",
+      "emergencyContact": "string",
+      "insuranceProvider": "string",
+      "insuranceNumber": "string",
+      "medications": ["string"],
+      "notes": "string"
+    }
+
+    If any field is not found in the document, use null for that field.
+    Ensure the care level is a number between 1 and 5.`;
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: documentImage.split(",")[1] // Remove data URL prefix if present
+        }
+      },
+      { text: prompt }
+    ]);
+
+    const response = await result.response;
+    const text = response.text();
+
+    // Try to parse the response as JSON
+    try {
+      const extractedData = JSON.parse(text);
+
+      // Validate the extracted data against our patient schema
+      const validatedData = patientSchema.parse(extractedData);
+
+      res.json({
+        success: true,
+        data: validatedData
+      });
+    } catch (parseError) {
+      console.error("Data parsing error:", parseError);
+      res.status(422).json({
+        error: "Konnte Patientendaten nicht aus dem Dokument extrahieren",
+        details: "Ungültiges Datenformat"
+      });
+    }
+  } catch (error) {
+    console.error("Document extraction error:", error);
+    if (error instanceof Error) {
+      res.status(500).json({
+        error: "Dokumentenanalyse fehlgeschlagen",
+        details: error.message
+      });
+    } else {
+      res.status(500).json({
+        error: "Dokumentenanalyse fehlgeschlagen",
+        details: "Unbekannter Fehler"
+      });
+    }
   }
 });
 

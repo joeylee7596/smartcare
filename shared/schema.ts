@@ -143,7 +143,7 @@ export const insuranceBilling = pgTable("insurance_billing", {
   submissionDate: timestamp("submission_date"),
   responseDate: timestamp("response_date"),
   insuranceResponse: text("insurance_response"),
-  content: text("content"), 
+  content: text("content"),
 });
 
 export const expiryTracking = pgTable("expiry_tracking", {
@@ -169,8 +169,8 @@ export const shifts = pgTable("shifts", {
   employeeId: integer("employee_id").notNull(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
-  status: text("status").notNull().default("pending"), 
-  type: text("type").notNull(), 
+  status: text("status").notNull().default("pending"),
+  type: text("type").notNull(),
   notes: text("notes"),
   aiGenerated: boolean("ai_generated").default(false),
   conflictInfo: json("conflict_info").$type<{
@@ -196,7 +196,7 @@ export const shiftChanges = pgTable("shift_changes", {
   id: serial("id").primaryKey(),
   shiftId: integer("shift_id").notNull(),
   requestedBy: integer("requested_by").notNull(),
-  requestType: text("request_type").notNull(), 
+  requestType: text("request_type").notNull(),
   requestStatus: text("request_status").notNull().default("pending"),
   requestDetails: json("request_details").$type<{
     reason: string;
@@ -212,7 +212,12 @@ export const shiftChanges = pgTable("shift_changes", {
 });
 
 export const insertUserSchema = createInsertSchema(users);
-export const insertPatientSchema = createInsertSchema(patients);
+export const insertPatientSchema = createInsertSchema(patients, {
+  medications: z.array(z.string()).default([]),
+  aiSummary: z.string().nullable(),
+  notes: z.string().nullable(),
+  careLevel: z.number().int().min(1).max(5),
+});
 export const insertEmployeeSchema = createInsertSchema(employees);
 export const insertTourSchema = createInsertSchema(tours).extend({
   date: z.string().or(z.date()).transform(val =>
@@ -259,6 +264,22 @@ export type ShiftPreference = typeof shiftPreferences.$inferSelect;
 export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
 export type ShiftChange = typeof shiftChanges.$inferSelect;
 export type InsertChange = z.infer<typeof insertChangeSchema>;
+
+// Add base patient schema for AI validation
+export const patientSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  careLevel: z.number().int().min(1).max(5),
+  address: z.string().min(1, "Address is required"),
+  emergencyContact: z.string().min(1, "Emergency contact is required"),
+  medications: z.array(z.string()).default([]),
+  notes: z.string().nullable(),
+  insuranceProvider: z.string().min(1, "Insurance provider is required"),
+  insuranceNumber: z.string().min(1, "Insurance number is required"),
+  aiSummary: z.string().nullable(),
+  lastVisit: z.date().nullable(),
+  nextScheduledVisit: z.date().nullable(),
+});
+
 
 export const DocumentationStatus = {
   PENDING: "pending",
