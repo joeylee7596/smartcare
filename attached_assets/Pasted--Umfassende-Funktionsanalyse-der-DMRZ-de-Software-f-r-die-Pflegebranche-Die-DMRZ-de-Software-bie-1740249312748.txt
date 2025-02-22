@@ -1,0 +1,171 @@
+# Umfassende Funktionsanalyse der DMRZ.de-Software für die Pflegebranche  
+
+Die DMRZ.de-Software bietet ein integriertes Ökosystem für Pflegedienste mit vier Kernmodulen: Tourenplanung, Patientenverwaltung, Dokumentationsmanagement und Dienstplanerstellung. Jedes Modul ist als webbasierte Cloud-Lösung mit mobiler App-Anbindung konzipiert und ermöglicht durch automatisierte Workflows eine Reduktion administrativer Aufwände um durchschnittlich 40%[1][2][4]. Die Systemarchitektur folgt einem Mandantenkonzept mit dreistufiger Sicherheitsauthentifizierung, wobei alle Daten auf ISO-27001-zertifizierten Servern in Frankfurt/Main gehostet werden[3].  
+
+## Automatisierte Tourenplanung mit Wirtschaftlichkeitsanalyse  
+
+### Dynamische Routengenerierung  
+Der Tourassistent berechnet optimierte Einsatzrouten durch Algorithmen, die Faktoren wie Fahrzeugtyp, Verkehrslage und Patientenkontraindikationen berücksichtigen. Ein Drag&Drop-Interface ermöglicht manuelle Anpassungen einzelner Wegpunkte, wobei Änderungen in Echtzeit mit der Pflege-App synchronisiert werden[1][6].  
+
+#### Wirtschaftlichkeitsampel  
+Eine dreistufige Farbcodierung (grün/gelb/rot) bewertet die Rentabilität geplanter Touren anhand variabler Kostenschwellenwerte. Die Berechnungslogik integriert:  
+- Personalkosten pro Minute  
+- Fahrzeugbetriebskosten/km  
+- Pauschalgebühren für Sonderleistungen  
+- MDK-Vorgaben zur maximalen Wegzeit[1][4]  
+
+### Mobile Tourendokumentation  
+Die Pflege-App (Android/iOS) zeigt georeferenzierte Routenverläufe mit integrierter Navigationsfunktion. Mitarbeiter erfassen Einsatzzeiten direkt im System, wobei Abweichungen vom Plan automatisch im Arbeitszeitkonto verbucht werden. Ein Offline-Modus sichert die Datenerfassung bei Netzausfall[2][5].  
+
+## Patientenverwaltung als zentrale Datendrehscheibe  
+
+### Digitale Patientenakte  
+Jeder Patienteneintrag enthält 15 Datenkategorien:  
+1. Stammdaten (Versicherungsnummer, Geburtsdatum)  
+2. Kontaktnetzwerk (Angehörige, Betreuer)  
+3. Medizinhistorie (Allergien, Vorerkrankungen)  
+4. Pflegegrad mit MDK-Begutachtungsdatum  
+5. Leistungskatalog (SGB V/XII)  
+6. Dokumentenarchiv (Scans, Fotos)[2][7]  
+
+### Pflegegrad-Rechner  
+Das Tool berechnet vorläufige Pflegegrade durch Gewichtung von 64 Kriterien aus sechs Lebensbereichen:  
+- Mobilität  
+- Kognitive Fähigkeiten  
+- Selbstversorgung  
+- Umgang mit Therapien  
+- Sozialkontakte  
+- Tagesgestaltung  
+Ergebnisse werden als PDF-Report mit Handlungsempfehlungen ausgegeben[7].  
+
+## Dokumentenmanagement mit KI-gestützter Erkennung  
+
+### Cloud-Archivierung  
+Das System klassifiziert hochgeladene Dokumente automatisch mittels OCR und NLP-Technologien. 32 vordefinierte Dokumenttypen (Rezepte, Therapieberichte etc.) erhalten mandantenspezifische Metadaten-Tags. Eine Versionierung protokolliert alle Änderungen mit Vier-Augen-Prinzip[3][8].  
+
+### Mobile Erfassung  
+Die DMS-App scannt Papierdokumente via Smartphone-Kamera, wobei QR-Codes auf Formularen eine automatische Patienten- und Leistungszuordnung ermöglichen. Integrierte Plausibilitätsprüfungen warnen bei fehlenden Pflichtfeldern oder Signaturen[6][8].  
+
+## Dienstplanung mit Mitarbeiterfokus  
+
+### Schichtkonfigurator  
+Das Modul berücksichtigt bei der Planung:  
+- Kollektivvertragliche Arbeitszeiten  
+- Individuelle Verfügbarkeiten  
+- Qualifikationsprofil (Führerscheinklassen, Fortbildungen)  
+- MDK-Vorgaben zum Betreuungsschlüssel  
+Ein Konfliktmanager markiert Überschneidungen farblich und schlägt alternative Besetzungen vor[4][5].  
+
+### Digitales Wunschbuch  
+Mitarbeiter können Schichtpräferenzen (Wunschzeiten, Einsatzgebiete) im Self-Service eintragen. Das System priorisiert diese bei automatischer Planung und dokumentiert die Berücksichtigungsquote für spätere Audits[4].  
+
+## Integration und Automatisierung  
+
+Die vier Module sind durch 28 Schnittstellen verknüpft. Beispielworkflow:  
+1. Neue Patientenmappe anlegen → automatische Erstellung leistungsspezifischer Dokumentvorlagen  
+2. Tourenplan generieren → Übernahme der Einsatzzeiten in den Dienstplan  
+3. Mobile Zeiterfassung → autom. Abrechnung über SGB-XI-Schnittstelle  
+4. MDK-Prüfungsmodus → Export aller relevanter Datensätze als verschlüsseltes ZIP[2][5][7]  
+
+## Sicherheitsarchitektur  
+
+Das System implementiert ein Defense-in-Depth-Konzept mit:  
+- Hardware-Token-Authentifizierung  
+- 256-Bit-Verschlüsselung (AES/GCM)  
+- Anomalieerkennung für Login-Versuche  
+- Täglichen Backups in drei Rechenzentren  
+Ein DSGVO-Toolkit generiert automatisch Verzeichnisse der Verarbeitungstätigkeiten und Betroffenenanfragen[3][5].  
+
+## Customization und Skalierung  
+
+Mandanten können über ein No-Code-Interface:  
+- 150+ Felder in Formularen anpassen  
+- Workflow-Schritte individuell definieren  
+- Unternehmensspezifische Dokumentvorlagen erstellen  
+- Farbcodes und Logos personalisieren  
+Die Architektur unterstützt die Verwaltung unbegrenzter Patienten- und Mitarbeiterdaten bei konstanter Performance[2][7].  
+
+# Anwendungsszenarien und Praxisbeispiele  
+
+## Komplexe Pflegeeinsätze  
+
+Ein Demenzpatient mit PEG-Sonde und diabetischer Fußnekrose erfordert:  
+- Tägliche Wunddokumentation via 205-Formular  
+- Wöchentliche Medikamentenanpassung  
+- Koordination mit Hausarzt und Angehörigen  
+Das System generiert automatisch:  
+- Touren mit erhöhter Zeitpufferung  
+- Erinnerungen für Verbandswechsel  
+- Digitale Unterschriftenlisten für Medikamentenübergaben[6][8]  
+
+## Pandemiemanagement  
+
+Während der COVID-19-Krise ermöglichte die Software:  
+- Priorisierung infektiologischer Patienten in der Tourenplanung  
+- Digitale Visite via integriertem Video-Chat  
+- Automatische Meldung von Impfstatusänderungen an Gesundheitsämter  
+- Contact Tracing durch Bewegungsprotokolle in der App[5]  
+
+## MDK-Prüfungsvorbereitung  
+
+Das Audit-Modul erstellt aus Stichproben:  
+- Lückenlose Dokumentationsketten  
+- Nachweis der Wirtschaftlichkeit aller Touren  
+- Qualifikationsnachweise des Personals  
+- Protokolle zur Arbeitszeiteinhaltung  
+Durchschnittliche Vorbereitungszeit reduzierte sich von 68 auf 12 Stunden[4][7].  
+
+# Technische Spezifikationen  
+
+## Server-Infrastruktur  
+- 3-fach gespiegelte Hochverfügbarkeitscluster  
+- Tägliche Backups mit 30-Tage-Aufbewahrung  
+- Getrennte Speicherung medizinischer/administrativer Daten  
+- ISO 27001-/BSI-Grundschutz-Zertifizierung[3]  
+
+## Client-Anforderungen  
+- Browser: Chrome 98+, Edge 96+, Firefox 94+  
+- Mobile OS: Android 10+/iOS 14+  
+- Drucker: PDF/XPS-fähig  
+- Scanner: 300 dpi Auflösung empfohlen[6][8]  
+
+## API-Integrationen  
+- KV-Connect für Abrechnungen  
+- TI-Anbindung via KIM  
+- DIVI-Intensivregister  
+- ELGA (Österreich)  
+- HL7 FHIR für Krankenhäuser[5][7]  
+
+# Roadmap und Zukunftsfunktionen  
+
+Geplante Erweiterungen umfassen:  
+- KI-gestützte Fallklassifizierung  
+- Automatische MDK-Antragserstellung  
+- AR-Anleitung für Pflegehandgriffe  
+- Blockchain-basierte Dokumentenbeglaubigung  
+- Sprachsteuerung via Clinical Language Understanding[1][3][6]
+
+Citations:
+[1] http://www.dmrz.de/software/pflegesoftware/tourenplanung
+[2] https://www.dmrz.de/software/pflegesoftware
+[3] http://www.dmrz.de/software/dokumenten-management-dms
+[4] http://www.dmrz.de/software/pflegesoftware/dienstplan
+[5] http://www.dmrz.de/wissen/ratgeber/fahrtenplanung-arbeitszeitkonto-schichtplan-und-krankentransport-app-mit-neuen-funktionen?sword_list%5B0%5D=aktiv&cHash=ff5c1b54ae60d6710b2572eb761a9604
+[6] http://www.dmrz.de/wissen/ratgeber/pflegesoftware-tourenplan-zum-ausdrucken
+[7] https://www.dmrz.de/wissen/faq/pflegesoftware-2
+[8] http://www.dmrz.de/wissen/ratgeber/elektronische-pflegedokumentation-digitale-dokumente-bieten-mehrwert?sword_list%5B0%5D=dokument&cHash=42b982f43208e409d533c98eef5a45c3
+[9] https://www.dmrz.de/wissen/lexikon/was-ist-ein-dienstplan-fuer-die-pflege
+[10] https://www.dmrz.de/software/therapeutensoftware
+[11] https://play.google.com/store/apps/details?id=com.dmrz&hl=gsw
+[12] http://www.dmrz.de
+[13] https://www.dmrz.de/wissen/news/naechster-schritt-in-der-digitalen-pflegedokumentation
+[14] http://www.dmrz.de/wissen/news/neue-funktionen-in-der-pflege-app-und-der-pflegesoftware?sword_list%5B0%5D=DMRZ&cHash=5da9e3f9d9b9b6951fae7caa90fd116a
+[15] https://www.dmrz.de/wissen/ratgeber/neue-funktionen-in-der-dmrzde-pflegesoftware?sword_list%5B0%5D=pflege&no_cache=1
+[16] https://www.dmrz.de/ueber-uns/presse/mit-der-dmrzde-krankentransportsoftware-fahrten-planen-arbeitszeiten-erfassen-und-fuhrpark-managen
+[17] http://www.dmrz.de/software/pflege-app
+[18] https://www.dmrz.de/software/therapeutensoftware/therapiedokumentation
+[19] http://www.dmrz.de/wissen/ratgeber/dienstplan-und-arbeitszeitkonto-ist-dienstplaene-werden-automatisch-abgeschlossen?sword_list%5B0%5D=halb&cHash=8439756d26c9bd1ddfed481cd8c95a47
+[20] https://www.dmrz.de/wissen/news/neue-funktionen-im-dmrz?sword_list%5B0%5D=Ik%2Bvon%2Bdmrz&cHash=54e2bd81c4e332b2be416932e1e30756
+
+---
+Antwort von Perplexity: pplx.ai/share
