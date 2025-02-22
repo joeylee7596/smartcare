@@ -93,7 +93,7 @@ function DocumentationPage() {
       type: string; 
       status: DocumentationStatus 
     }) => {
-      const res = await apiRequest("POST", "/api/docs", {
+      const docData = {
         patientId: data.patientId,
         employeeId: user?.id,
         date: new Date().toISOString(),
@@ -101,8 +101,14 @@ function DocumentationPage() {
         type: data.type,
         status: data.status,
         aiGenerated: true,
-        verified: false
-      });
+        verified: false,
+        reviewerId: null,
+        reviewNotes: null,
+        reviewDate: null,
+        audioRecordingUrl: null
+      };
+
+      const res = await apiRequest("POST", "/api/docs", docData);
 
       if (!res.ok) {
         const error = await res.json();

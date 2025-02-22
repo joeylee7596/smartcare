@@ -143,7 +143,7 @@ export const insuranceBilling = pgTable("insurance_billing", {
   submissionDate: timestamp("submission_date"),
   responseDate: timestamp("response_date"),
   insuranceResponse: text("insurance_response"),
-  content: text("content"), // Added new field for storing billing text content
+  content: text("content"), 
 });
 
 export const expiryTracking = pgTable("expiry_tracking", {
@@ -164,14 +164,13 @@ export const expiryTracking = pgTable("expiry_tracking", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// New tables for duty roster
 export const shifts = pgTable("shifts", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
-  status: text("status").notNull().default("pending"), // pending, confirmed, rejected
-  type: text("type").notNull(), // regular, on-call, overtime
+  status: text("status").notNull().default("pending"), 
+  type: text("type").notNull(), 
   notes: text("notes"),
   aiGenerated: boolean("ai_generated").default(false),
   conflictInfo: json("conflict_info").$type<{
@@ -197,7 +196,7 @@ export const shiftChanges = pgTable("shift_changes", {
   id: serial("id").primaryKey(),
   shiftId: integer("shift_id").notNull(),
   requestedBy: integer("requested_by").notNull(),
-  requestType: text("request_type").notNull(), // swap, cancel, modify
+  requestType: text("request_type").notNull(), 
   requestStatus: text("request_status").notNull().default("pending"),
   requestDetails: json("request_details").$type<{
     reason: string;
@@ -220,7 +219,11 @@ export const insertTourSchema = createInsertSchema(tours).extend({
     typeof val === 'string' ? new Date(val) : val
   ),
 });
-export const insertDocSchema = createInsertSchema(documentation);
+export const insertDocSchema = createInsertSchema(documentation).extend({
+  date: z.string().or(z.date()).transform(val =>
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
 export const insertWorkflowSchema = createInsertSchema(workflowTemplates);
 export const insertBillingSchema = createInsertSchema(insuranceBilling);
 export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).extend({
@@ -229,7 +232,6 @@ export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).ext
   ),
 });
 
-// Create insert schemas for new tables
 export const insertShiftSchema = createInsertSchema(shifts);
 export const insertPreferenceSchema = createInsertSchema(shiftPreferences);
 export const insertChangeSchema = createInsertSchema(shiftChanges);
@@ -251,7 +253,6 @@ export type InsertBilling = z.infer<typeof insertBillingSchema>;
 export type ExpiryTracking = typeof expiryTracking.$inferSelect;
 export type InsertExpiryTracking = z.infer<typeof insertExpiryTrackingSchema>;
 
-// Create types for new tables
 export type Shift = typeof shifts.$inferSelect;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
 export type ShiftPreference = typeof shiftPreferences.$inferSelect;
@@ -267,7 +268,6 @@ export const DocumentationStatus = {
 
 export type DocumentationStatusType = typeof DocumentationStatus[keyof typeof DocumentationStatus];
 
-// Add shift-related constants
 export const ShiftStatus = {
   PENDING: "pending",
   CONFIRMED: "confirmed",
