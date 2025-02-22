@@ -200,7 +200,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               <TooltipTrigger asChild>
                 <div
                   className={cn(
-                    "absolute h-[calc(100%-8px)] m-1 rounded-xl p-2",
+                    "absolute h-[calc(100%-8px)] m-1 rounded-2xl p-2",
                     "transition-all duration-500 group cursor-pointer",
                     "hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:-translate-y-1 hover:z-10",
                     employeeColor.light,
@@ -231,7 +231,8 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               </TooltipTrigger>
               <TooltipContent 
                 side="top" 
-                className="bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-xl border border-white/40"
+                className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl
+                  shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]"
               >
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
