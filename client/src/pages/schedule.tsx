@@ -271,34 +271,36 @@ export default function SchedulePage() {
 
           {/* Right Panel - AI Recommendations */}
           <div className="w-80 border-l border-gray-200 bg-[#1E2A4A]/5 overflow-y-auto">
-            <ScrollArea className="h-full p-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-50/50 border-blue-100">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg font-semibold text-blue-700">
-                    KI-Empfehlungen
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <p className="text-sm text-blue-600/90">
-                      Basierend auf der aktuellen Planung und den Mitarbeiterpräferenzen:
-                    </p>
-                    {isLoadingAI ? (
-                      <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100">
-                        <div className="animate-pulse space-y-2">
-                          <div className="h-4 bg-blue-100 rounded w-3/4"></div>
-                          <div className="h-4 bg-blue-100 rounded w-1/2"></div>
-                          <div className="h-4 bg-blue-100 rounded w-2/3"></div>
+            <ScrollArea className="h-full">
+              <div className="p-4 space-y-4">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-50/50 border-blue-100">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-semibold text-blue-700">
+                      KI-Empfehlungen
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <p className="text-sm text-blue-600/90">
+                        Basierend auf der aktuellen Planung und den Mitarbeiterpräferenzen:
+                      </p>
+                      {isLoadingAI ? (
+                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100">
+                          <div className="animate-pulse space-y-2">
+                            <div className="h-4 bg-blue-100 rounded w-3/4"></div>
+                            <div className="h-4 bg-blue-100 rounded w-1/2"></div>
+                            <div className="h-4 bg-blue-100 rounded w-2/3"></div>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100 whitespace-pre-line">
-                        {aiRecommendations || "Keine KI-Empfehlungen verfügbar."}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      ) : (
+                        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100 whitespace-pre-line">
+                          {aiRecommendations || "Keine KI-Empfehlungen verfügbar."}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </ScrollArea>
           </div>
         </div>
