@@ -16,6 +16,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocation } from 'wouter';
 
 function DocumentationPage() {
   const { toast } = useToast();
@@ -23,6 +24,16 @@ function DocumentationPage() {
   const { sendMessage, subscribe } = useWebSocket();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [, params] = useLocation();
+
+  // Get patientId from URL if provided
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const patientId = searchParams.get('patient');
+    if (patientId) {
+      setActivePatientId(parseInt(patientId));
+    }
+  }, []);
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],

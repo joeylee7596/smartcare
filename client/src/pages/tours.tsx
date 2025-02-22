@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO, startOfDay, endOfDay, addHours, isSameDay, addMinutes } from "date-fns";
 import { de } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tour, Patient, Employee } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -376,6 +376,23 @@ export default function Tours() {
   const [showAddTourDialog, setShowAddTourDialog] = useState(false);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<Employee | null>(null);
+
+  // Get patientId from URL if provided
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const patientId = searchParams.get('patient');
+    if (patientId) {
+      const patientIdNum = parseInt(patientId);
+      // Find the tour containing this patient
+      const tour = tours.find(t => t.patientIds.includes(patientIdNum));
+      if (tour) {
+        setSelectedDate(parseISO(tour.date.toString()));
+        setSelectedEmployee(tour.employeeId);
+        setSelectedEmployeeForDetails(employees.find(e => e.id === tour.employeeId) || null);
+        setShowEmployeeDetails(true);
+      }
+    }
+  }, []);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],

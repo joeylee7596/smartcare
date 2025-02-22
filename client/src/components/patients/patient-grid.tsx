@@ -29,7 +29,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EditPatientDialog } from "./edit-patient-dialog";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CarePredictionDialog } from "./care-prediction-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -272,44 +272,51 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 h-12 rounded-xl
-                          bg-gradient-to-r from-white to-blue-50/50
-                          hover:from-blue-50 hover:to-blue-100/50
-                          border border-white/40 hover:border-blue-200
-                          shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
-                          hover:-translate-y-0.5 hover:scale-[1.02]
-                          transition-all duration-500 group"
+                      <Link 
+                        href={`/documentation?patient=${patient.id}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/documentation?patientId=${patient.id}`);
                         }}
                       >
-                        <FileText className="h-5 w-5 mr-2 transition-transform duration-500
-                          group-hover:scale-110 group-hover:rotate-6" />
-                        <span className="font-medium">Dokumentation</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 h-12 rounded-xl
-                          bg-gradient-to-r from-white to-purple-50/50
-                          hover:from-purple-50 hover:to-purple-100/50
-                          border border-white/40 hover:border-purple-200
-                          shadow-lg shadow-purple-500/5 hover:shadow-purple-500/20
-                          hover:-translate-y-0.5 hover:scale-[1.02]
-                          transition-all duration-500 group"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-12 rounded-xl
+                            bg-gradient-to-r from-white to-blue-50/50
+                            hover:from-blue-50 hover:to-blue-100/50
+                            border border-white/40 hover:border-blue-200
+                            shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                            hover:-translate-y-0.5 hover:scale-[1.02]
+                            transition-all duration-500 group"
+                        >
+                          <FileText className="h-5 w-5 mr-2 transition-transform duration-500
+                            group-hover:scale-110 group-hover:rotate-6" />
+                          <span className="font-medium">Dokumentation</span>
+                        </Button>
+                      </Link>
+
+                      <Link 
+                        href={`/tours?patient=${patient.id}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLocation(`/tours?patientId=${patient.id}`);
                         }}
                       >
-                        <Calendar className="h-5 w-5 mr-2 transition-transform duration-500
-                          group-hover:scale-110 group-hover:rotate-6" />
-                        <span className="font-medium">Termine</span>
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-12 rounded-xl
+                            bg-gradient-to-r from-white to-purple-50/50
+                            hover:from-purple-50 hover:to-purple-100/50
+                            border border-white/40 hover:border-purple-200
+                            shadow-lg shadow-purple-500/5 hover:shadow-purple-500/20
+                            hover:-translate-y-0.5 hover:scale-[1.02]
+                            transition-all duration-500 group"
+                        >
+                          <Calendar className="h-5 w-5 mr-2 transition-transform duration-500
+                            group-hover:scale-110 group-hover:rotate-6" />
+                          <span className="font-medium">Termine</span>
+                        </Button>
+                      </Link>
                     </div>
 
                     {patient.notes && (
