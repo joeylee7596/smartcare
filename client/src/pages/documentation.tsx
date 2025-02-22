@@ -95,9 +95,17 @@ function DocumentationPage() {
         aiGenerated: true,
         verified: false,
         employeeId: user?.id,
+        status: data.status,
+        content: data.content.trim(), // Ensure content is properly formatted
+        reviewNotes: null,
+        reviewerId: null,
+        reviewDate: null,
+        audioRecordingUrl: null,
       });
+
       if (!res.ok) {
-        throw new Error("Fehler beim Erstellen der Dokumentation");
+        const error = await res.json();
+        throw new Error(error.error || "Fehler beim Erstellen der Dokumentation");
       }
       return res.json();
     },
@@ -122,7 +130,7 @@ function DocumentationPage() {
     onError: (error) => {
       toast({
         title: "Fehler",
-        description: "Die Dokumentation konnte nicht erstellt werden.",
+        description: error instanceof Error ? error.message : "Die Dokumentation konnte nicht erstellt werden.",
         variant: "destructive",
       });
       console.error("Documentation creation error:", error);
