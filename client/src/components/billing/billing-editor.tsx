@@ -133,17 +133,22 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
       return;
     }
 
-    const totalAmount = serviceEntries.reduce((sum, service) => sum + (Number(service.amount) || 0), 0);
+    // Convert all amounts to proper numeric values
+    const validatedServices = serviceEntries.map(service => ({
+      ...service,
+      amount: Number(service.amount) || 0,
+      code: service.code || "",
+      description: service.description || "",
+    }));
+
+    const totalAmount = validatedServices.reduce((sum, service) => sum + service.amount, 0);
 
     onSave({
       patientId: patient.id,
-      date: selectedDate,
-      services: serviceEntries.map(service => ({
-        ...service,
-        amount: Number(service.amount) || 0
-      })),
+      date: new Date(selectedDate).toISOString(),
+      services: validatedServices,
       totalAmount,
-      status: "pending"
+      status: "pending",
     });
   };
 

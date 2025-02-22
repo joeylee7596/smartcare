@@ -205,14 +205,23 @@ export default function BillingPage() {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
-                                      ...billing,
-                                      date: new Date(billing.date).toISOString(),
+                                      patientId: billing.patientId,
                                       employeeId: 1, // TODO: Get from auth context
+                                      date: billing.date,
+                                      services: billing.services.map(service => ({
+                                        code: service.code,
+                                        description: service.description,
+                                        amount: Number(service.amount)
+                                      })),
                                       totalAmount: billing.totalAmount.toString(),
+                                      status: "pending"
                                     }),
                                   });
 
-                                  if (!response.ok) throw new Error('Fehler beim Speichern');
+                                  if (!response.ok) {
+                                    const error = await response.json();
+                                    throw new Error(error.message || 'Fehler beim Speichern der Abrechnung');
+                                  }
 
                                   queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
                                   setIsNewBillingOpen(false);
@@ -221,9 +230,10 @@ export default function BillingPage() {
                                     description: 'Die Abrechnung wurde erfolgreich erstellt.',
                                   });
                                 } catch (error) {
+                                  console.error('Saving Error:', error);
                                   toast({
                                     title: 'Fehler',
-                                    description: 'Die Abrechnung konnte nicht erstellt werden.',
+                                    description: error instanceof Error ? error.message : 'Die Abrechnung konnte nicht erstellt werden.',
                                     variant: 'destructive',
                                   });
                                 }
