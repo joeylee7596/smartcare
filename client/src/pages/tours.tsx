@@ -236,7 +236,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
               </TooltipTrigger>
               <TooltipContent
                 side="top"
-                className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]"
+                className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)] z-40"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

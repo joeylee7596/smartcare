@@ -174,7 +174,7 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] relative z-50">
         <DialogHeader>
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
@@ -296,7 +296,7 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
                     <p className={cn(
                       "font-medium",
                       economicCalculation.profitMargin >= 20 ? "text-green-600" :
-                      economicCalculation.profitMargin >= 10 ? "text-amber-600" : "text-red-600"
+                        economicCalculation.profitMargin >= 10 ? "text-amber-600" : "text-red-600"
                     )}>
                       {economicCalculation.profitMargin.toFixed(1)}%
                     </p>
