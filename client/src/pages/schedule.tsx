@@ -5,33 +5,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarIcon, Filter, Users, Clock, UserCheck, UserX, ArrowLeftRight, AlertCircle } from "lucide-react";
+import { Calendar as CalendarIcon, Filter, Users, Clock, UserCheck, UserX, ArrowLeftRight, AlertCircle, Edit2, Calendar as CalendarComponent } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addHours, isSameDay } from "date-fns";
+import { format, isSameDay, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import type { Employee, Shift, ShiftChange } from "@shared/schema";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
+import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 const WORKING_HOURS = {
   start: 6,
   end: 22,
-};
+} as const;
+
+type ShiftDialogMode = "create" | "edit" | "change" | null;
 
 export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [filterEmployeeType, setFilterEmployeeType] = useState<"all" | "full-time" | "part-time">("all");
-  const [isNewShiftDialogOpen, setIsNewShiftDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<ShiftDialogMode>(null);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
-  const [isChangeDialogOpen, setIsChangeDialogOpen] = useState(false);
+  const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
+
+  // Sensors für Drag & Drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   // Fetch employees and shifts
   const { data: employees, isLoading: isLoadingEmployees } = useQuery<Employee[]>({
@@ -54,6 +65,7 @@ export default function SchedulePage() {
       startTime: string;
       endTime: string;
       type: string;
+      notes?: string;
     }) => {
       const response = await fetch("/api/shifts", {
         method: "POST",
@@ -65,7 +77,37 @@ export default function SchedulePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      setIsNewShiftDialogOpen(false);
+      setDialogMode(null);
+    },
+  });
+
+  // Update shift mutation
+  const updateShift = useMutation({
+    mutationFn: async ({
+      shiftId,
+      updates,
+    }: {
+      shiftId: number;
+      updates: Partial<{
+        employeeId: number;
+        startTime: string;
+        endTime: string;
+        type: string;
+        notes: string;
+      }>;
+    }) => {
+      const response = await fetch(`/api/shifts/${shiftId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) throw new Error("Failed to update shift");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      setDialogMode(null);
+      setSelectedShift(null);
     },
   });
 
@@ -115,57 +157,35 @@ export default function SchedulePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/shift-changes"] });
-      setIsChangeDialogOpen(false);
+      setDialogMode(null);
     },
   });
 
-  // Fetch AI recommendations
-  const { data: aiRecommendations, isLoading: isLoadingAI } = useQuery({
-    queryKey: ["/api/ai/shift-optimization", selectedDate.toISOString()],
-    queryFn: async () => {
-      if (!employees) return null;
-      const response = await fetch("/api/ai/shift-optimization", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeData: employees,
-          currentShifts: shifts,
-          date: selectedDate.toISOString(),
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to get AI recommendations");
-      const data = await response.json();
-      return data.recommendations;
-    },
-    enabled: !!employees && !!shifts,
-  });
+  // Handle drag end event
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-  const handleCreateShift = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const formData = new FormData(form);
+    if (!active || !over || !draggedShift) return;
 
-    const employeeId = Number(formData.get("employeeId"));
-    const startTime = formData.get("startTime") as string;
-    const endTime = formData.get("endTime") as string;
-    const type = formData.get("type") as string;
+    const newEmployeeId = parseInt(over.id as string);
+    if (newEmployeeId === draggedShift.employeeId) return;
 
-    if (!employeeId || !startTime || !endTime || !type) return;
+    updateShift.mutate({
+      shiftId: draggedShift.id,
+      updates: {
+        employeeId: newEmployeeId,
+      },
+    });
 
-    const newShift = {
-      employeeId,
-      startTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${startTime}`).toISOString(),
-      endTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${endTime}`).toISOString(),
-      type,
-    };
-
-    createShift.mutate(newShift);
+    setDraggedShift(null);
   };
 
   // Helper function to calculate shift position and width
   const calculateShiftStyle = (shift: Shift) => {
-    const startHour = new Date(shift.startTime).getHours() + new Date(shift.startTime).getMinutes() / 60;
-    const endHour = new Date(shift.endTime).getHours() + new Date(shift.endTime).getMinutes() / 60;
+    const startTime = parseISO(shift.startTime);
+    const endTime = parseISO(shift.endTime);
+    const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+    const endHour = endTime.getHours() + endTime.getMinutes() / 60;
 
     const totalHours = WORKING_HOURS.end - WORKING_HOURS.start;
     const left = ((startHour - WORKING_HOURS.start) / totalHours) * 100;
@@ -179,8 +199,39 @@ export default function SchedulePage() {
 
   // Filter shifts for selected date
   const todaysShifts = shifts?.filter(shift => 
-    isSameDay(new Date(shift.startTime), selectedDate)
+    isSameDay(parseISO(shift.startTime), selectedDate)
   ) || [];
+
+  const handleSubmitShift = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const employeeId = Number(formData.get("employeeId"));
+    const startTime = formData.get("startTime") as string;
+    const endTime = formData.get("endTime") as string;
+    const type = formData.get("type") as string;
+    const notes = formData.get("notes") as string;
+
+    if (!employeeId || !startTime || !endTime || !type) return;
+
+    const shiftData = {
+      employeeId,
+      startTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${startTime}`).toISOString(),
+      endTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${endTime}`).toISOString(),
+      type,
+      notes,
+    };
+
+    if (dialogMode === "create") {
+      createShift.mutate(shiftData);
+    } else if (dialogMode === "edit" && selectedShift) {
+      updateShift.mutate({
+        shiftId: selectedShift.id,
+        updates: shiftData,
+      });
+    }
+  };
 
   return (
     <div className="flex h-screen">
@@ -271,84 +322,10 @@ export default function SchedulePage() {
                     {todaysShifts.length} Schichten geplant
                   </p>
                 </div>
-                <Dialog open={isNewShiftDialogOpen} onOpenChange={setIsNewShiftDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      Neue Schicht
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Neue Schicht erstellen</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleCreateShift} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="employeeId">Mitarbeiter</Label>
-                        <Select name="employeeId" required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Mitarbeiter auswählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {employees?.map((employee) => (
-                              <SelectItem key={employee.id} value={String(employee.id)}>
-                                {employee.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="type">Schichttyp</Label>
-                        <Select name="type" required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Schichttyp auswählen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="regular">Regulär</SelectItem>
-                            <SelectItem value="on-call">Bereitschaft</SelectItem>
-                            <SelectItem value="overtime">Überstunden</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="startTime">Startzeit</Label>
-                          <Input
-                            id="startTime"
-                            name="startTime"
-                            type="time"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="endTime">Endzeit</Label>
-                          <Input
-                            id="endTime"
-                            name="endTime"
-                            type="time"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsNewShiftDialogOpen(false)}
-                        >
-                          Abbrechen
-                        </Button>
-                        <Button type="submit" disabled={createShift.isPending}>
-                          {createShift.isPending ? "Wird erstellt..." : "Schicht erstellen"}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <Button onClick={() => setDialogMode("create")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  Neue Schicht
+                </Button>
               </div>
 
               {/* Schedule Grid */}
@@ -362,99 +339,148 @@ export default function SchedulePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4">
-                      {/* Time scale */}
-                      <div className="relative h-8 mb-4">
-                        {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start + 1 }).map((_, i) => (
+                    <DndContext
+                      sensors={sensors}
+                      modifiers={[restrictToVerticalAxis]}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <div className="p-4">
+                        {/* Time scale */}
+                        <div className="relative h-8 mb-4">
+                          {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start + 1 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className="absolute text-sm text-gray-500"
+                              style={{ left: `${(i / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%` }}
+                            >
+                              {String(WORKING_HOURS.start + i).padStart(2, '0')}:00
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Shifts */}
+                        <div className="space-y-4">
+                          {employees?.map(employee => (
+                            <div 
+                              key={employee.id}
+                              id={String(employee.id)}
+                              className="relative h-16 border-t border-gray-100 first:border-t-0 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center pr-4">
+                                <div className="truncate">
+                                  <div className="font-medium">{employee.name}</div>
+                                  <div className="text-sm text-gray-500">{employee.role}</div>
+                                </div>
+                              </div>
+
+                              <div className="relative ml-48 h-full bg-gray-50/50">
+                                {/* Time slots background */}
+                                <div className="absolute inset-0 grid grid-cols-16 gap-0">
+                                  {Array.from({ length: 16 }).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className="h-full border-l border-gray-200 first:border-l-0"
+                                    />
+                                  ))}
+                                </div>
+
+                                {/* Employee's shifts */}
+                                {todaysShifts
+                                  .filter(shift => shift.employeeId === employee.id)
+                                  .map(shift => {
+                                    const style = calculateShiftStyle(shift);
+                                    const isChanged = shiftChanges?.some(
+                                      change => change.shiftId === shift.id && change.requestStatus === "pending"
+                                    );
+
+                                    return (
+                                      <TooltipProvider key={shift.id}>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <div
+                                              className={cn(
+                                                "absolute top-2 h-12 rounded-md cursor-pointer transition-all group",
+                                                "flex items-center justify-between px-2 text-sm font-medium text-white",
+                                                {
+                                                  "bg-green-500 hover:bg-green-600": shift.status === "confirmed",
+                                                  "bg-yellow-500 hover:bg-yellow-600": isChanged,
+                                                  "bg-red-500 hover:bg-red-600": shift.status === "sick",
+                                                }
+                                              )}
+                                              style={style}
+                                              onClick={() => {
+                                                setSelectedShift(shift);
+                                                setDialogMode("edit");
+                                              }}
+                                              draggable
+                                              onDragStart={() => setDraggedShift(shift)}
+                                            >
+                                              <div className="truncate">
+                                                {format(parseISO(shift.startTime), "HH:mm")} - 
+                                                {format(parseISO(shift.endTime), "HH:mm")}
+                                              </div>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setSelectedShift(shift);
+                                                  setDialogMode("edit");
+                                                }}
+                                              >
+                                                <Edit2 className="h-3 w-3 text-white" />
+                                              </Button>
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <div className="space-y-1">
+                                              <div className="font-medium">{employee.name}</div>
+                                              <div className="text-sm">
+                                                {format(parseISO(shift.startTime), "HH:mm")} - 
+                                                {format(parseISO(shift.endTime), "HH:mm")}
+                                              </div>
+                                              <div className="text-sm">
+                                                Status: {shift.status}
+                                                {isChanged && " (Änderung angefragt)"}
+                                              </div>
+                                              {shift.notes && (
+                                                <div className="text-sm">
+                                                  Notizen: {shift.notes}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    );
+                                  })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <DragOverlay>
+                        {draggedShift && (
                           <div
-                            key={i}
-                            className="absolute text-sm text-gray-500"
-                            style={{ left: `${(i / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%` }}
+                            className={cn(
+                              "h-12 rounded-md px-2 text-sm font-medium text-white",
+                              "flex items-center justify-center",
+                              {
+                                "bg-green-500": draggedShift.status === "confirmed",
+                                "bg-yellow-500": draggedShift.status === "pending",
+                                "bg-red-500": draggedShift.status === "sick",
+                              }
+                            )}
+                            style={{ width: calculateShiftStyle(draggedShift).width }}
                           >
-                            {String(WORKING_HOURS.start + i).padStart(2, '0')}:00
+                            {format(parseISO(draggedShift.startTime), "HH:mm")} - 
+                            {format(parseISO(draggedShift.endTime), "HH:mm")}
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Shifts */}
-                      <div className="space-y-4">
-                        {employees?.map(employee => (
-                          <div key={employee.id} className="relative h-16 border-t border-gray-100 first:border-t-0">
-                            <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center pr-4">
-                              <div className="truncate">
-                                <div className="font-medium">{employee.name}</div>
-                                <div className="text-sm text-gray-500">{employee.role}</div>
-                              </div>
-                            </div>
-
-                            <div className="relative ml-48 h-full bg-gray-50">
-                              {/* Time slots background */}
-                              <div className="absolute inset-0 grid grid-cols-16 gap-0">
-                                {Array.from({ length: 16 }).map((_, i) => (
-                                  <div
-                                    key={i}
-                                    className="h-full border-l border-gray-200 first:border-l-0"
-                                  />
-                                ))}
-                              </div>
-
-                              {/* Employee's shifts */}
-                              {todaysShifts
-                                .filter(shift => shift.employeeId === employee.id)
-                                .map(shift => {
-                                  const style = calculateShiftStyle(shift);
-                                  const isChanged = shiftChanges?.some(
-                                    change => change.shiftId === shift.id && change.requestStatus === "pending"
-                                  );
-
-                                  return (
-                                    <TooltipProvider key={shift.id}>
-                                      <Tooltip>
-                                        <TooltipTrigger>
-                                          <div
-                                            className={cn(
-                                              "absolute top-2 h-12 rounded-md cursor-pointer transition-all",
-                                              "flex items-center justify-center text-sm font-medium text-white",
-                                              {
-                                                "bg-green-500": shift.status === "confirmed",
-                                                "bg-yellow-500": isChanged,
-                                                "bg-red-500": shift.status === "sick",
-                                              }
-                                            )}
-                                            style={style}
-                                            onClick={() => {
-                                              setSelectedShift(shift);
-                                              setIsChangeDialogOpen(true);
-                                            }}
-                                          >
-                                            <div className="px-2 truncate">
-                                              {format(new Date(shift.startTime), "HH:mm")} - 
-                                              {format(new Date(shift.endTime), "HH:mm")}
-                                            </div>
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <div className="space-y-1">
-                                            <div className="font-medium">{employee.name}</div>
-                                            <div className="text-sm">
-                                              {format(new Date(shift.startTime), "HH:mm")} - 
-                                              {format(new Date(shift.endTime), "HH:mm")}
-                                            </div>
-                                            <div className="text-sm">
-                                              Status: {shift.status}
-                                              {isChanged && " (Änderung angefragt)"}
-                                            </div>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                        )}
+                      </DragOverlay>
+                    </DndContext>
                   )}
                 </ScrollArea>
               </div>
@@ -475,7 +501,7 @@ export default function SchedulePage() {
                         <Button
                           variant="outline"
                           className="w-full justify-start"
-                          onClick={() => setIsChangeDialogOpen(true)}
+                          onClick={() => setDialogMode("change")}
                         >
                           <ArrowLeftRight className="mr-2 h-4 w-4" />
                           Schicht tauschen
@@ -498,30 +524,43 @@ export default function SchedulePage() {
                   </Card>
                 )}
 
-                <Card className="bg-gradient-to-br from-blue-50 to-blue-50/50 border-blue-100">
+                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50/50 border-blue-100">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-lg font-semibold text-blue-700">
-                      KI-Empfehlungen
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold text-blue-700">
+                        KI-Empfehlungen
+                      </CardTitle>
+                      <CalendarComponent className="h-5 w-5 text-blue-500" />
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <p className="text-sm text-blue-600/90">
-                        Basierend auf der aktuellen Planung und den Mitarbeiterpräferenzen:
-                      </p>
-                      {isLoadingAI ? (
-                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100">
-                          <div className="animate-pulse space-y-2">
-                            <div className="h-4 bg-blue-100 rounded w-3/4"></div>
-                            <div className="h-4 bg-blue-100 rounded w-1/2"></div>
-                            <div className="h-4 bg-blue-100 rounded w-2/3"></div>
-                          </div>
+                      <div className="text-sm text-blue-700/90 font-medium">
+                        Optimierungsvorschläge:
+                      </div>
+                      <div className="space-y-3">
+                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
+                          <div className="font-medium text-blue-800 mb-1">Schichtverteilung</div>
+                          <p className="text-sm text-blue-600/90">
+                            Die aktuelle Verteilung zeigt Lücken im Spätdienst. 
+                            Erwägen Sie zusätzliche Schichten zwischen 14:00 und 22:00 Uhr.
+                          </p>
                         </div>
-                      ) : (
-                        <div className="max-h-[calc(100vh-16rem)] overflow-y-auto rounded-md bg-white/80 backdrop-blur-sm p-3 text-sm border border-blue-100 whitespace-pre-line">
-                          {aiRecommendations || "Keine KI-Empfehlungen verfügbar."}
+                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
+                          <div className="font-medium text-blue-800 mb-1">Qualifikationen</div>
+                          <p className="text-sm text-blue-600/90">
+                            Stellen Sie sicher, dass in jeder Schicht mindestens eine 
+                            Pflegefachkraft verfügbar ist.
+                          </p>
                         </div>
-                      )}
+                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
+                          <div className="font-medium text-blue-800 mb-1">Arbeitszeiten</div>
+                          <p className="text-sm text-blue-600/90">
+                            Beachten Sie die Ruhezeiten zwischen den Schichten von 
+                            mindestens 11 Stunden.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -529,47 +568,152 @@ export default function SchedulePage() {
             </ScrollArea>
           </div>
 
-          {/* Shift Change Dialog */}
-          <Dialog open={isChangeDialogOpen} onOpenChange={setIsChangeDialogOpen}>
-            <DialogContent className="sm:max-w-[425px]">
+          {/* Shift Dialog */}
+          <Dialog open={!!dialogMode} onOpenChange={(open) => !open && setDialogMode(null)}>
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Schicht ändern</DialogTitle>
+                <DialogTitle>
+                  {dialogMode === "create" ? "Neue Schicht erstellen" :
+                   dialogMode === "edit" ? "Schicht bearbeiten" :
+                   "Schicht ändern"}
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Art der Änderung</Label>
-                  <Select
-                    onValueChange={(value) => {
-                      if (selectedShift) {
-                        requestShiftChange.mutate({
-                          shiftId: selectedShift.id,
-                          type: value as "swap" | "cancel" | "modify",
-                          details: {
-                            reason: "Änderungsanfrage",
-                          },
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Bitte wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="swap">Schicht tauschen</SelectItem>
-                      <SelectItem value="cancel">Schicht absagen</SelectItem>
-                      <SelectItem value="modify">Zeit ändern</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Grund der Änderung</Label>
-                  <Textarea
-                    placeholder="Bitte geben Sie den Grund für die Änderung an"
-                    className="min-h-[100px]"
-                  />
+              {dialogMode === "change" ? (
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Art der Änderung</Label>
+                    <Select
+                      onValueChange={(value) => {
+                        if (selectedShift) {
+                          requestShiftChange.mutate({
+                            shiftId: selectedShift.id,
+                            type: value as "swap" | "cancel" | "modify",
+                            details: {
+                              reason: "Änderungsanfrage",
+                            },
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Bitte wählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="swap">Mit anderem Mitarbeiter tauschen</SelectItem>
+                        <SelectItem value="cancel">Schicht absagen</SelectItem>
+                        <SelectItem value="modify">Arbeitszeit ändern</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Grund der Änderung</Label>
+                    <Textarea
+                      placeholder="Bitte geben Sie den Grund für die Änderung an"
+                      className="min-h-[100px]"
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <form onSubmit={handleSubmitShift} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="employeeId">Mitarbeiter</Label>
+                    <Select 
+                      name="employeeId" 
+                      defaultValue={selectedShift?.employeeId.toString()}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Mitarbeiter auswählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {employees?.map((employee) => (
+                          <SelectItem key={employee.id} value={String(employee.id)}>
+                            {employee.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Schichttyp</Label>
+                    <Select 
+                      name="type" 
+                      defaultValue={selectedShift?.type}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Schichttyp auswählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="regular">Regulär</SelectItem>
+                        <SelectItem value="on-call">Bereitschaft</SelectItem>
+                        <SelectItem value="overtime">Überstunden</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startTime">Startzeit</Label>
+                      <Input
+                        id="startTime"
+                        name="startTime"
+                        type="time"
+                        defaultValue={selectedShift ? 
+                          format(parseISO(selectedShift.startTime), "HH:mm") :
+                          undefined
+                        }
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endTime">Endzeit</Label>
+                      <Input
+                        id="endTime"
+                        name="endTime"
+                        type="time"
+                        defaultValue={selectedShift ? 
+                          format(parseISO(selectedShift.endTime), "HH:mm") :
+                          undefined
+                        }
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Notizen</Label>
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      placeholder="Zusätzliche Informationen zur Schicht"
+                      defaultValue={selectedShift?.notes || ""}
+                    />
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setDialogMode(null)}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={dialogMode === "create" ? createShift.isPending : updateShift.isPending}
+                    >
+                      {dialogMode === "create" ? 
+                        (createShift.isPending ? "Wird erstellt..." : "Schicht erstellen") :
+                        (updateShift.isPending ? "Wird gespeichert..." : "Änderungen speichern")
+                      }
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
             </DialogContent>
           </Dialog>
         </div>
