@@ -10,8 +10,6 @@ import {
   Gear,
   CaretLeft,
   Calendar,
-  CurrencyCircleDollar,
-  Timer
 } from "phosphor-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,8 +20,6 @@ const primaryNavigation = [
   { name: "Touren", href: "/tours", icon: Path },
   { name: "Dokumentation", href: "/documentation", icon: ClipboardText },
   { name: "Dienstplan", href: "/schedule", icon: Calendar },
-  { name: "Abrechnung", href: "/billing", icon: CurrencyCircleDollar },
-  { name: "Verfallsdatum", href: "/expiry", icon: Timer },
 ];
 
 const secondaryNavigation = [

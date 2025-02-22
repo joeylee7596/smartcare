@@ -1,0 +1,111 @@
+Detailed Explanation of the Duty Roster (Dienstplan) Feature in SmartCare
+
+The Duty Roster (Schichtplan / Dienstplan) feature in SmartCare is designed to simplify staff scheduling, ensure compliance with work regulations, and optimize workforce distribution using AI-assisted planning. The goal is to reduce the administrative burden while ensuring that the right employee is assigned to the right patient, at the right time, based on their skills, contract type, and availability.
+
+User Interface & Layout
+
+The Duty Roster page is divided into three main sections:
+	1.	Left Sidebar (Navigation & Filters)
+	•	Quick access to other sections like Dashboard, Tours, Employees, Patients, and Reports.
+	•	Filters to show employees based on full-time (Vollzeit), part-time (Teilzeit), on-call (Bereitschaft), or off-duty.
+	•	Option to filter by skills & qualifications (e.g., wound care, dementia care, injections, etc.).
+	2.	Main Planning Area (Shift Overview & Editing)
+	•	Displays a weekly or monthly calendar view of all scheduled shifts in a Gantt-chart style layout.
+	•	Each row represents an employee, and each assigned shift is a colored block.
+	•	Color coding:
+	•	Green → Assigned & Confirmed Shift
+	•	Yellow → Pending AI Optimization
+	•	Red → Overbooking / Conflict Detected
+	•	Shift Editing & Assignments:
+	•	Click on an empty slot → Opens a pop-up to assign a new shift.
+	•	Click on an existing shift → Opens a detailed view with edit & delete options.
+	3.	Right Panel (AI Suggestions & Real-Time Warnings)
+	•	Shows AI-driven recommendations for optimal shift assignments.
+	•	Displays real-time warnings for scheduling conflicts, missing employees, overtime violations.
+	•	A quick overview of uncovered shifts that need immediate attention.
+
+Core Features & Functionality
+
+1. Employee Database Integration
+	•	The scheduling system pulls real-time data from the employee database, ensuring accurate planning.
+	•	Employees have stored attributes:
+	•	Name, Role, and Shift Preferences (Day/Night/Weekend).
+	•	Contract Type (Full-Time, Part-Time, Minijob).
+	•	Certifications (Wound care, injections, dementia training, etc.).
+	•	Availability (e.g., vacation, sick leave, time-off requests).
+	•	Employees are automatically categorized based on these factors, allowing for efficient filtering.
+
+2. AI-Powered Shift Assignment
+	•	The AI suggests the best employee for each shift based on:
+	•	Availability (No vacation, no conflict).
+	•	Contract Type (Ensures compliance with work hour limits).
+	•	Required Skills (Matches the patient’s needs with the caregiver’s certifications).
+	•	Preferred Shifts (Avoids assigning night shifts to employees who prefer day shifts).
+	•	Workload Distribution (Ensures no employee is overloaded).
+	•	The system marks critical gaps in the schedule and provides alternative assignments.
+	•	Admin can accept AI suggestions or manually override.
+
+3. Shift Optimization & Conflict Detection
+	•	If a shift is overbooked, the system displays a warning (e.g., “Employee already assigned elsewhere”).
+	•	AI recalculates optimal schedules in real time to balance workloads and ensure shifts are evenly distributed.
+	•	The system automatically suggests replacements in case of sick leave.
+
+4. Employee Shift Confirmation & Communication
+	•	Employees receive automated notifications about their assigned shifts.
+	•	They can confirm, request a change, or report a conflict.
+	•	Shift changes trigger instant notifications for managers.
+
+5. Compliance & Work Regulations Check
+	•	The system prevents:
+	•	Overtime violations (Ensures full-time employees do not exceed weekly hour limits).
+	•	Legal rest time violations (Ensures at least 11 hours rest between shifts).
+	•	Weekend rules (Limits maximum number of consecutive weekend shifts).
+	•	If a conflict arises, the AI automatically reassigns shifts to comply with regulations.
+
+6. Real-Time Adjustments & Emergency Assignments
+	•	In case of unexpected sick leave, the system suggests the best available replacement instantly.
+	•	Emergency assignments prioritize part-time and backup employees before asking full-time staff.
+	•	The manager can approve or override AI recommendations.
+
+7. Shift Templates & Recurring Patterns
+	•	Admins can save shift templates for faster scheduling.
+	•	Allows creating recurring weekly shift patterns, reducing repetitive manual work.
+	•	Example: “Every Monday, assign Julia to the 07:00 - 14:00 shift”.
+
+8. Employee Preferences & Workload Balance
+	•	Employees can set shift preferences (e.g., prefers day shifts, no weekends).
+	•	AI adapts scheduling to respect these preferences while maintaining fairness.
+	•	Workload Balancing: No employee should be overworked while others have too few shifts.
+
+9. Reporting & Payroll Integration
+	•	The total worked hours per employee are automatically calculated.
+	•	Overtime tracking ensures compliance with labor laws.
+	•	Data is exportable for payroll processing.
+	•	Monthly attendance reports can be generated with one click.
+
+Workflow of the Shift Scheduling Process
+	1.	Manager opens the Duty Roster page and selects the week/month to plan.
+	2.	The system loads all employees, filtering out unavailable staff.
+	3.	Manager clicks on an empty shift slot to assign a shift.
+	4.	AI suggests the best employee for the shift based on skills, workload, and availability.
+	5.	Manager confirms AI suggestions or manually assigns shifts.
+	6.	If conflicts occur (e.g., overtime, double booking), system highlights errors and suggests solutions.
+	7.	Once finalized, employees receive automatic notifications about their shifts.
+	8.	Employees confirm or request changes, triggering instant updates.
+	9.	In case of emergency replacements, the system auto-suggests backup staff.
+	10.	At the end of the month, the system exports work hour reports for payroll.
+
+Technical Implementation Overview
+	•	Frontend: React (Next.js) with Tailwind CSS for a clean, modern UI.
+	•	Backend: Node.js with Express for API communication.
+	•	Database: PostgreSQL or Firebase to store employee data and shifts.
+	•	AI Optimization: Gemini AI (or GPT API) for intelligent shift assignment.
+	•	Notification System: WebSockets for real-time updates, Email & SMS integration.
+
+Optimized Prompt for KI Development
+
+“Create a fully interactive duty roster (shift planning) system for an ambulatory care SaaS tool. The UI should have a three-panel layout: a sidebar for navigation and filtering, a central shift calendar with a Gantt-chart display, and a right-side AI recommendations panel. Users should be able to create shifts via drag-and-drop and assign employees based on availability, contract type (full-time, part-time), and skills. The AI should optimize shift assignments to prevent scheduling conflicts, ensure fair workload distribution, and suggest replacements in case of sick leave. Work-hour limits, rest-period regulations, and employee preferences should be enforced. Employees should receive automated notifications and be able to confirm or request changes to their shifts. The system should generate payroll reports and integrate with financial processing tools. Use React for the frontend, Node.js for the backend, PostgreSQL for data storage, and AI for smart shift planning. Make sure all updates are real-time and the UI is simple and intuitive for non-technical users.”
+
+This fully thought-out description & prompt ensures that the KI understands exactly what to build and delivers a user-friendly, AI-optimized shift planning system.
+
+Would you like to refine anything or add another feature? 🚀

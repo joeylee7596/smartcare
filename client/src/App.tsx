@@ -12,8 +12,6 @@ import Patients from "@/pages/patients";
 import Tours from "@/pages/tours";
 import Documentation from "@/pages/documentation";
 import Schedule from "@/pages/schedule";
-import Billing from "@/pages/billing";
-import ExpiryTracking from "@/pages/expiry";
 
 function Router() {
   return (
@@ -23,8 +21,6 @@ function Router() {
       <ProtectedRoute path="/tours" component={Tours} />
       <ProtectedRoute path="/documentation" component={Documentation} />
       <ProtectedRoute path="/schedule" component={Schedule} />
-      <ProtectedRoute path="/billing" component={Billing} />
-      <ProtectedRoute path="/expiry" component={ExpiryTracking} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
