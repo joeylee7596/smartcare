@@ -10,6 +10,7 @@ import {
   Gear,
   CaretLeft,
   Calendar,
+  Receipt,
 } from "phosphor-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ const primaryNavigation = [
   { name: "Touren", href: "/tours", icon: Path },
   { name: "Dokumentation", href: "/documentation", icon: ClipboardText },
   { name: "Dienstplan", href: "/schedule", icon: Calendar },
+  { name: "Abrechnung", href: "/billing", icon: Receipt },
 ];
 
 const secondaryNavigation = [
