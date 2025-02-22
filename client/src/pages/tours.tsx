@@ -12,7 +12,6 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   MapPin,
@@ -32,60 +31,136 @@ const WORKING_HOURS = {
   end: 22
 };
 
-const TimelineHour = ({ hour }: { hour: number }) => (
-  <div className="relative w-20 flex-shrink-0 text-center">
-    <span className="text-sm text-gray-500">
-      {String(hour).padStart(2, '0')}:00
-    </span>
-  </div>
-);
+function formatHour(hour: number) {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
 
-const TimelineEvent = ({ 
-  tour, 
-  patients 
-}: { 
+function TimelineHeader() {
+  const hours = Array.from(
+    { length: WORKING_HOURS.end - WORKING_HOURS.start },
+    (_, i) => WORKING_HOURS.start + i
+  );
+
+  return (
+    <div className="flex border-b border-gray-200 pb-2">
+      <div className="w-48 flex-shrink-0 px-4 font-medium text-gray-500">
+        Mitarbeiter
+      </div>
+      <div className="flex-1 flex">
+        {hours.map((hour) => (
+          <div key={hour} className="flex-1 text-center">
+            <span className="text-sm text-gray-500">{formatHour(hour)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface TimelineEventProps {
   tour: Tour;
   patients: Patient[];
-}) => {
+}
+
+function TimelineEvent({ tour, patients }: TimelineEventProps) {
   const startTime = parseISO(tour.date.toString());
   const endTime = addHours(startTime, tour.optimizedRoute?.estimatedDuration || 1);
 
   const startHour = startTime.getHours() + (startTime.getMinutes() / 60);
   const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
 
-  const left = `${((startHour - WORKING_HOURS.start) / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%`;
-  const width = `${(duration / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%`;
+  const totalHours = WORKING_HOURS.end - WORKING_HOURS.start;
+  const startPercentage = ((startHour - WORKING_HOURS.start) / totalHours) * 100;
+  const widthPercentage = (duration / totalHours) * 100;
 
   return (
     <div
       className={cn(
-        "absolute top-0 h-full rounded-xl p-2 cursor-pointer",
-        "transition-all duration-300 group",
+        "absolute h-[calc(100%-8px)] m-1 rounded-lg p-2",
+        "transition-all duration-300 group cursor-pointer",
         "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
-        tour.status === "active" ? "bg-green-100 border border-green-200" :
-        tour.status === "completed" ? "bg-blue-100 border border-blue-200" :
-        "bg-amber-100 border border-amber-200"
+        {
+          "bg-green-100 border border-green-200 hover:bg-green-200": tour.status === "active",
+          "bg-blue-100 border border-blue-200 hover:bg-blue-200": tour.status === "completed",
+          "bg-amber-100 border border-amber-200 hover:bg-amber-200": tour.status === "scheduled"
+        }
       )}
-      style={{ left, width }}
+      style={{
+        left: `${startPercentage}%`,
+        width: `${widthPercentage}%`,
+      }}
     >
-      <div className="flex items-center h-full">
-        <div className="space-y-1 overflow-hidden">
-          <div className="flex items-center gap-2">
-            <Clock className="h-3 w-3" />
-            <span className="text-xs font-medium">
-              {format(startTime, "HH:mm")}
-            </span>
-          </div>
-          <div className="text-xs font-medium truncate">
-            {tour.patientIds.map(id => 
-              patients.find(p => p.id === id)?.name
-            ).join(", ")}
-          </div>
+      <div className="h-full flex flex-col justify-center overflow-hidden">
+        <div className="flex items-center gap-2 mb-0.5">
+          <Clock className="h-3 w-3 text-gray-500" />
+          <span className="text-xs font-medium text-gray-700">
+            {format(startTime, "HH:mm")}
+          </span>
+        </div>
+        <div className="text-xs font-medium text-gray-700 truncate">
+          {tour.patientIds.map(id => 
+            patients.find(p => p.id === id)?.name
+          ).join(", ")}
         </div>
       </div>
     </div>
   );
-};
+}
+
+function TimelineRow({ employee, tours, patients }: { 
+  employee: Employee;
+  tours: Tour[];
+  patients: Patient[];
+}) {
+  const employeeTours = tours.filter(tour => tour.employeeId === employee.id);
+
+  return (
+    <div className="group">
+      <div className="flex items-center min-h-[100px] relative">
+        <div className="w-48 flex-shrink-0 px-4">
+          <div className="font-medium text-gray-700">{employee.name}</div>
+          <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+            <Clock className="h-4 w-4" />
+            <span>{employeeTours.length} Touren</span>
+          </div>
+          {employee.qualifications.nursingDegree && (
+            <Badge variant="secondary" className="mt-2">
+              <Shield className="h-3 w-3 mr-1" />
+              Examiniert
+            </Badge>
+          )}
+        </div>
+        <div className="flex-1 relative">
+          {/* Hour markers */}
+          <div className="absolute inset-0 flex">
+            {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start }).map((_, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex-1 border-l border-gray-100",
+                  "group-hover:border-gray-200 transition-colors duration-200",
+                  i === 0 && "border-l-0"
+                )}
+              />
+            ))}
+          </div>
+
+          {/* Background */}
+          <div className="absolute inset-0 bg-gray-50/50 rounded-xl" />
+
+          {/* Events */}
+          {employeeTours.map(tour => (
+            <TimelineEvent
+              key={tour.id}
+              tour={tour}
+              patients={patients}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Tours() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -105,11 +180,6 @@ export default function Tours() {
 
   const dateFilteredTours = tours.filter(tour => 
     isSameDay(parseISO(tour.date.toString()), selectedDate)
-  );
-
-  const timelineHours = Array.from(
-    { length: WORKING_HOURS.end - WORKING_HOURS.start },
-    (_, i) => WORKING_HOURS.start + i
   );
 
   return (
@@ -169,7 +239,7 @@ export default function Tours() {
             </div>
 
             <Button
-              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg"
               size="lg"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -235,49 +305,17 @@ export default function Tours() {
               </CardHeader>
               <CardContent>
                 <div className="relative">
-                  {/* Timeline Header */}
-                  <div className="flex border-b pb-2 mb-4">
-                    <div className="w-48 flex-shrink-0">Mitarbeiter</div>
-                    <div className="flex-1 flex">
-                      {timelineHours.map(hour => (
-                        <TimelineHour key={hour} hour={hour} />
-                      ))}
-                    </div>
-                  </div>
+                  <TimelineHeader />
 
-                  {/* Timeline Content */}
-                  <div className="space-y-6">
+                  {/* Timeline Rows */}
+                  <div className="mt-4 space-y-4">
                     {employees.map(employee => (
-                      <div key={employee.id} className="relative">
-                        <div className="flex items-center mb-4">
-                          <div className="w-48 flex-shrink-0">
-                            <p className="font-medium">{employee.name}</p>
-                          </div>
-                          <div className="flex-1 relative h-16 bg-gray-50 rounded-xl">
-                            {/* Hour markers */}
-                            <div className="absolute inset-0 flex">
-                              {timelineHours.map(hour => (
-                                <div 
-                                  key={hour} 
-                                  className="flex-1 border-l border-gray-200 first:border-l-0"
-                                />
-                              ))}
-                            </div>
-
-                            {/* Events */}
-                            {dateFilteredTours
-                              .filter(tour => tour.employeeId === employee.id)
-                              .map(tour => (
-                                <TimelineEvent
-                                  key={tour.id}
-                                  tour={tour}
-                                  patients={patients}
-                                />
-                              ))
-                            }
-                          </div>
-                        </div>
-                      </div>
+                      <TimelineRow
+                        key={employee.id}
+                        employee={employee}
+                        tours={dateFilteredTours}
+                        patients={patients}
+                      />
                     ))}
                   </div>
                 </div>
@@ -286,7 +324,7 @@ export default function Tours() {
           </div>
 
           {/* AI Recommendations */}
-          <Card className="rounded-2xl border border-white/40 bg-white/80
+          <Card className="mt-6 rounded-2xl border border-white/40 bg-white/80
             backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
             hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
             transition-all duration-500">
