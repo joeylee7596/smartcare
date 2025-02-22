@@ -23,7 +23,8 @@ import {
   Brain,
   Shield,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MapIcon
 } from "lucide-react";
 
 const WORKING_HOURS = {
@@ -43,7 +44,7 @@ function TimelineHeader() {
 
   return (
     <div className="flex border-b border-gray-200 pb-2">
-      <div className="w-48 flex-shrink-0 px-4 font-medium text-gray-500">
+      <div className="w-64 flex-shrink-0 px-4 font-medium text-gray-500">
         Mitarbeiter
       </div>
       <div className="flex-1 flex">
@@ -116,8 +117,8 @@ function TimelineRow({ employee, tours, patients }: {
 
   return (
     <div className="group">
-      <div className="flex items-center min-h-[100px] relative">
-        <div className="w-48 flex-shrink-0 px-4">
+      <div className="flex items-center min-h-[100px] relative border-b border-gray-100 last:border-b-0">
+        <div className="w-64 flex-shrink-0 px-4">
           <div className="font-medium text-gray-700">{employee.name}</div>
           <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
             <Clock className="h-4 w-4" />
@@ -130,7 +131,7 @@ function TimelineRow({ employee, tours, patients }: {
             </Badge>
           )}
         </div>
-        <div className="flex-1 relative">
+        <div className="flex-1 relative px-2">
           {/* Hour markers */}
           <div className="absolute inset-0 flex">
             {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start }).map((_, i) => (
@@ -298,56 +299,76 @@ export default function Tours() {
               </CardContent>
             </Card>
 
-            {/* Timeline */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Tagesübersicht</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <TimelineHeader />
-
-                  {/* Timeline Rows */}
-                  <div className="mt-4 space-y-4">
-                    {employees.map(employee => (
-                      <TimelineRow
-                        key={employee.id}
-                        employee={employee}
-                        tours={dateFilteredTours}
-                        patients={patients}
-                      />
-                    ))}
+            {/* Right Content Area */}
+            <div className="space-y-6">
+              {/* Timeline */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle>Tagesübersicht</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative">
+                    <TimelineHeader />
+                    {/* Timeline Rows */}
+                    <div className="mt-4">
+                      {employees.map(employee => (
+                        <TimelineRow
+                          key={employee.id}
+                          employee={employee}
+                          tours={dateFilteredTours}
+                          patients={patients}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                </CardContent>
+              </Card>
 
-          {/* AI Recommendations */}
-          <Card className="mt-6 rounded-2xl border border-white/40 bg-white/80
-            backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
-            hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
-            transition-all duration-500">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-blue-500" />
-                <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
-                  bg-clip-text text-transparent">
-                  KI-Empfehlungen
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-sm text-gray-600">
-                <p>Basierend auf der aktuellen Planung empfehlen wir:</p>
-                <ul className="list-disc pl-4 space-y-2">
-                  <li>Tour #2 sollte aufgrund der Pflegestufen neu priorisiert werden</li>
-                  <li>Mitarbeiter mit Wundversorgungsqualifikation für Patient Schmidt einplanen</li>
-                  <li>Routenoptimierung könnte 45 Minuten Fahrzeit einsparen</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Map Card */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Kartenansicht</CardTitle>
+                    <Button variant="outline" size="sm">
+                      <MapIcon className="h-4 w-4 mr-2" />
+                      Vollbild
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] rounded-xl bg-gray-100 flex items-center justify-center">
+                    <MapIcon className="h-12 w-12 text-gray-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Recommendations */}
+              <Card className="rounded-2xl border border-white/40 bg-white/80
+                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+                transition-all duration-500">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-blue-500" />
+                    <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
+                      bg-clip-text text-transparent">
+                      KI-Empfehlungen
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 text-sm text-gray-600">
+                    <p>Basierend auf der aktuellen Planung empfehlen wir:</p>
+                    <ul className="list-disc pl-4 space-y-2">
+                      <li>Tour #2 sollte aufgrund der Pflegestufen neu priorisiert werden</li>
+                      <li>Mitarbeiter mit Wundversorgungsqualifikation für Patient Schmidt einplanen</li>
+                      <li>Routenoptimierung könnte 45 Minuten Fahrzeit einsparen</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </main>
       </div>
     </div>
