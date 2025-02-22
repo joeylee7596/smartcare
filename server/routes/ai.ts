@@ -26,6 +26,24 @@ const carePredictionSchema = z.object({
   }),
 });
 
+const shiftOptimizationSchema = z.object({
+  employeeData: z.array(z.object({
+    id: z.number(),
+    name: z.string(),
+    role: z.string(),
+    workingHours: z.any(),
+    qualifications: z.any(),
+  })),
+  currentShifts: z.array(z.object({
+    id: z.number(),
+    employeeId: z.number(),
+    startTime: z.string(),
+    endTime: z.string(),
+    type: z.string(),
+  })).optional(),
+  date: z.string(),
+});
+
 router.post("/patient-insights", async (req, res) => {
   try {
     const { patientData } = patientInsightsSchema.parse(req.body);
@@ -33,7 +51,6 @@ router.post("/patient-insights", async (req, res) => {
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
     const prompt = `Als medizinischer Assistent, analysiere bitte die folgenden Patientendaten und erstelle eine professionelle Zusammenfassung. Berücksichtige dabei den Pflegegrad und alle verfügbaren Informationen.
-
 Patient: ${patientData.name}
 Pflegegrad: ${patientData.careLevel}
 ${patientData.medications?.length ? `Medikamente: ${patientData.medications.join(", ")}` : ''}
@@ -136,6 +153,68 @@ Die Prognose soll als Entscheidungshilfe für die Pflegeplanung dienen.`;
     } else {
       res.status(500).json({ 
         error: "Pflegebedarfsprognose konnte nicht erstellt werden",
+        details: "Unbekannter Fehler"
+      });
+    }
+  }
+});
+
+router.post("/shift-optimization", async (req, res) => {
+  try {
+    const { employeeData, currentShifts, date } = shiftOptimizationSchema.parse(req.body);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const prompt = `Als KI-Assistent für Dienstplanoptimierung, analysiere bitte die folgenden Mitarbeiter- und Schichtdaten und erstelle Empfehlungen für eine optimale Schichtplanung.
+
+Datum: ${date}
+
+Mitarbeiterdaten:
+${employeeData.map(emp => `- ${emp.name} (${emp.role})
+  Qualifikationen: ${Object.entries(emp.qualifications).filter(([_, val]) => val === true).map(([key]) => key).join(', ')}
+  Arbeitszeiten: ${Object.entries(emp.workingHours).filter(([_, val]) => val.isWorkingDay).map(([day]) => day).join(', ')}
+`).join('\n')}
+
+${currentShifts ? `Aktuelle Schichten:
+${currentShifts.map(shift => {
+  const employee = employeeData.find(emp => emp.id === shift.employeeId);
+  return `- ${employee?.name}: ${new Date(shift.startTime).toLocaleTimeString('de-DE')} - ${new Date(shift.endTime).toLocaleTimeString('de-DE')} (${shift.type})`;
+}).join('\n')}` : ''}
+
+Bitte erstelle eine Analyse mit folgenden Punkten:
+
+1. Schichtoptimierung
+   - Vorschläge für optimale Schichtverteilung
+   - Berücksichtigung von Qualifikationen und Verfügbarkeit
+   - Identifizierung von Engpässen oder Überbesetzungen
+
+2. Risiken & Empfehlungen
+   - Potenzielle Konflikte oder Probleme
+   - Konkrete Verbesserungsvorschläge
+   - Präventive Maßnahmen
+
+3. Compliance & Fairness
+   - Einhaltung von Arbeitszeiten und Ruhephasen
+   - Ausgewogene Verteilung der Arbeitsbelastung
+   - Berücksichtigung von Mitarbeiterpräferenzen
+
+Die Empfehlungen sollen praktisch umsetzbar sein und die Effizienz sowie Mitarbeiterzufriedenheit optimieren.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ recommendations: text });
+  } catch (error) {
+    console.error("Shift Optimization Error:", error);
+    if (error instanceof Error) {
+      res.status(500).json({ 
+        error: "Schichtoptimierung konnte nicht durchgeführt werden",
+        details: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        error: "Schichtoptimierung konnte nicht durchgeführt werden",
         details: "Unbekannter Fehler"
       });
     }
