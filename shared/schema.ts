@@ -163,6 +163,54 @@ export const expiryTracking = pgTable("expiry_tracking", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// New tables for duty roster
+export const shifts = pgTable("shifts", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, rejected
+  type: text("type").notNull(), // regular, on-call, overtime
+  notes: text("notes"),
+  aiGenerated: boolean("ai_generated").default(false),
+  conflictInfo: json("conflict_info").$type<{
+    type?: "overtime" | "rest-period" | "qualification";
+    description?: string;
+  }>(),
+  lastModified: timestamp("last_modified").defaultNow(),
+  lastModifiedBy: integer("last_modified_by"),
+});
+
+export const shiftPreferences = pgTable("shift_preferences", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  preferredShiftTypes: json("preferred_shift_types").$type<string[]>().notNull(),
+  preferredDays: json("preferred_days").$type<string[]>().notNull(),
+  maxShiftsPerWeek: integer("max_shifts_per_week").notNull(),
+  minRestHours: integer("min_rest_hours").notNull().default(11),
+  blackoutDates: json("blackout_dates").$type<string[]>().notNull(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+export const shiftChanges = pgTable("shift_changes", {
+  id: serial("id").primaryKey(),
+  shiftId: integer("shift_id").notNull(),
+  requestedBy: integer("requested_by").notNull(),
+  requestType: text("request_type").notNull(), // swap, cancel, modify
+  requestStatus: text("request_status").notNull().default("pending"),
+  requestDetails: json("request_details").$type<{
+    reason: string;
+    proposedChanges?: {
+      startTime?: string;
+      endTime?: string;
+      newEmployeeId?: number;
+    };
+  }>().notNull(),
+  responseNote: text("response_note"),
+  createdAt: timestamp("created_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+});
+
 export const insertUserSchema = createInsertSchema(users);
 export const insertPatientSchema = createInsertSchema(patients);
 export const insertEmployeeSchema = createInsertSchema(employees);
@@ -179,6 +227,11 @@ export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).ext
     typeof val === 'string' ? new Date(val) : val
   ),
 });
+
+// Create insert schemas for new tables
+export const insertShiftSchema = createInsertSchema(shifts);
+export const insertPreferenceSchema = createInsertSchema(shiftPreferences);
+export const insertChangeSchema = createInsertSchema(shiftChanges);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -197,6 +250,14 @@ export type InsertBilling = z.infer<typeof insertBillingSchema>;
 export type ExpiryTracking = typeof expiryTracking.$inferSelect;
 export type InsertExpiryTracking = z.infer<typeof insertExpiryTrackingSchema>;
 
+// Create types for new tables
+export type Shift = typeof shifts.$inferSelect;
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type ShiftPreference = typeof shiftPreferences.$inferSelect;
+export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
+export type ShiftChange = typeof shiftChanges.$inferSelect;
+export type InsertChange = z.infer<typeof insertChangeSchema>;
+
 export const DocumentationStatus = {
   PENDING: "pending",
   REVIEW: "review",
@@ -204,3 +265,28 @@ export const DocumentationStatus = {
 } as const;
 
 export type DocumentationStatusType = typeof DocumentationStatus[keyof typeof DocumentationStatus];
+
+// Add shift-related constants
+export const ShiftStatus = {
+  PENDING: "pending",
+  CONFIRMED: "confirmed",
+  REJECTED: "rejected",
+} as const;
+
+export const ShiftType = {
+  REGULAR: "regular",
+  ON_CALL: "on-call",
+  OVERTIME: "overtime",
+} as const;
+
+export const ChangeRequestType = {
+  SWAP: "swap",
+  CANCEL: "cancel",
+  MODIFY: "modify",
+} as const;
+
+export const ChangeRequestStatus = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+} as const;

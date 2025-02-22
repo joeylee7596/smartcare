@@ -1,13 +1,14 @@
 import {
-  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, expiryTracking,
-  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, 
-  type Employee, type ExpiryTracking, type InsertExpiryTracking,
-  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, 
-  type InsertBilling, type InsertEmployee
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, shifts, shiftPreferences, shiftChanges,
+  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, type Employee,
+  type Shift, type ShiftPreference, type ShiftChange,
+  type InsertShift, type InsertPreference, type InsertChange,
+  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow,
+  type InsertBilling, type InsertEmployee, type ExpiryTracking, type InsertExpiryTracking
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, desc, not, lte, gte, SQL } from "drizzle-orm";
-import { addDays } from "date-fns";
+import { eq, and, desc, not, lte, gte, between } from "drizzle-orm";
+import { addDays, startOfWeek, endOfWeek } from "date-fns";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -63,6 +64,21 @@ export interface IStorage {
   updateExpiryItem(id: number, item: Partial<InsertExpiryTracking>): Promise<ExpiryTracking>;
   deleteExpiryItem(id: number): Promise<void>;
 
+  // Shift methods
+  getShifts(startDate: Date, endDate: Date): Promise<Shift[]>;
+  getEmployeeShifts(employeeId: number, startDate: Date, endDate: Date): Promise<Shift[]>;
+  createShift(shift: InsertShift): Promise<Shift>;
+  updateShift(id: number, shift: Partial<InsertShift>): Promise<Shift>;
+  deleteShift(id: number): Promise<void>;
+
+  // Shift preferences methods
+  getEmployeePreferences(employeeId: number): Promise<ShiftPreference | undefined>;
+  updateEmployeePreferences(employeeId: number, preferences: Partial<InsertPreference>): Promise<ShiftPreference>;
+
+  // Shift changes methods
+  getShiftChanges(shiftId: number): Promise<ShiftChange[]>;
+  createShiftChange(change: InsertChange): Promise<ShiftChange>;
+  updateShiftChange(id: number, change: Partial<InsertChange>): Promise<ShiftChange>;
   sessionStore: session.Store;
 }
 
@@ -373,6 +389,127 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExpiryItem(id: number): Promise<void> {
     await db.delete(expiryTracking).where(eq(expiryTracking.id, id));
+  }
+
+  // Implement new shift-related methods
+  async getShifts(startDate: Date, endDate: Date): Promise<Shift[]> {
+    return db
+      .select()
+      .from(shifts)
+      .where(
+        and(
+          gte(shifts.startTime, startDate),
+          lte(shifts.endTime, endDate)
+        )
+      )
+      .orderBy(shifts.startTime);
+  }
+
+  async getEmployeeShifts(employeeId: number, startDate: Date, endDate: Date): Promise<Shift[]> {
+    return db
+      .select()
+      .from(shifts)
+      .where(
+        and(
+          eq(shifts.employeeId, employeeId),
+          gte(shifts.startTime, startDate),
+          lte(shifts.endTime, endDate)
+        )
+      )
+      .orderBy(shifts.startTime);
+  }
+
+  async createShift(shift: InsertShift): Promise<Shift> {
+    const [created] = await db
+      .insert(shifts)
+      .values(shift)
+      .returning();
+    return created;
+  }
+
+  async updateShift(id: number, updates: Partial<InsertShift>): Promise<Shift> {
+    const [updated] = await db
+      .update(shifts)
+      .set({
+        ...updates,
+        lastModified: new Date(),
+      })
+      .where(eq(shifts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteShift(id: number): Promise<void> {
+    await db.delete(shifts).where(eq(shifts.id, id));
+  }
+
+  async getEmployeePreferences(employeeId: number): Promise<ShiftPreference | undefined> {
+    const [preferences] = await db
+      .select()
+      .from(shiftPreferences)
+      .where(eq(shiftPreferences.employeeId, employeeId));
+    return preferences;
+  }
+
+  async updateEmployeePreferences(employeeId: number, preferences: Partial<InsertPreference>): Promise<ShiftPreference> {
+    const [existing] = await db
+      .select()
+      .from(shiftPreferences)
+      .where(eq(shiftPreferences.employeeId, employeeId));
+
+    if (existing) {
+      const [updated] = await db
+        .update(shiftPreferences)
+        .set({
+          ...preferences,
+          lastUpdated: new Date(),
+        })
+        .where(eq(shiftPreferences.employeeId, employeeId))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(shiftPreferences)
+      .values({
+        employeeId,
+        preferredShiftTypes: [],
+        preferredDays: [],
+        maxShiftsPerWeek: 5,
+        minRestHours: 11,
+        blackoutDates: [],
+        ...preferences,
+      })
+      .returning();
+    return created;
+  }
+
+  async getShiftChanges(shiftId: number): Promise<ShiftChange[]> {
+    return db
+      .select()
+      .from(shiftChanges)
+      .where(eq(shiftChanges.shiftId, shiftId))
+      .orderBy(desc(shiftChanges.createdAt));
+  }
+
+  async createShiftChange(change: InsertChange): Promise<ShiftChange> {
+    const [created] = await db
+      .insert(shiftChanges)
+      .values(change)
+      .returning();
+    return created;
+  }
+
+  async updateShiftChange(id: number, updates: Partial<InsertChange>): Promise<ShiftChange> {
+    const [updated] = await db
+      .update(shiftChanges)
+      .set({
+        ...updates,
+        respondedAt: updates.requestStatus !== "pending" ? new Date() : undefined,
+      })
+      .where(eq(shiftChanges.id, id))
+      .returning();
+    return updated;
   }
 }
 
