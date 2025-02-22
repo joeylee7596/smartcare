@@ -60,7 +60,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
     code: string;
     description: string;
     amount: number;
-  }>>([]); 
+  }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -162,7 +162,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Fehler beim Abrufen der Vorschläge");
+        throw new Error(error.details || error.error || "Fehler beim Abrufen der Vorschläge");
       }
 
       const suggestions = await response.json();

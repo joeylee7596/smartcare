@@ -329,7 +329,8 @@ router.post("/suggest-services", async (req, res) => {
 
     if (dayDocs.length === 0) {
       return res.status(404).json({
-        error: "Keine Dokumentation für dieses Datum gefunden"
+        error: "Keine Dokumentation für dieses Datum gefunden",
+        details: "Bitte stellen Sie sicher, dass für das ausgewählte Datum eine Dokumentation existiert."
       });
     }
 
@@ -343,7 +344,7 @@ Patient:
 - Versicherung: ${patient.insuranceProvider}
 
 Dokumentation vom ${new Date(date).toLocaleDateString('de-DE')}:
-${dayDocs.map(doc => `- ${doc.notes}`).join('\n')}
+${dayDocs.map(doc => `- ${doc.content}`).join('\n')}
 
 Basierend auf dieser Dokumentation:
 1. Identifiziere die erbrachten Pflegeleistungen
@@ -351,7 +352,7 @@ Basierend auf dieser Dokumentation:
 3. Schlage angemessene Beträge vor
 4. Berücksichtige den Pflegegrad bei der Auswahl
 
-Gib die Vorschläge im folgenden JSON-Format zurück:
+Gib die Vorschläge strikt im folgenden JSON-Format zurück, ohne zusätzlichen Text:
 {
   "services": [
     {
@@ -369,27 +370,41 @@ Gib die Vorschläge im folgenden JSON-Format zurück:
     const text = response.text();
 
     try {
-      // Versuche das JSON zu parsen
-      const suggestions = JSON.parse(text);
-
-      // Validiere das Format
-      if (!Array.isArray(suggestions.services)) {
-        throw new Error("Ungültiges Antwortformat");
+      // Extract JSON from the response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Konnte keine gültigen JSON-Daten aus der KI-Antwort extrahieren");
       }
 
+      const suggestions = JSON.parse(jsonMatch[0]);
+
+      // Validate the format
+      if (!suggestions.services || !Array.isArray(suggestions.services)) {
+        throw new Error("Ungültiges Antwortformat: Services-Array fehlt");
+      }
+
+      // Validate each service
+      suggestions.services = suggestions.services.map(service => ({
+        code: String(service.code || ''),
+        description: String(service.description || ''),
+        amount: Number(service.amount) || 0,
+        confidence: Number(service.confidence) || 0,
+        based_on: String(service.based_on || '')
+      }));
+
       res.json(suggestions);
-    } catch (error) {
-      // Fallback für den Fall, dass die KI kein valides JSON zurückgibt
-      res.status(500).json({
+    } catch (parseError) {
+      console.error("Parse Error:", parseError, "Raw Text:", text);
+      res.status(422).json({
         error: "Fehler bei der Analyse der Dokumentation",
-        details: "Konnte keine gültigen Vorschläge generieren"
+        details: "Die KI-Antwort konnte nicht korrekt verarbeitet werden. Bitte versuchen Sie es erneut."
       });
     }
   } catch (error) {
     console.error("Service Suggestion Error:", error);
     res.status(500).json({
       error: "Fehler bei der Analyse der Dokumentation",
-      details: error instanceof Error ? error.message : "Unbekannter Fehler"
+      details: error instanceof Error ? error.message : "Ein unerwarteter Fehler ist aufgetreten"
     });
   }
 });
