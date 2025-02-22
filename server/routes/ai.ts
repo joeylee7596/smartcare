@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { storage } from "../storage";
 
 const router = Router();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -301,6 +302,94 @@ Gib die verbesserten Beschreibungen im JSON-Format zurück, wobei du für jede L
         details: "Unbekannter Fehler"
       });
     }
+  }
+});
+
+const documentationAnalysisSchema = z.object({
+  patientId: z.number(),
+  date: z.string(),
+});
+
+router.post("/suggest-services", async (req, res) => {
+  try {
+    const { patientId, date } = documentationAnalysisSchema.parse(req.body);
+
+    // Get patient data
+    const patient = await storage.getPatient(patientId);
+    if (!patient) {
+      return res.status(404).json({ error: "Patient nicht gefunden" });
+    }
+
+    // Get documentation for the specified date
+    const docs = await storage.getDocs(patientId);
+    const dayDocs = docs.filter(doc => 
+      new Date(doc.date).toISOString().split('T')[0] === new Date(date).toISOString().split('T')[0]
+    );
+
+    if (dayDocs.length === 0) {
+      return res.status(404).json({ 
+        error: "Keine Dokumentation für dieses Datum gefunden" 
+      });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const prompt = `Als KI-Assistent für Pflegeabrechnungen, analysiere bitte die folgende Pflegedokumentation und schlage passende Leistungen vor.
+
+Patient:
+- Name: ${patient.name}
+- Pflegegrad: ${patient.careLevel}
+- Versicherung: ${patient.insuranceProvider}
+
+Dokumentation vom ${new Date(date).toLocaleDateString('de-DE')}:
+${dayDocs.map(doc => `- ${doc.notes}`).join('\n')}
+
+Basierend auf dieser Dokumentation:
+1. Identifiziere die erbrachten Pflegeleistungen
+2. Ordne sie den entsprechenden Abrechnungscodes zu
+3. Schlage angemessene Beträge vor
+4. Berücksichtige den Pflegegrad bei der Auswahl
+
+Gib die Vorschläge im folgenden JSON-Format zurück:
+{
+  "services": [
+    {
+      "code": "string",
+      "description": "string",
+      "amount": number,
+      "confidence": number,
+      "based_on": "string"
+    }
+  ]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    try {
+      // Versuche das JSON zu parsen
+      const suggestions = JSON.parse(text);
+
+      // Validiere das Format
+      if (!Array.isArray(suggestions.services)) {
+        throw new Error("Ungültiges Antwortformat");
+      }
+
+      res.json(suggestions);
+    } catch (error) {
+      // Fallback für den Fall, dass die KI kein valides JSON zurückgibt
+      res.status(500).json({ 
+        error: "Fehler bei der Analyse der Dokumentation",
+        details: "Konnte keine gültigen Vorschläge generieren"
+      });
+    }
+  } catch (error) {
+    console.error("Service Suggestion Error:", error);
+    res.status(500).json({ 
+      error: "Fehler bei der Analyse der Dokumentation",
+      details: error instanceof Error ? error.message : "Unbekannter Fehler"
+    });
   }
 });
 

@@ -5,15 +5,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Save, Wand2, Plus, Trash2 } from "lucide-react";
+import { FileText, Save, Wand2, Plus, Trash2, Loader2 } from "lucide-react";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+
+interface ServiceSuggestion {
+  code: string;
+  description: string;
+  amount: number;
+  confidence: number;
+  based_on: string;
+}
 
 interface BillingEditorProps {
   billing?: InsuranceBilling;
   patient: Patient;
-  onSave: (billing: Partial<InsuranceBilling>) => void;
+  onSave: (billing: Partial<InsuranceBilling>) => Promise<void>;
 }
 
 // Service catalog with common healthcare services
@@ -50,8 +59,12 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
   const [serviceEntries, setServiceEntries] = useState(billing?.services || []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
-    format(billing?.date ? new Date(billing.date) : new Date(), "yyyy-MM-dd")
+    billing?.date ? format(new Date(billing.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd")
   );
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    services: ServiceSuggestion[];
+  } | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
 
   const suggestedServices = getServiceSuggestions(patient.careLevel);
@@ -123,6 +136,61 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
     }
   };
 
+  // New function to get AI suggestions
+  const getAISuggestions = async () => {
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/ai/suggest-services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: patient.id,
+          date: selectedDate,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Fehler beim Abrufen der Vorschläge");
+      }
+
+      const suggestions = await response.json();
+      setAiSuggestions(suggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("AI Suggestions Error:", error);
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Fehler beim Abrufen der Vorschläge",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Function to apply suggestions
+  const applySuggestions = (selectedSuggestions: ServiceSuggestion[] | undefined) => {
+    if (!selectedSuggestions) return;
+
+    setServiceEntries(prev => [
+      ...prev,
+      ...selectedSuggestions.map(suggestion => ({
+        code: suggestion.code,
+        description: suggestion.description,
+        amount: suggestion.amount
+      }))
+    ]);
+
+    setShowSuggestions(false);
+    setAiSuggestions(null);
+
+    toast({
+      title: "Vorschläge übernommen",
+      description: "Die ausgewählten Leistungen wurden hinzugefügt.",
+    });
+  };
+
   const handleSave = () => {
     if (serviceEntries.length === 0) {
       toast({
@@ -135,19 +203,18 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
 
     // Convert all amounts to proper numeric values
     const validatedServices = serviceEntries.map(service => ({
-      ...service,
-      amount: Number(service.amount) || 0,
       code: service.code || "",
       description: service.description || "",
+      amount: Number(service.amount) || 0,
     }));
 
     const totalAmount = validatedServices.reduce((sum, service) => sum + service.amount, 0);
 
     onSave({
       patientId: patient.id,
-      date: new Date(selectedDate).toISOString(),
+      date: selectedDate, // This will be converted to ISO string in the parent component
       services: validatedServices,
-      totalAmount,
+      totalAmount: totalAmount.toString(),
       status: "pending",
     });
   };
@@ -161,6 +228,19 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
             <span>Leistungserfassung</span>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={getAISuggestions}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4 mr-2" />
+              )}
+              KI-Vorschläge
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -290,6 +370,42 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
           </div>
         </div>
       </CardContent>
+      <AlertDialog open={showSuggestions} onOpenChange={setShowSuggestions}>
+        <AlertDialogContent className="max-w-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>KI-Vorschläge für Leistungen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Basierend auf der Dokumentation vom {format(new Date(selectedDate), "dd.MM.yyyy", { locale: de })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            {aiSuggestions?.services.map((suggestion, index) => (
+              <div key={index} className="p-4 border rounded-lg mb-2 hover:bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{suggestion.code}: {suggestion.description}</p>
+                    <p className="text-sm text-gray-500">Basierend auf: {suggestion.based_on}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{suggestion.amount.toFixed(2)} €</p>
+                    <p className="text-sm text-gray-500">
+                      Konfidenz: {(suggestion.confidence * 100).toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => applySuggestions(aiSuggestions?.services)}>
+              Vorschläge übernehmen
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
