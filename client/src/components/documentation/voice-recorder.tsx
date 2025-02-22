@@ -10,6 +10,10 @@ import { ConfirmationDialog } from "./confirmation-dialog";
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string, sendToReview: boolean) => void;
+  patientContext?: {
+    careLevel?: number;
+    lastVisit?: Date;
+  };
   className?: string;
 }
 
@@ -20,7 +24,7 @@ declare global {
   }
 }
 
-export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecorderProps) {
+export function VoiceRecorder({ onTranscriptionComplete, patientContext, className }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [previewText, setPreviewText] = useState<string>("");
   const [editableText, setEditableText] = useState<string>("");
@@ -33,10 +37,8 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   useEffect(() => {
     return subscribe((message) => {
-      console.log('WebSocket message received:', message); // Debug-Log
       switch (message.type) {
         case 'TRANSCRIPTION_COMPLETE':
-          console.log('Transcription complete, documentation:', message.documentation); // Debug-Log
           setIsProcessing(false);
           setShowConfirmation(true);
           setAiGeneratedText(message.documentation);
@@ -128,15 +130,14 @@ export function VoiceRecorder({ onTranscriptionComplete, className }: VoiceRecor
 
   const handleConfirm = () => {
     setIsProcessing(true);
-    console.log('Sending text for AI processing:', editableText); // Debug-Log
     sendMessage({
       type: 'VOICE_TRANSCRIPTION',
-      audioContent: editableText
+      audioContent: editableText,
+      patientContext: patientContext
     });
   };
 
   const handleDocumentationConfirm = (text: string, sendToReview: boolean) => {
-    console.log('Documentation confirmed:', text, 'Send to review:', sendToReview); // Debug-Log
     onTranscriptionComplete(text, sendToReview);
   };
 

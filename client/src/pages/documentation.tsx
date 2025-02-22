@@ -7,19 +7,22 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { Patient, Documentation as Doc, DocumentationStatus } from "@shared/schema";
 import { Button } from "@/components/ui/button";
-import { Brain, Check, Clock, RefreshCw, Plus, ArrowRight, ArrowLeft } from "lucide-react";
+import { Brain, Check, Clock, RefreshCw, Plus, ArrowRight, ArrowLeft, AlertTriangle, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { VoiceRecorder } from "@/components/documentation/voice-recorder";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function DocumentationPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { sendMessage, subscribe } = useWebSocket();
   const [activePatientId, setActivePatientId] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -29,13 +32,23 @@ function DocumentationPage() {
     queryKey: ["/api/docs"],
   });
 
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery({
+    queryKey: ["/api/templates", activePatientId],
+    enabled: !!activePatientId,
+  });
+
+  const { data: careAnalysis = null } = useQuery({
+    queryKey: ["/api/analysis", activePatientId],
+    enabled: !!activePatientId,
+  });
+
   const docsByStatus = allDocs.reduce((acc, doc) => {
     if (!acc[doc.status]) {
       acc[doc.status] = [];
     }
     acc[doc.status].push(doc);
     return acc;
-  }, {} as Record<DocumentationStatus, Doc[]>);
+  }, {} as Record<typeof DocumentationStatus, Doc[]>);
 
   const updateDocStatusMutation = useMutation({
     mutationFn: async ({ id, status, reviewNotes }: { id: number; status: DocumentationStatus; reviewNotes?: string }) => {
@@ -164,6 +177,33 @@ function DocumentationPage() {
     }
   };
 
+  const handleTemplateUse = async (templateContent: string) => {
+    if (!activePatientId) return;
+
+    try {
+      const newDoc = await createDocMutation.mutateAsync({
+        content: templateContent,
+        patientId: activePatientId,
+        type: "KI-Vorlage",
+        status: DocumentationStatus.PENDING,
+      });
+
+      if (newDoc) {
+        setActivePatientId(null);
+        setSelectedTemplate("");
+        toast({ title: "Vorlage angewendet", description: "Die Vorlage wurde erfolgreich angewendet." });
+        sendMessage({ type: 'DOC_STATUS_UPDATE', docId: newDoc.id, status: newDoc.status });
+        queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
+      }
+    } catch (error) {
+      console.error("Failed to use template:", error);
+      toast({ title: "Fehler", description: error instanceof Error ? error.message : "Die Vorlage konnte nicht angewendet werden.", variant: "destructive" });
+    }
+  };
+
+
+  const activePatient = patients.find(p => p.id === activePatientId);
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-background via-blue-50/20 to-white">
       <Sidebar />
@@ -175,7 +215,7 @@ function DocumentationPage() {
               Dokumentation
             </h1>
             <p className="text-lg text-gray-500">
-              Verwalten Sie hier alle Patientendokumentationen
+              Intelligente Dokumentationsverwaltung mit KI-Unterstützung
             </p>
           </div>
 
@@ -188,25 +228,99 @@ function DocumentationPage() {
             >
               {activePatientId ? (
                 <div className="space-y-4">
-                  <VoiceRecorder
-                    onTranscriptionComplete={handleTranscriptionComplete}
-                    className="mb-4"
-                  />
-                  <Button
-                    variant="outline"
-                    className="w-full text-sm h-12 rounded-xl
-                      bg-gradient-to-r from-white to-blue-50/50
-                      hover:from-blue-50 hover:to-blue-100/50
-                      border border-white/40 hover:border-blue-200
-                      shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
-                      hover:-translate-y-0.5 hover:scale-[1.02]
-                      transition-all duration-500 group"
-                    onClick={() => setActivePatientId(null)}
-                  >
-                    <ArrowLeft className="mr-2 h-4 w-4 transition-transform duration-500 
-                      group-hover:scale-110 group-hover:-translate-x-1" />
-                    Abbrechen
-                  </Button>
+                  <Card className="p-4 border-blue-200/20">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="font-medium">{activePatient?.name}</h3>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant="outline">Pflegegrad {activePatient?.careLevel}</Badge>
+                          {careAnalysis?.riskAreas?.length > 0 && (
+                            <Badge variant="destructive">
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Risikobereiche
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setActivePatientId(null)}
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {careAnalysis && (
+                      <div className="mb-4 p-3 rounded-lg bg-blue-50/50 border border-blue-200/20">
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-blue-500" />
+                          KI-Analyse
+                        </h4>
+                        {careAnalysis.suggestions.length > 0 && (
+                          <ul className="text-sm space-y-1 text-gray-600">
+                            {careAnalysis.suggestions.map((suggestion, i) => (
+                              <li key={i} className="flex items-center gap-2">
+                                <div className="w-1 h-1 rounded-full bg-blue-400" />
+                                {suggestion}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    <Tabs defaultValue="voice" className="mb-4">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="voice">Spracheingabe</TabsTrigger>
+                        <TabsTrigger value="templates">Vorlagen</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="voice">
+                        <VoiceRecorder
+                          onTranscriptionComplete={handleTranscriptionComplete}
+                          patientContext={{
+                            careLevel: activePatient?.careLevel,
+                            lastVisit: activePatient?.lastVisit,
+                          }}
+                        />
+                      </TabsContent>
+                      <TabsContent value="templates">
+                        <div className="space-y-2">
+                          {loadingTemplates ? (
+                            <p>Lade Vorlagen...</p>
+                          ) : templates.length === 0 ? (
+                            <p>Keine Vorlagen verfügbar.</p>
+                          ) : (
+                            templates.map((template, i) => (
+                              <Button
+                                key={i}
+                                variant="outline"
+                                className="w-full justify-start text-left"
+                                onClick={() => setSelectedTemplate(template.content)}
+                              >
+                                <div>
+                                  <div className="font-medium">{template.type}</div>
+                                  <div className="text-sm text-gray-500">
+                                    ~{template.suggestedDuration} Min.
+                                  </div>
+                                </div>
+                              </Button>
+                            ))
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    {selectedTemplate && (
+                      <Button
+                        variant="default"
+                        className="w-full"
+                        onClick={() => handleTemplateUse(selectedTemplate)}
+                      >
+                        Vorlage verwenden
+                      </Button>
+                    )}
+                  </Card>
                 </div>
               ) : (
                 <>
@@ -215,7 +329,7 @@ function DocumentationPage() {
                       key={doc.id}
                       doc={doc}
                       patient={patients.find(p => p.id === doc.patientId)!}
-                      onMoveForward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'forward')}
+                      onMoveForward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'forward')}
                       showMoveForward
                       color="blue"
                     />
@@ -245,8 +359,8 @@ function DocumentationPage() {
                   key={doc.id}
                   doc={doc}
                   patient={patients.find(p => p.id === doc.patientId)!}
-                  onMoveForward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'forward')}
-                  onMoveBackward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'backward')}
+                  onMoveForward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'forward')}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'backward')}
                   showMoveForward
                   showMoveBackward
                   color="amber"
@@ -265,7 +379,7 @@ function DocumentationPage() {
                   key={doc.id}
                   doc={doc}
                   patient={patients.find(p => p.id === doc.patientId)!}
-                  onMoveBackward={() => moveDoc(doc.id, doc.status as DocumentationStatus, 'backward')}
+                  onMoveBackward={() => moveDoc(doc.id, doc.status as typeof DocumentationStatus, 'backward')}
                   showMoveBackward
                   color="green"
                 />
