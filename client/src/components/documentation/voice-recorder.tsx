@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmationDialog } from "./confirmation-dialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface VoiceRecorderProps {
   onTranscriptionComplete: (text: string, sendToReview: boolean) => void;
@@ -32,8 +33,12 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [aiGeneratedText, setAiGeneratedText] = useState<string>("");
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
   const { sendMessage, subscribe } = useWebSocket();
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const animationFrameRef = useRef<number>();
+  const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
     return subscribe((message) => {
@@ -53,6 +58,28 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
       }
     });
   }, [subscribe]);
+
+  useEffect(() => {
+    if (isRecording) {
+      startTimeRef.current = Date.now();
+      const updateDuration = () => {
+        setRecordingDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+        animationFrameRef.current = requestAnimationFrame(updateDuration);
+      };
+      animationFrameRef.current = requestAnimationFrame(updateDuration);
+
+      // Simulate audio level for visual feedback
+      const simulateAudioLevel = () => {
+        setAudioLevel(Math.random() * 100);
+        setTimeout(simulateAudioLevel, 100);
+      };
+      simulateAudioLevel();
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    }
+  }, [isRecording]);
 
   const startRecording = () => {
     try {
@@ -141,6 +168,12 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
     onTranscriptionComplete(text, sendToReview);
   };
 
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   return (
     <>
       <Card className={cn("relative overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300", className)}>
@@ -152,17 +185,26 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
                   <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
                   <span className="text-sm font-medium text-red-500">Aufnahme läuft...</span>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {editableText.length} Zeichen
+                <div className="text-sm font-mono text-muted-foreground">
+                  {formatDuration(recordingDuration)}
                 </div>
               </div>
               <div className="space-y-4">
-                <Progress value={100} className="h-1" />
-                <div className="p-4 bg-muted/30 rounded-lg">
+                <div className="space-y-1">
+                  <Progress value={audioLevel} className="h-1" />
+                  <Progress value={100} className="h-1 opacity-30" />
+                  <Progress value={audioLevel * 0.7} className="h-1 opacity-50" />
+                </div>
+                <motion.div 
+                  className="p-4 bg-muted/30 rounded-lg"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <p className="text-sm font-mono whitespace-pre-wrap">
                     {editableText || "Warte auf Spracheingabe..."}
                   </p>
-                </div>
+                </motion.div>
               </div>
               <Button
                 variant="destructive"
@@ -194,7 +236,12 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
           )}
 
           {editableText && !showConfirmation && !isRecording && (
-            <div className="mt-6 space-y-4 animate-in fade-in-50">
+            <motion.div 
+              className="mt-6 space-y-4 animate-in fade-in-50"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <div className="space-y-2">
                 <label className="text-sm font-medium">Aufgenommener Text:</label>
                 <Textarea
@@ -212,7 +259,7 @@ export function VoiceRecorder({ onTranscriptionComplete, patientContext, classNa
                 <Brain className="mr-2 h-4 w-4" />
                 {isProcessing ? "Verarbeite..." : "Mit KI optimieren"}
               </Button>
-            </div>
+            </motion.div>
           )}
         </CardContent>
       </Card>
