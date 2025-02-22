@@ -15,6 +15,7 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import type { ExpiryTracking } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
+import { Sidebar } from "@/components/layout/sidebar";
 
 export default function ExpiryTrackingPage() {
   const { toast } = useToast();
@@ -50,22 +51,18 @@ export default function ExpiryTrackingPage() {
     return "text-green-500";
   };
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-          </div>
+  const content = isLoading ? (
+    <div className="container mx-auto p-6">
+      <div className="animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+        <div className="space-y-4">
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
+          <div className="h-4 bg-gray-200 rounded w-full"></div>
         </div>
       </div>
-    );
-  }
-
-  return (
+    </div>
+  ) : (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold tracking-tight">Verfallsdatum-Tracking</h1>
@@ -138,6 +135,15 @@ export default function ExpiryTrackingPage() {
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+
+  return (
+    <div className="flex">
+      <Sidebar />
+      <main className="flex-1">
+        {content}
+      </main>
     </div>
   );
 }
