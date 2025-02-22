@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { 
+import {
   Users,
   FileText,
   Route,
@@ -31,17 +31,33 @@ import {
   Tooltip,
   ResponsiveContainer
 } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
-function DashboardCard({ 
-  title, 
-  value, 
-  description, 
+// Background pattern component
+const BackgroundPattern = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="absolute w-[500px] h-[500px] -top-48 -right-48 bg-blue-500/10 rounded-full blur-3xl" />
+    <div className="absolute w-[400px] h-[400px] top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-emerald-500/10 rounded-full blur-3xl" />
+    <div className="absolute w-[600px] h-[600px] -bottom-48 -left-48 bg-indigo-500/10 rounded-full blur-3xl" />
+    <svg className="absolute inset-0 w-full h-full opacity-[0.015]" xmlns="http://www.w3.org/2000/svg">
+      <pattern id="pattern" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+        <path d="M0 32V16L16 0H32V16L16 32" fill="currentColor"/>
+      </pattern>
+      <rect width="100%" height="100%" fill="url(#pattern)"/>
+    </svg>
+  </div>
+);
+
+function DashboardCard({
+  title,
+  value,
+  description,
   icon: Icon,
   trend,
   trendValue,
   className,
   gradient = false
-}: { 
+}: {
   title: string;
   value: number | string;
   description: string;
@@ -52,55 +68,73 @@ function DashboardCard({
   gradient?: boolean;
 }) {
   return (
-    <Card className={cn(
-      "relative overflow-hidden transition-all duration-500",
-      "hover:scale-[1.02] hover:-translate-y-1",
-      "rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]",
-      "hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)]",
-      "border border-white/20 backdrop-blur-sm",
-      gradient && "bg-gradient-to-br from-blue-500/[0.08] via-blue-400/[0.05] to-transparent",
-      className
-    )}>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className={cn(
-            "p-4 rounded-2xl shadow-lg transition-transform duration-500 group-hover:scale-110",
-            gradient 
-              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-500/25" 
-              : "bg-white shadow-blue-500/10"
-          )}>
-            <Icon 
+    <motion.div
+      whileHover={{ scale: 1.02, y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+    >
+      <Card className={cn(
+        "relative overflow-hidden",
+        "rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]",
+        "hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)]",
+        "border border-white/20 backdrop-blur-sm",
+        gradient && "bg-gradient-to-br from-blue-500/[0.08] via-blue-400/[0.05] to-transparent",
+        className
+      )}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <motion.div
+              initial={{ scale: 1 }}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
               className={cn(
-                "h-8 w-8 transition-all duration-500",
-                "group-hover:scale-110 group-hover:rotate-6",
-                !gradient && "text-blue-500"
-              )} 
-            />
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
-              {value}
-            </div>
-            <div className="text-sm text-gray-500 mt-1 flex items-center justify-end gap-2">
-              {trendValue && (
-                <span className={cn(
-                  "px-2 py-0.5 rounded text-xs font-medium",
-                  trend === "up" && "bg-green-100 text-green-700",
-                  trend === "down" && "bg-red-100 text-red-700",
-                  trend === "neutral" && "bg-gray-100 text-gray-700"
-                )}>
-                  {trendValue}
-                </span>
+                "p-4 rounded-2xl shadow-lg",
+                gradient
+                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-500/25"
+                  : "bg-white shadow-blue-500/10"
               )}
-              {description}
+            >
+              <Icon
+                className={cn(
+                  "h-8 w-8",
+                  !gradient && "text-blue-500"
+                )}
+              />
+            </motion.div>
+            <div className="text-right">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent"
+              >
+                {value}
+              </motion.div>
+              <div className="text-sm text-gray-500 mt-1 flex items-center justify-end gap-2">
+                {trendValue && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className={cn(
+                      "px-2 py-0.5 rounded text-xs font-medium",
+                      trend === "up" && "bg-green-100 text-green-700",
+                      trend === "down" && "bg-red-100 text-red-700",
+                      trend === "neutral" && "bg-gray-100 text-gray-700"
+                    )}
+                  >
+                    {trendValue}
+                  </motion.span>
+                )}
+                {description}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="mt-4">
-          <h3 className="font-medium text-sm text-gray-600">{title}</h3>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="mt-4">
+            <h3 className="font-medium text-sm text-gray-600">{title}</h3>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -108,29 +142,38 @@ function ActivityFeed({ activities }: { activities: any[] }) {
   return (
     <ScrollArea className="h-[400px]">
       <div className="space-y-4 pr-4">
-        {activities.map((activity, i) => (
-          <div 
-            key={i}
-            className="flex items-start gap-4 p-4 rounded-xl border bg-white/50 backdrop-blur-sm
-              hover:bg-gradient-to-r hover:from-blue-50 hover:to-white
-              transition-all duration-300 group"
-          >
-            <div className={cn(
-              "p-2 rounded-lg shrink-0",
-              activity.type === "documentation" && "bg-blue-100 text-blue-700",
-              activity.type === "tour" && "bg-green-100 text-green-700",
-              activity.type === "patient" && "bg-amber-100 text-amber-700",
-              activity.type === "alert" && "bg-red-100 text-red-700"
-            )}>
-              {activity.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 truncate">{activity.title}</p>
-              <p className="text-sm text-gray-500">{activity.description}</p>
-            </div>
-            <time className="text-xs text-gray-400">{activity.time}</time>
-          </div>
-        ))}
+        <AnimatePresence>
+          {activities.map((activity, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2, delay: i * 0.1 }}
+              className="flex items-start gap-4 p-4 rounded-xl border bg-white/50 backdrop-blur-sm
+                hover:bg-gradient-to-r hover:from-blue-50 hover:to-white
+                transition-all duration-300 group"
+            >
+              <motion.div
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                className={cn(
+                  "p-2 rounded-lg shrink-0",
+                  activity.type === "documentation" && "bg-blue-100 text-blue-700",
+                  activity.type === "tour" && "bg-green-100 text-green-700",
+                  activity.type === "patient" && "bg-amber-100 text-amber-700",
+                  activity.type === "alert" && "bg-red-100 text-red-700"
+                )}
+              >
+                {activity.icon}
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">{activity.title}</p>
+                <p className="text-sm text-gray-500">{activity.description}</p>
+              </div>
+              <time className="text-xs text-gray-400">{activity.time}</time>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </ScrollArea>
   );
@@ -205,23 +248,34 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white relative">
+      <BackgroundPattern />
       <Sidebar />
       <div className="flex-1">
         <Header />
         <main className="p-8">
           {/* Header Section */}
-          <div className="mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
             <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
               Willkommen zurück, {user?.name}
             </h1>
             <p className="text-lg text-gray-500">
               {format(new Date(), "EEEE, dd. MMMM yyyy", { locale: de })}
             </p>
-          </div>
+          </motion.div>
 
           {/* Overview Cards */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8"
+          >
             <DashboardCard
               title="Aktive Patienten"
               value={patients.length}
@@ -258,121 +312,122 @@ export default function Dashboard() {
               trendValue={`${activeEmployees.length}/${employees.length}`}
               className="bg-gradient-to-br from-emerald-500/[0.08] via-emerald-400/[0.05] to-transparent"
             />
-          </div>
+          </motion.div>
 
           {/* Main Content Area */}
           <div className="grid gap-6 lg:grid-cols-7">
             {/* Left Column: Care Level Distribution */}
-            <Card className="lg:col-span-3 rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-              <CardHeader>
-                <CardTitle className="text-xl text-gray-800">Pflegegrad-Verteilung</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={careLevelData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#3B82F6" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="lg:col-span-3"
+            >
+              <Card className="rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
+                <CardHeader>
+                  <CardTitle className="text-xl text-gray-800">Pflegegrad-Verteilung</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={careLevelData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                        <XAxis dataKey="name" stroke="#6B7280" />
+                        <YAxis stroke="#6B7280" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '0.5rem',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                          }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          fill="#3B82F6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-            {/* Middle Column: Recent Activity */}
-            <Card className="lg:col-span-4 rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-xl text-gray-800">Aktivitäten</CardTitle>
-                <Bell className="h-5 w-5 text-gray-400" />
-              </CardHeader>
-              <CardContent>
-                <ActivityFeed activities={recentActivities} />
-              </CardContent>
-            </Card>
+            {/* Right Column: Recent Activity */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="lg:col-span-4"
+            >
+              <Card className="rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-xl text-gray-800">Aktivitäten</CardTitle>
+                  <Bell className="h-5 w-5 text-gray-400" />
+                </CardHeader>
+                <CardContent>
+                  <ActivityFeed activities={recentActivities} />
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
-            <Link href="/patients/new">
-              <Button 
-                variant="outline" 
-                className="w-full justify-between h-14 rounded-xl
-                  bg-gradient-to-r from-white to-blue-50/50
-                  hover:from-blue-50 hover:to-blue-100/50
-                  border border-white/40 hover:border-blue-200
-                  hover:shadow-lg hover:-translate-y-0.5
-                  transition-all duration-500 group"
-              >
-                <div className="flex items-center">
-                  <Users className="mr-3 h-5 w-5 text-blue-500 
-                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                  <span className="font-medium text-gray-700">Neuer Patient</span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
-                  group-hover:translate-x-1 transition-all duration-500" />
-              </Button>
-            </Link>
-            <Link href="/tours/new">
-              <Button 
-                variant="outline" 
-                className="w-full justify-between h-14 rounded-xl
-                  bg-gradient-to-r from-white to-blue-50/50
-                  hover:from-blue-50 hover:to-blue-100/50
-                  border border-white/40 hover:border-blue-200
-                  hover:shadow-lg hover:-translate-y-0.5
-                  transition-all duration-500 group"
-              >
-                <div className="flex items-center">
-                  <Route className="mr-3 h-5 w-5 text-blue-500 
-                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                  <span className="font-medium text-gray-700">Tour planen</span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
-                  group-hover:translate-x-1 transition-all duration-500" />
-              </Button>
-            </Link>
-            <Link href="/documentation/new">
-              <Button 
-                variant="outline" 
-                className="w-full justify-between h-14 rounded-xl
-                  bg-gradient-to-r from-white to-blue-50/50
-                  hover:from-blue-50 hover:to-blue-100/50
-                  border border-white/40 hover:border-blue-200
-                  hover:shadow-lg hover:-translate-y-0.5
-                  transition-all duration-500 group"
-              >
-                <div className="flex items-center">
-                  <Brain className="mr-3 h-5 w-5 text-blue-500 
-                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                  <span className="font-medium text-gray-700">KI-Dokumentation</span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
-                  group-hover:translate-x-1 transition-all duration-500" />
-              </Button>
-            </Link>
-            <Link href="/schedule">
-              <Button 
-                variant="outline" 
-                className="w-full justify-between h-14 rounded-xl
-                  bg-gradient-to-r from-white to-blue-50/50
-                  hover:from-blue-50 hover:to-blue-100/50
-                  border border-white/40 hover:border-blue-200
-                  hover:shadow-lg hover:-translate-y-0.5
-                  transition-all duration-500 group"
-              >
-                <div className="flex items-center">
-                  <Calendar className="mr-3 h-5 w-5 text-blue-500 
-                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                  <span className="font-medium text-gray-700">Dienstplan</span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
-                  group-hover:translate-x-1 transition-all duration-500" />
-              </Button>
-            </Link>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8"
+          >
+            {[
+              {
+                href: "/patients/new",
+                icon: Users,
+                label: "Neuer Patient"
+              },
+              {
+                href: "/tours/new",
+                icon: Route,
+                label: "Tour planen"
+              },
+              {
+                href: "/documentation/new",
+                icon: Brain,
+                label: "KI-Dokumentation"
+              },
+              {
+                href: "/schedule",
+                icon: Calendar,
+                label: "Dienstplan"
+              }
+            ].map((action) => (
+              <Link key={action.href} href={action.href}>
+                <motion.div
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between h-14 rounded-xl
+                      bg-gradient-to-r from-white to-blue-50/50
+                      hover:from-blue-50 hover:to-blue-100/50
+                      border border-white/40 hover:border-blue-200
+                      hover:shadow-lg
+                      transition-all duration-500 group"
+                  >
+                    <div className="flex items-center">
+                      <action.icon className="mr-3 h-5 w-5 text-blue-500
+                        transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
+                      <span className="font-medium text-gray-700">{action.label}</span>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100
+                      group-hover:translate-x-1 transition-all duration-500" />
+                  </Button>
+                </motion.div>
+              </Link>
+            ))}
+          </motion.div>
         </main>
       </div>
     </div>
