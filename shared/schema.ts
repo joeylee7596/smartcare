@@ -31,6 +31,48 @@ export const patients = pgTable("patients", {
   aiSummary: text("ai_summary"),
   lastVisit: timestamp("last_visit"),
   nextScheduledVisit: timestamp("next_scheduled_visit"),
+  // Added DMRZ.de specific fields
+  contactNetwork: json("contact_network").$type<{
+    relatives: Array<{
+      name: string;
+      relationship: string;
+      phone: string;
+      isEmergencyContact: boolean;
+    }>;
+    caregivers: Array<{
+      name: string;
+      role: string;
+      organization: string;
+      phone: string;
+    }>;
+    physicians: Array<{
+      name: string;
+      specialty: string;
+      practice: string;
+      phone: string;
+    }>;
+  }>(),
+  medicalHistory: json("medical_history").$type<{
+    allergies: string[];
+    preExistingConditions: string[];
+    hospitalizations: Array<{
+      date: string;
+      reason: string;
+      hospital: string;
+    }>;
+  }>(),
+  careLevelAssessment: json("care_level_assessment").$type<{
+    lastAssessment: string;
+    nextAssessment: string;
+    mobilityScore: number;
+    cognitiveScore: number;
+    selfCareScore: number;
+    therapyScore: number;
+    socialScore: number;
+    dailyRoutineScore: number;
+    totalScore: number;
+    mdkNotes: string;
+  }>(),
 });
 
 export const employees = pgTable("employees", {
@@ -97,6 +139,25 @@ export const tours = pgTable("tours", {
   employeeNotes: text("employee_notes"),
   optimizationScore: decimal("optimization_score"),
   matchingScore: decimal("matching_score"),
+  // Added DMRZ.de specific fields
+  economicIndicator: text("economic_indicator").notNull().default("yellow"), // green/yellow/red
+  economicCalculation: json("economic_calculation").$type<{
+    personnelCosts: number;
+    vehicleCosts: number;
+    specialServiceFees: number;
+    totalCosts: number;
+    expectedRevenue: number;
+    profitMargin: number;
+  }>(),
+  mobileDocumentation: json("mobile_documentation").$type<{
+    offlineCapable: boolean;
+    gpsTracking: boolean;
+    signatureRequired: boolean;
+  }>().default({
+    offlineCapable: true,
+    gpsTracking: true,
+    signatureRequired: true,
+  }),
 });
 
 export const documentation = pgTable("documentation", {
@@ -113,6 +174,34 @@ export const documentation = pgTable("documentation", {
   reviewerId: integer("reviewer_id"),
   reviewNotes: text("review_notes"),
   reviewDate: timestamp("review_date"),
+  // Added DMRZ.de specific fields
+  documentClassification: json("document_classification").$type<{
+    category: string;
+    confidentialityLevel: string;
+    retentionPeriod: string;
+    metadataTags: string[];
+    ocrProcessed: boolean;
+    extractedData: Record<string, string>;
+  }>(),
+  mobileCapture: json("mobile_capture").$type<{
+    deviceId: string;
+    gpsLocation?: { lat: number; lng: number };
+    captureMethod: "scan" | "photo" | "voice" | "manual";
+    qrCodeData?: string;
+  }>(),
+  versionControl: json("version_control").$type<{
+    version: number;
+    changes: Array<{
+      timestamp: string;
+      userId: number;
+      description: string;
+    }>;
+    fourEyesPrinciple: {
+      verified: boolean;
+      verifierId?: number;
+      verificationDate?: string;
+    };
+  }>(),
 });
 
 export const workflowTemplates = pgTable("workflow_templates", {
@@ -217,17 +306,108 @@ export const insertPatientSchema = createInsertSchema(patients, {
   aiSummary: z.string().nullable(),
   notes: z.string().nullable(),
   careLevel: z.number().int().min(1).max(5),
+  contactNetwork: z.object({
+    relatives: z.array(z.object({
+      name: z.string(),
+      relationship: z.string(),
+      phone: z.string(),
+      isEmergencyContact: z.boolean()
+    })).default([]),
+    caregivers: z.array(z.object({
+      name: z.string(),
+      role: z.string(),
+      organization: z.string(),
+      phone: z.string()
+    })).default([]),
+    physicians: z.array(z.object({
+      name: z.string(),
+      specialty: z.string(),
+      practice: z.string(),
+      phone: z.string()
+    })).default([])
+  }).nullable(),
+  medicalHistory: z.object({
+    allergies: z.array(z.string()).default([]),
+    preExistingConditions: z.array(z.string()).default([]),
+    hospitalizations: z.array(z.object({
+      date: z.string(),
+      reason: z.string(),
+      hospital: z.string()
+    })).default([])
+  }).nullable(),
+  careLevelAssessment: z.object({
+    lastAssessment: z.string(),
+    nextAssessment: z.string(),
+    mobilityScore: z.number().min(0).max(100),
+    cognitiveScore: z.number().min(0).max(100),
+    selfCareScore: z.number().min(0).max(100),
+    therapyScore: z.number().min(0).max(100),
+    socialScore: z.number().min(0).max(100),
+    dailyRoutineScore: z.number().min(0).max(100),
+    totalScore: z.number().min(0).max(100),
+    mdkNotes: z.string()
+  }).nullable()
+}).extend({
+  // Add any additional validation or transformation logic here
 });
 export const insertEmployeeSchema = createInsertSchema(employees);
 export const insertTourSchema = createInsertSchema(tours).extend({
   date: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
   ),
+  economicIndicator: z.enum(['green', 'yellow', 'red']).default('yellow'),
+  economicCalculation: z.object({
+    personnelCosts: z.number().min(0),
+    vehicleCosts: z.number().min(0),
+    specialServiceFees: z.number().min(0),
+    totalCosts: z.number().min(0),
+    expectedRevenue: z.number().min(0),
+    profitMargin: z.number()
+  }).nullable(),
+  mobileDocumentation: z.object({
+    offlineCapable: z.boolean(),
+    gpsTracking: z.boolean(),
+    signatureRequired: z.boolean()
+  }).default({
+    offlineCapable: true,
+    gpsTracking: true,
+    signatureRequired: true
+  })
 });
 export const insertDocSchema = createInsertSchema(documentation).extend({
   date: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
   ),
+  documentClassification: z.object({
+    category: z.string(),
+    confidentialityLevel: z.enum(['public', 'internal', 'confidential', 'strictly_confidential']),
+    retentionPeriod: z.string(),
+    metadataTags: z.array(z.string()),
+    ocrProcessed: z.boolean(),
+    extractedData: z.record(z.string())
+  }).nullable(),
+  mobileCapture: z.object({
+    deviceId: z.string(),
+    gpsLocation: z.object({
+      lat: z.number(),
+      lng: z.number()
+    }).optional(),
+    captureMethod: z.enum(['scan', 'photo', 'voice', 'manual']),
+    qrCodeData: z.string().optional()
+  }).nullable(),
+  versionControl: z.object({
+    version: z.number(),
+    changes: z.array(z.object({
+      timestamp: z.string(),
+      userId: z.number(),
+      description: z.string()
+    })),
+    fourEyesPrinciple: z.object({
+      verified: z.boolean(),
+      verifierId: z.number().optional(),
+      verificationDate: z.string().optional()
+    })
+  }).nullable()
 });
 export const insertWorkflowSchema = createInsertSchema(workflowTemplates);
 export const insertBillingSchema = createInsertSchema(insuranceBilling);

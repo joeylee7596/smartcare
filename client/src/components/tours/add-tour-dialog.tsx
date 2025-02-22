@@ -1,16 +1,18 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { InsertTour, insertTourSchema, Patient, Employee } from "@shared/schema";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Plus, X, Clock } from "lucide-react";
+import { MapPin, Plus, X, Clock, Euro, Calculator, PhoneCall } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface AddTourDialogProps {
   open: boolean;
@@ -39,6 +41,20 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
       patientIds: [],
       date: selectedDate,
       status: "scheduled",
+      economicIndicator: "yellow",
+      economicCalculation: {
+        personnelCosts: 0,
+        vehicleCosts: 0,
+        specialServiceFees: 0,
+        totalCosts: 0,
+        expectedRevenue: 0,
+        profitMargin: 0
+      },
+      mobileDocumentation: {
+        offlineCapable: true,
+        gpsTracking: true,
+        signatureRequired: true
+      }
     },
   });
 
@@ -48,6 +64,26 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
       const newPatients = [...selectedPatients, patient];
       setSelectedPatients(newPatients);
       form.setValue("patientIds", newPatients.map(p => p.id));
+
+      // Update economic calculations
+      const personnelCosts = newPatients.length * 45; // Base cost per patient
+      const vehicleCosts = calculateVehicleCosts(newPatients);
+      const specialServiceFees = calculateSpecialServiceFees(newPatients);
+      const totalCosts = personnelCosts + vehicleCosts + specialServiceFees;
+      const expectedRevenue = calculateExpectedRevenue(newPatients);
+      const profitMargin = ((expectedRevenue - totalCosts) / totalCosts) * 100;
+
+      const newEconomicCalculation = {
+        personnelCosts,
+        vehicleCosts,
+        specialServiceFees,
+        totalCosts,
+        expectedRevenue,
+        profitMargin
+      };
+
+      form.setValue("economicCalculation", newEconomicCalculation);
+      form.setValue("economicIndicator", profitMargin >= 20 ? "green" : profitMargin >= 10 ? "yellow" : "red");
     }
   };
 
@@ -55,6 +91,44 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
     const newPatients = selectedPatients.filter(p => p.id !== patientId);
     setSelectedPatients(newPatients);
     form.setValue("patientIds", newPatients.map(p => p.id));
+
+    // Recalculate economics after removing patient
+    if (newPatients.length === 0) {
+      const defaultEconomicCalculation = {
+        personnelCosts: 0,
+        vehicleCosts: 0,
+        specialServiceFees: 0,
+        totalCosts: 0,
+        expectedRevenue: 0,
+        profitMargin: 0
+      };
+      form.setValue("economicCalculation", defaultEconomicCalculation);
+      form.setValue("economicIndicator", "yellow");
+    } else {
+      // Trigger recalculation logic
+      addPatient(newPatients[newPatients.length - 1].id.toString());
+    }
+  };
+
+  const calculateVehicleCosts = (patients: Patient[]): number => {
+    // Simplified calculation - in reality would use actual distances and rates
+    return patients.length * 15; // Average vehicle cost per patient
+  };
+
+  const calculateSpecialServiceFees = (patients: Patient[]): number => {
+    return patients.reduce((total, patient) => {
+      // Add fees based on care level and special requirements
+      return total + (patient.careLevel * 10);
+    }, 0);
+  };
+
+  const calculateExpectedRevenue = (patients: Patient[]): number => {
+    return patients.reduce((total, patient) => {
+      // Base rate plus care level multiplier
+      const baseRate = 60;
+      const careLevelMultiplier = patient.careLevel * 15;
+      return total + baseRate + careLevelMultiplier;
+    }, 0);
   };
 
   const mutation = useMutation({
@@ -88,6 +162,15 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
   });
 
   const selectedEmployee = form.watch("employeeId");
+  const economicCalculation = form.watch("economicCalculation") || {
+    personnelCosts: 0,
+    vehicleCosts: 0,
+    specialServiceFees: 0,
+    totalCosts: 0,
+    expectedRevenue: 0,
+    profitMargin: 0
+  };
+  const mobileDocumentation = form.watch("mobileDocumentation");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -187,6 +270,104 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
                 )}
               />
             )}
+
+            {/* Economic Indicators - Show when patients are selected */}
+            {selectedPatients.length > 0 && (
+              <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
+                <h3 className="font-medium flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-primary" />
+                  Wirtschaftlichkeitsberechnung
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Personalkosten</p>
+                    <p className="font-medium">{economicCalculation.personnelCosts.toFixed(2)} €</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Fahrzeugkosten</p>
+                    <p className="font-medium">{economicCalculation.vehicleCosts.toFixed(2)} €</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Erwarteter Umsatz</p>
+                    <p className="font-medium">{economicCalculation.expectedRevenue.toFixed(2)} €</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gewinnmarge</p>
+                    <p className={cn(
+                      "font-medium",
+                      economicCalculation.profitMargin >= 20 ? "text-green-600" :
+                      economicCalculation.profitMargin >= 10 ? "text-amber-600" : "text-red-600"
+                    )}>
+                      {economicCalculation.profitMargin.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Documentation Settings */}
+            <div className="space-y-4 p-4 rounded-lg border bg-accent/5">
+              <h3 className="font-medium flex items-center gap-2">
+                <PhoneCall className="h-4 w-4 text-primary" />
+                Mobile Dokumentation
+              </h3>
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="mobileDocumentation.offlineCapable"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel>Offline-Modus</FormLabel>
+                        <FormDescription>
+                          Ermöglicht die Dokumentation ohne Internetverbindung
+                        </FormDescription>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mobileDocumentation.gpsTracking"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel>GPS-Tracking</FormLabel>
+                        <FormDescription>
+                          Erfasst automatisch die Position bei Leistungserbringung
+                        </FormDescription>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="mobileDocumentation.signatureRequired"
+                  render={({ field }) => (
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <FormLabel>Unterschrift erforderlich</FormLabel>
+                        <FormDescription>
+                          Fordert eine digitale Unterschrift des Patienten an
+                        </FormDescription>
+                      </div>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </div>
+                  )}
+                />
+              </div>
+            </div>
 
             <Button
               type="submit"

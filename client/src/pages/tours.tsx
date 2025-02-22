@@ -27,7 +27,12 @@ import {
   MapIcon,
   Activity,
   Heart,
-  AlertTriangle
+  AlertTriangle,
+  Euro,
+  PhoneCall,
+  WifiOff,
+  Navigation,
+  PenTool
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
 import AddTourDialog from "@/components/tours/add-tour-dialog";
@@ -229,15 +234,20 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                   </div>
                 </div>
               </TooltipTrigger>
-              <TooltipContent 
-                side="top" 
-                className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl
-                  shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]"
+              <TooltipContent
+                side="top"
+                className="bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]"
               >
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Heart className={cn("h-5 w-5", employeeColor.text)} />
-                    <span className="text-lg font-medium">{visit.patient.name}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Heart className={cn("h-5 w-5", employeeColor.text)} />
+                      <span className="text-lg font-medium">{visit.patient.name}</span>
+                    </div>
+                    <Badge variant={tour.economicIndicator as "default" | "destructive" | "outline"}>
+                      <Euro className="h-3.5 w-3.5 mr-1" />
+                      {tour.economicCalculation?.profitMargin.toFixed(1)}%
+                    </Badge>
                   </div>
                   <div className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
                     <div className="flex items-center gap-2 text-gray-500">
@@ -267,6 +277,32 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                         <div className="font-medium text-amber-600">{visit.patient.notes}</div>
                       </>
                     )}
+
+                    {/* Add new mobile documentation status */}
+                    <div className="flex items-center gap-2 text-gray-500">
+                      <PhoneCall className="h-4 w-4" />
+                      <span>Mobile Doku:</span>
+                    </div>
+                    <div className="flex gap-2">
+                      {tour.mobileDocumentation?.offlineCapable && (
+                        <Badge variant="outline" className="h-6">
+                          <WifiOff className="h-3 w-3 mr-1" />
+                          Offline
+                        </Badge>
+                      )}
+                      {tour.mobileDocumentation?.gpsTracking && (
+                        <Badge variant="outline" className="h-6">
+                          <Navigation className="h-3 w-3 mr-1" />
+                          GPS
+                        </Badge>
+                      )}
+                      {tour.mobileDocumentation?.signatureRequired && (
+                        <Badge variant="outline" className="h-6">
+                          <PenTool className="h-3 w-3 mr-1" />
+                          Unterschrift
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </TooltipContent>
