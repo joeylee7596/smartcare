@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Save, Wand2, Copy, CheckCircle2, Plus, Trash2, Calendar } from "lucide-react";
+import { FileText, Save, Wand2, Plus, Trash2 } from "lucide-react";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -18,56 +16,45 @@ interface BillingEditorProps {
   onSave: (billing: Partial<InsuranceBilling>) => void;
 }
 
-// Templates for different insurance providers
-const insuranceTemplates = {
-  "AOK": {
-    title: "AOK Pflegekasse",
-    prefix: `Sehr geehrte Damen und Herren,
+// Service catalog with common healthcare services
+const serviceCatalog = [
+  { code: "P1", description: "Grundpflege", baseAmount: 35.50 },
+  { code: "P2", description: "Behandlungspflege", baseAmount: 45.00 },
+  { code: "P3", description: "Hauswirtschaftliche Versorgung", baseAmount: 28.50 },
+  { code: "P4", description: "Beratungsbesuch", baseAmount: 40.00 },
+  { code: "P5", description: "Pflegevisite", baseAmount: 35.00 },
+];
 
-hiermit reichen wir die Abrechnung für folgende erbrachte Pflegeleistungen ein:`,
-    footer: `Mit freundlichen Grüßen
-{{care_provider}}
+// Get service suggestions based on patient's care level
+const getServiceSuggestions = (careLevel: number) => {
+  const suggestions = [];
 
-Anlagen:
-- Leistungsnachweis
-- Pflegedokumentation`
-  },
-  "TK": {
-    title: "Techniker Krankenkasse",
-    prefix: `Sehr geehrte Damen und Herren,
-
-gemäß Versorgungsvertrag übermitteln wir Ihnen die Abrechnung für:`,
-    footer: `Für Rückfragen stehen wir gerne zur Verfügung.
-
-Mit freundlichen Grüßen
-{{care_provider}}`
-  },
-  "BARMER": {
-    title: "BARMER",
-    prefix: `Sehr geehrte Damen und Herren,
-
-wir übersenden Ihnen die Abrechnung für die durchgeführten Pflegeleistungen:`,
-    footer: `Bei Fragen erreichen Sie uns unter {{phone_number}}.
-
-Mit freundlichen Grüßen
-{{care_provider}}`
+  if (careLevel >= 3) {
+    suggestions.push(
+      { code: "P1", description: "Intensivierte Grundpflege", baseAmount: 45.50 },
+      { code: "P2", description: "Erweiterte Behandlungspflege", baseAmount: 55.00 }
+    );
   }
+
+  if (careLevel >= 4) {
+    suggestions.push(
+      { code: "P6", description: "Mobilisation und Transfer", baseAmount: 40.00 },
+      { code: "P7", description: "Dekubitusprophylaxe", baseAmount: 35.00 }
+    );
+  }
+
+  return [...serviceCatalog, ...suggestions];
 };
 
 export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) {
-  const [selectedTemplate, setSelectedTemplate] = useState(patient.insuranceProvider || "AOK");
   const [serviceEntries, setServiceEntries] = useState(billing?.services || []);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(
+    format(billing?.date ? new Date(billing.date) : new Date(), "yyyy-MM-dd")
+  );
   const { toast } = useToast();
 
-  // Service catalog with common healthcare services
-  const serviceCatalog = [
-    { code: "P1", description: "Grundpflege", baseAmount: 35.50 },
-    { code: "P2", description: "Behandlungspflege", baseAmount: 45.00 },
-    { code: "P3", description: "Hauswirtschaftliche Versorgung", baseAmount: 28.50 },
-    { code: "P4", description: "Beratungsbesuch", baseAmount: 40.00 },
-    { code: "P5", description: "Pflegevisite", baseAmount: 35.00 },
-  ];
+  const suggestedServices = getServiceSuggestions(patient.careLevel);
 
   const addServiceEntry = () => {
     setServiceEntries([...serviceEntries, { code: "", description: "", amount: 0 }]);
@@ -93,15 +80,16 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
         body: JSON.stringify({
           patient,
           services: serviceEntries,
-          template: insuranceTemplates[selectedTemplate as keyof typeof insuranceTemplates]
+          careLevel: patient.careLevel,
+          date: selectedDate,
         }),
       });
 
       if (!response.ok) throw new Error("Fehler bei der KI-Unterstützung");
 
       const data = await response.json();
+
       if (data.suggestions) {
-        // Update service descriptions and check for completeness
         const enhancedServices = serviceEntries.map((service, index) => ({
           ...service,
           description: data.suggestions[index]?.enhancedDescription || service.description
@@ -124,36 +112,49 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
     }
   };
 
+  const handleSave = () => {
+    if (serviceEntries.length === 0) {
+      toast({
+        title: "Fehler",
+        description: "Bitte fügen Sie mindestens eine Leistung hinzu.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalAmount = serviceEntries.reduce((sum, service) => sum + (service.amount || 0), 0);
+
+    onSave({
+      patientId: patient.id,
+      date: selectedDate,
+      services: serviceEntries,
+      totalAmount: totalAmount,
+      status: "pending"
+    });
+  };
+
   return (
     <Card className="flex flex-col h-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            <span>Abrechnungseditor</span>
+            <span>Leistungserfassung</span>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={getAIAssistance}
-              disabled={isGenerating}
+              disabled={isGenerating || serviceEntries.length === 0}
             >
               <Wand2 className="h-4 w-4 mr-2" />
               KI-Optimierung
             </Button>
             <Button
               size="sm"
-              onClick={() => {
-                const billing = {
-                  patientId: patient.id,
-                  date: new Date().toISOString(),
-                  services: serviceEntries,
-                  totalAmount: serviceEntries.reduce((sum, service) => sum + service.amount, 0),
-                  status: "pending"
-                };
-                onSave(billing);
-              }}
+              onClick={handleSave}
+              disabled={serviceEntries.length === 0}
             >
               <Save className="h-4 w-4 mr-2" />
               Speichern
@@ -175,9 +176,19 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
               <div>
                 <p><strong>Pflegegrad:</strong> {patient.careLevel}</p>
                 <p><strong>Adresse:</strong> {patient.address}</p>
-                <p><strong>Notfallkontakt:</strong> {patient.emergencyContact}</p>
               </div>
             </div>
+          </div>
+
+          {/* Date Selection */}
+          <div>
+            <Label>Datum der Leistungserbringung</Label>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="mt-1"
+            />
           </div>
 
           {/* Service Entries */}
@@ -197,9 +208,9 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
                     <Select
                       value={service.code}
                       onValueChange={(value) => {
-                        const catalogService = serviceCatalog.find(s => s.code === value);
-                        updateServiceEntry(index, 'code', value);
+                        const catalogService = suggestedServices.find(s => s.code === value);
                         if (catalogService) {
+                          updateServiceEntry(index, 'code', value);
                           updateServiceEntry(index, 'description', catalogService.description);
                           updateServiceEntry(index, 'amount', catalogService.baseAmount);
                         }
@@ -209,7 +220,7 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
                         <SelectValue placeholder="Code wählen" />
                       </SelectTrigger>
                       <SelectContent>
-                        {serviceCatalog.map(item => (
+                        {suggestedServices.map(item => (
                           <SelectItem key={item.code} value={item.code}>
                             {item.code} - {item.description}
                           </SelectItem>
@@ -217,7 +228,7 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-5">
+                  <div className="col-span-6">
                     <Label>Beschreibung</Label>
                     <Input
                       value={service.description}
@@ -234,7 +245,7 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
                       step="0.01"
                     />
                   </div>
-                  <div className="col-span-2 flex items-end justify-end h-full">
+                  <div className="col-span-1 flex items-end justify-end h-full">
                     <Button
                       variant="ghost"
                       size="sm"

@@ -2,9 +2,9 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { InsuranceBilling, Patient } from "@shared/schema";
-import { FileText, Plus, Download, Search, Calendar, CheckCircle2, AlertCircle } from "lucide-react";
+import { FileText, Plus, Download, Search, Calendar, Filter, Clock } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
@@ -13,13 +13,16 @@ import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BillingEditor } from "@/components/billing/billing-editor";
+import { Badge } from "@/components/ui/badge";
 
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isNewBillingOpen, setIsNewBillingOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>(
+    format(new Date(), "yyyy-MM")
+  );
   const { toast } = useToast();
 
   // Fetch data
@@ -36,9 +39,22 @@ export default function BillingPage() {
   const filteredPatients = searchQuery
     ? patients.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.insuranceNumber.includes(searchQuery)
+        p.insuranceNumber.includes(searchQuery) ||
+        p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : patients;
+
+  // Group billings by month
+  const groupedBillings = billings.reduce((acc, billing) => {
+    const month = format(new Date(billing.date), "yyyy-MM");
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(billing);
+    return acc;
+  }, {} as Record<string, InsuranceBilling[]>);
+
+  // Calculate total amount for selected month
+  const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
+    .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
   // Generate PDF for billing
   const generatePDF = async (billing: InsuranceBilling) => {
@@ -69,6 +85,17 @@ export default function BillingPage() {
         variant: "destructive",
       });
     }
+  };
+
+  const getPflegegradColor = (level: number) => {
+    const colors: Record<number, string> = {
+      1: "bg-blue-100 text-blue-800",
+      2: "bg-green-100 text-green-800",
+      3: "bg-yellow-100 text-yellow-800",
+      4: "bg-orange-100 text-orange-800",
+      5: "bg-red-100 text-red-800",
+    };
+    return colors[level] || "bg-gray-100 text-gray-800";
   };
 
   return (
@@ -115,18 +142,18 @@ export default function BillingPage() {
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="font-medium">{patient.name}</h3>
-                            <p className="text-sm text-gray-500">
-                              VersNr: {patient.insuranceNumber}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {patient.insuranceProvider}
-                            </p>
+                            <div className="space-y-1 mt-1">
+                              <p className="text-sm text-gray-500">
+                                {patient.insuranceProvider}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                VersNr: {patient.insuranceNumber}
+                              </p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <span className="text-sm font-medium bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                              Pflegegrad {patient.careLevel}
-                            </span>
-                          </div>
+                          <Badge className={`${getPflegegradColor(patient.careLevel)}`}>
+                            Pflegegrad {patient.careLevel}
+                          </Badge>
                         </div>
                       </CardContent>
                     </Card>
@@ -144,12 +171,18 @@ export default function BillingPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <CardTitle className="text-2xl">{selectedPatient.name}</CardTitle>
-                          <div className="mt-1 space-y-1">
-                            <p className="text-sm text-gray-500">
+                          <div className="mt-2 space-y-1">
+                            <p className="text-sm text-gray-500 flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
                               Adresse: {selectedPatient.address}
                             </p>
-                            <p className="text-sm text-gray-500">
-                              Notfallkontakt: {selectedPatient.emergencyContact}
+                            <p className="text-sm text-gray-500 flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              Letzte Abrechnung: {
+                                billings.length > 0
+                                  ? format(new Date(billings[0].date), "dd. MMMM yyyy", { locale: de })
+                                  : "Keine Abrechnungen"
+                              }
                             </p>
                           </div>
                         </div>
@@ -160,7 +193,7 @@ export default function BillingPage() {
                               Neue Leistung
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
+                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Neue Leistung erfassen</DialogTitle>
                             </DialogHeader>
@@ -171,8 +204,14 @@ export default function BillingPage() {
                                   const response = await fetch('/api/billings', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(billing),
+                                    body: JSON.stringify({
+                                      ...billing,
+                                      date: new Date(billing.date).toISOString(),
+                                      employeeId: 1, // TODO: Get from auth context
+                                      totalAmount: billing.totalAmount.toString(),
+                                    }),
                                   });
+
                                   if (!response.ok) throw new Error('Fehler beim Speichern');
 
                                   queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
@@ -196,110 +235,72 @@ export default function BillingPage() {
                     </CardHeader>
                   </Card>
 
-                  <Tabs defaultValue="timeline">
-                    <TabsList>
-                      <TabsTrigger value="timeline">Leistungsverlauf</TabsTrigger>
-                      <TabsTrigger value="billing">Abrechnungen</TabsTrigger>
-                      <TabsTrigger value="documents">Dokumente</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="timeline" className="space-y-4">
-                      <Card>
-                        <CardContent className="p-0">
-                          <div className="divide-y">
-                            {billings.map((billing) => (
-                              <div key={billing.id} className="p-4">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="h-4 w-4 text-gray-500" />
-                                      <span className="text-sm text-gray-500">
-                                        {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
-                                      </span>
-                                    </div>
-                                    <div className="mt-2 space-y-2">
-                                      {billing.services.map((service, idx) => (
-                                        <div key={idx} className="flex items-center justify-between text-sm">
-                                          <span>{service.description}</span>
-                                          <span className="font-medium">{service.amount.toFixed(2)} €</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div className="ml-4 flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => generatePDF(billing)}
-                                    >
-                                      <Download className="h-4 w-4 mr-2" />
-                                      PDF
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div className="mt-3 flex items-center gap-2 text-sm">
-                                  {billing.status === "approved" ? (
-                                    <div className="flex items-center gap-1 text-green-600">
-                                      <CheckCircle2 className="h-4 w-4" />
-                                      <span>Genehmigt</span>
-                                    </div>
-                                  ) : billing.status === "pending" ? (
-                                    <div className="flex items-center gap-1 text-yellow-600">
-                                      <AlertCircle className="h-4 w-4" />
-                                      <span>In Bearbeitung</span>
-                                    </div>
-                                  ) : null}
-                                  <span className="text-gray-500">
-                                    Gesamtbetrag: {billing.totalAmount.toFixed(2)} €
+                  {/* Monthly view */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle>Abrechnungen</CardTitle>
+                        <div className="flex items-center gap-4">
+                          <Filter className="h-4 w-4 text-gray-500" />
+                          <select
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="border-none bg-transparent text-sm focus:ring-0"
+                          >
+                            {Object.keys(groupedBillings)
+                              .sort((a, b) => b.localeCompare(a))
+                              .map((month) => (
+                                <option key={month} value={month}>
+                                  {format(new Date(month), "MMMM yyyy", { locale: de })}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {(groupedBillings[selectedMonth] || []).map((billing) => (
+                          <div key={billing.id} className="border rounded-lg p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-gray-500" />
+                                  <span className="text-sm text-gray-500">
+                                    {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
                                   </span>
                                 </div>
+                                <div className="mt-2 space-y-2">
+                                  {billing.services.map((service, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-sm">
+                                      <span>{service.description}</span>
+                                      <span className="font-medium">{Number(service.amount).toFixed(2)} €</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                            ))}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => generatePDF(billing)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                PDF
+                              </Button>
+                            </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
+                        ))}
 
-                    <TabsContent value="billing">
-                      <BillingEditor
-                        patient={selectedPatient}
-                        onSave={async (billing) => {
-                          try {
-                            const response = await fetch('/api/billings', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(billing),
-                            });
-                            if (!response.ok) throw new Error('Fehler beim Speichern');
-                            queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
-                            toast({
-                              title: 'Gespeichert',
-                              description: 'Die Abrechnung wurde erfolgreich erstellt.',
-                            });
-                          } catch (error) {
-                            toast({
-                              title: 'Fehler',
-                              description: 'Die Abrechnung konnte nicht erstellt werden.',
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="documents">
-                      <Card>
-                        <CardContent className="py-4">
-                          <div className="space-y-4">
-                            {/* TODO: Implement document management */}
-                            <p className="text-sm text-gray-500">
-                              Dokumentenverwaltung wird implementiert...
-                            </p>
+                        {/* Monthly summary */}
+                        <div className="border-t pt-4 mt-6">
+                          <div className="flex items-center justify-between text-lg font-medium">
+                            <span>Gesamtbetrag {format(new Date(selectedMonth), "MMMM yyyy", { locale: de })}</span>
+                            <span>{selectedMonthTotal.toFixed(2)} €</span>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
