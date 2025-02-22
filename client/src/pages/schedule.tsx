@@ -1,24 +1,25 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarIcon, Filter, Users, Clock, UserCheck, UserX, ArrowLeftRight, AlertCircle, Edit2, Calendar as CalendarComponent } from "lucide-react";
+import { Calendar as CalendarIcon, Filter, Users, Clock, UserCheck, UserX, ArrowLeftRight, AlertCircle, Edit2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, isSameDay, parseISO } from "date-fns";
+import { format, addDays, subDays, isSameDay, parseISO, isWithinInterval, startOfWeek, endOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { Employee, Shift, ShiftChange } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
-import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, useSensor, useSensors, PointerSensor, useDraggable, useDroppable } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 
 const WORKING_HOURS = {
@@ -28,14 +29,17 @@ const WORKING_HOURS = {
 
 type ShiftDialogMode = "create" | "edit" | "change" | null;
 
+const MotionCard = motion(Card);
+
 export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [filterEmployeeType, setFilterEmployeeType] = useState<"all" | "full-time" | "part-time">("all");
   const [dialogMode, setDialogMode] = useState<ShiftDialogMode>(null);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
+  const [weekView, setWeekView] = useState(false);
 
-  // Sensors für Drag & Drop
+  // Sensors for Drag & Drop with better touch support
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -44,16 +48,16 @@ export default function SchedulePage() {
     })
   );
 
-  // Fetch employees and shifts
-  const { data: employees, isLoading: isLoadingEmployees } = useQuery<Employee[]>({
+  // Fetch data
+  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
 
-  const { data: shifts, isLoading: isLoadingShifts } = useQuery<Shift[]>({
+  const { data: shifts = [], isLoading: isLoadingShifts } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", selectedDate.toISOString()],
   });
 
-  const { data: shiftChanges, isLoading: isLoadingChanges } = useQuery<ShiftChange[]>({
+  const { data: shiftChanges = [], isLoading: isLoadingChanges } = useQuery<ShiftChange[]>({
     queryKey: ["/api/shift-changes"],
   });
 
@@ -113,9 +117,9 @@ export default function SchedulePage() {
   });
 
   // Helper function to calculate shift position and width
-  const calculateShiftStyle = (shift: Shift) => {
-    const startTime = parseISO(shift.startTime);
-    const endTime = parseISO(shift.endTime);
+  const calculateShiftStyle = useCallback((shift: Shift, isOverlay: boolean = false) => {
+    const startTime = new Date(shift.startTime);
+    const endTime = new Date(shift.endTime);
     const startHour = startTime.getHours() + startTime.getMinutes() / 60;
     const endHour = endTime.getHours() + endTime.getMinutes() / 60;
 
@@ -124,16 +128,25 @@ export default function SchedulePage() {
     const width = ((endHour - startHour) / totalHours) * 100;
 
     return {
-      left: `${left}%`,
+      left: isOverlay ? 0 : `${left}%`,
       width: `${width}%`,
+      position: "absolute" as const,
+      zIndex: isOverlay ? 50 : 10,
     };
-  };
+  }, []);
 
-  // Filter shifts for selected date
-  const todaysShifts = shifts?.filter(shift =>
-    isSameDay(parseISO(shift.startTime), selectedDate)
-  ) || [];
+  // Filter shifts for selected period
+  const periodShifts = shifts.filter(shift => {
+    const shiftDate = new Date(shift.startTime);
+    if (weekView) {
+      const weekStart = startOfWeek(selectedDate, { locale: de });
+      const weekEnd = endOfWeek(selectedDate, { locale: de });
+      return isWithinInterval(shiftDate, { start: weekStart, end: weekEnd });
+    }
+    return isSameDay(shiftDate, selectedDate);
+  });
 
+  // Handle form submission
   const handleSubmitShift = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -185,25 +198,75 @@ export default function SchedulePage() {
     setDraggedShift(null);
   };
 
+  // Loading state
+  if (isLoadingEmployees || isLoadingShifts) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <motion.div
+          className="space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+          <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex">
           {/* Left Panel - Calendar & Filters */}
-          <div className="w-64 border-r border-gray-200 bg-[#1E2A4A]/5">
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="w-64 border-r border-gray-200 bg-white/80 backdrop-blur-sm dark:bg-gray-900/80"
+          >
             <ScrollArea className="h-[calc(100vh-4rem)] p-4">
               <div className="space-y-6">
                 <div>
-                  <Label className="text-base font-semibold mb-2 block">Datum</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-base font-semibold">Datum</Label>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedDate(subDays(selectedDate, weekView ? 7 : 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedDate(addDays(selectedDate, weekView ? 7 : 1))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                   <Calendar
                     mode="single"
                     selected={selectedDate}
                     onSelect={(date) => date && setSelectedDate(date)}
-                    className="rounded-md border w-full max-w-[240px] bg-white shadow-sm"
+                    className="rounded-md border w-full max-w-[240px] bg-white shadow-sm dark:bg-gray-800"
                     locale={de}
                   />
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setWeekView(!weekView)}
+                    >
+                      {weekView ? "Tagesansicht" : "Wochenansicht"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -239,87 +302,117 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
-                <Card className="bg-white/50">
+                <MotionCard
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="bg-white/50 backdrop-blur-sm dark:bg-gray-800/50"
+                >
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">Legende</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <motion.div
+                        className="w-3 h-3 rounded-full bg-green-500"
+                        whileHover={{ scale: 1.2 }}
+                      />
                       <span className="text-sm">Bestätigt</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                      <motion.div
+                        className="w-3 h-3 rounded-full bg-yellow-500"
+                        whileHover={{ scale: 1.2 }}
+                      />
                       <span className="text-sm">Änderung angefragt</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <motion.div
+                        className="w-3 h-3 rounded-full bg-red-500"
+                        whileHover={{ scale: 1.2 }}
+                      />
                       <span className="text-sm">Krank gemeldet</span>
                     </div>
                   </CardContent>
-                </Card>
+                </MotionCard>
               </div>
             </ScrollArea>
-          </div>
+          </motion.div>
 
           {/* Center Panel - Schedule */}
-          <div className="flex-1 min-w-0 bg-white">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 min-w-0 bg-white dark:bg-gray-900"
+          >
             <div className="h-full p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-6">
+              <motion.div
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center justify-between mb-6"
+              >
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Dienstplan für {format(selectedDate, "EEEE, d. MMMM yyyy", { locale: de })}
+                  <h1 className="text-2xl font-bold tracking-tight">
+                    Dienstplan für {format(selectedDate, weekView ? "'KW' w, yyyy" : "EEEE, d. MMMM yyyy", { locale: de })}
                   </h1>
                   <p className="text-sm text-gray-500 mt-1">
-                    {todaysShifts.length} Schichten geplant
+                    {periodShifts.length} Schichten geplant
                   </p>
                 </div>
-                <Button onClick={() => setDialogMode("create")} className="shadow-sm">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  Neue Schicht
-                </Button>
-              </div>
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button onClick={() => setDialogMode("create")} className="shadow-sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Neue Schicht
+                  </Button>
+                </motion.div>
+              </motion.div>
 
               {/* Schedule Grid */}
-              <div className="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden dark:bg-gray-800 dark:border-gray-700"
+              >
                 <ScrollArea className="h-full">
-                  {isLoadingShifts ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-pulse space-y-4">
-                        <div className="h-4 bg-gray-200 rounded w-48"></div>
-                        <div className="h-4 bg-gray-200 rounded w-32"></div>
+                  <DndContext
+                    sensors={sensors}
+                    modifiers={[restrictToVerticalAxis]}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="p-4">
+                      {/* Time scale */}
+                      <div className="relative h-8 mb-4 border-b border-gray-100 dark:border-gray-700">
+                        {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start + 1 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="absolute text-sm text-gray-500"
+                            style={{ left: `${(i / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%` }}
+                          >
+                            {String(WORKING_HOURS.start + i).padStart(2, '0')}:00
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ) : (
-                    <DndContext
-                      sensors={sensors}
-                      modifiers={[restrictToVerticalAxis]}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <div className="p-4">
-                        {/* Time scale */}
-                        <div className="relative h-8 mb-4 border-b border-gray-100">
-                          {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start + 1 }).map((_, i) => (
-                            <div
-                              key={i}
-                              className="absolute text-sm text-gray-500"
-                              style={{ left: `${(i / (WORKING_HOURS.end - WORKING_HOURS.start)) * 100}%` }}
-                            >
-                              {String(WORKING_HOURS.start + i).padStart(2, '0')}:00
-                            </div>
-                          ))}
-                        </div>
 
-                        {/* Employee rows with shifts */}
-                        <div className="space-y-4">
-                          {employees?.map(employee => (
-                            <div
+                      {/* Employee rows with shifts */}
+                      <div className="space-y-4">
+                        <AnimatePresence>
+                          {employees.map(employee => (
+                            <motion.div
                               key={employee.id}
-                              id={String(employee.id)}
-                              className="relative h-16 border border-gray-100 rounded-md hover:bg-gray-50/50 transition-colors"
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              transition={{ duration: 0.2 }}
+                              className="relative h-16 border border-gray-100 rounded-md hover:bg-gray-50/50 transition-colors dark:border-gray-700 dark:hover:bg-gray-800/50"
                             >
                               {/* Employee info */}
-                              <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center px-4 bg-white border-r border-gray-100">
+                              <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center px-4 bg-white border-r border-gray-100 dark:bg-gray-900 dark:border-gray-700">
                                 <div className="truncate">
                                   <div className="font-medium">{employee.name}</div>
                                   <div className="text-sm text-gray-500">{employee.role}</div>
@@ -327,206 +420,129 @@ export default function SchedulePage() {
                               </div>
 
                               {/* Timeline with shifts */}
-                              <div className="relative ml-48 h-full bg-gray-50/50 rounded-r-md">
+                              <div className="relative ml-48 h-full bg-gray-50/50 rounded-r-md dark:bg-gray-800/50">
                                 {/* Time slots background */}
                                 <div className="absolute inset-0 grid grid-cols-16 gap-0">
                                   {Array.from({ length: 16 }).map((_, i) => (
                                     <div
                                       key={i}
-                                      className="h-full border-l border-gray-200 first:border-l-0"
+                                      className="h-full border-l border-gray-200 first:border-l-0 dark:border-gray-700"
                                     />
                                   ))}
                                 </div>
 
                                 {/* Employee's shifts */}
-                                {todaysShifts
-                                  .filter(shift => shift.employeeId === employee.id)
-                                  .map(shift => {
-                                    const style = calculateShiftStyle(shift);
-                                    const isChanged = shiftChanges?.some(
-                                      change => change.shiftId === shift.id && change.requestStatus === "pending"
-                                    );
+                                <AnimatePresence>
+                                  {periodShifts
+                                    .filter(shift => shift.employeeId === employee.id)
+                                    .map(shift => {
+                                      const style = calculateShiftStyle(shift);
+                                      const isChanged = shiftChanges.some(
+                                        change => change.shiftId === shift.id && change.requestStatus === "pending"
+                                      );
 
-                                    return (
-                                      <TooltipProvider key={shift.id}>
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <div
-                                              className={cn(
-                                                "absolute top-2 h-12 rounded-md cursor-pointer transition-all group shadow-sm",
-                                                "flex items-center justify-between px-2 text-sm font-medium text-white",
-                                                {
-                                                  "bg-green-500 hover:bg-green-600": shift.status === "confirmed",
-                                                  "bg-yellow-500 hover:bg-yellow-600": isChanged,
-                                                  "bg-red-500 hover:bg-red-600": shift.status === "sick",
-                                                }
-                                              )}
-                                              style={style}
-                                              onClick={() => {
-                                                setSelectedShift(shift);
-                                                setDialogMode("edit");
-                                              }}
-                                              draggable
-                                              onDragStart={() => setDraggedShift(shift)}
-                                            >
-                                              <div className="truncate">
-                                                {format(parseISO(shift.startTime), "HH:mm")} -
-                                                {format(parseISO(shift.endTime), "HH:mm")}
-                                              </div>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
+                                      return (
+                                        <TooltipProvider key={shift.id}>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <motion.div
+                                                className={cn(
+                                                  "absolute top-2 h-12 rounded-md cursor-pointer shadow-sm",
+                                                  "flex items-center justify-between px-2 text-sm font-medium text-white",
+                                                  {
+                                                    "bg-green-500 hover:bg-green-600": shift.status === "confirmed",
+                                                    "bg-yellow-500 hover:bg-yellow-600": isChanged,
+                                                    "bg-red-500 hover:bg-red-600": shift.status === "sick",
+                                                  }
+                                                )}
+                                                style={style}
+                                                onClick={() => {
                                                   setSelectedShift(shift);
                                                   setDialogMode("edit");
                                                 }}
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                exit={{ opacity: 0, scale: 0.9 }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                drag="y"
+                                                dragConstraints={{ top: 0, bottom: 0 }}
+                                                onDragStart={() => setDraggedShift(shift)}
                                               >
-                                                <Edit2 className="h-3 w-3 text-white" />
-                                              </Button>
-                                            </div>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <div className="space-y-1">
-                                              <div className="font-medium">{employee.name}</div>
-                                              <div className="text-sm">
-                                                {format(parseISO(shift.startTime), "HH:mm")} -
-                                                {format(parseISO(shift.endTime), "HH:mm")}
-                                              </div>
-                                              <div className="text-sm">
-                                                Status: {shift.status}
-                                                {isChanged && " (Änderung angefragt)"}
-                                              </div>
-                                              {shift.notes && (
-                                                <div className="text-sm">
-                                                  Notizen: {shift.notes}
+                                                <div className="truncate">
+                                                  {format(new Date(shift.startTime), "HH:mm")} -
+                                                  {format(new Date(shift.endTime), "HH:mm")}
                                                 </div>
-                                              )}
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    );
-                                  })}
+                                                <motion.button
+                                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                  whileHover={{ scale: 1.1 }}
+                                                  whileTap={{ scale: 0.9 }}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedShift(shift);
+                                                    setDialogMode("edit");
+                                                  }}
+                                                >
+                                                  <Edit2 className="h-3 w-3 text-white" />
+                                                </motion.button>
+                                              </motion.div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <div className="space-y-1">
+                                                <div className="font-medium">{employee.name}</div>
+                                                <div className="text-sm">
+                                                  {format(new Date(shift.startTime), "HH:mm")} -
+                                                  {format(new Date(shift.endTime), "HH:mm")}
+                                                </div>
+                                                <div className="text-sm">
+                                                  Status: {shift.status}
+                                                  {isChanged && " (Änderung angefragt)"}
+                                                </div>
+                                                {shift.notes && (
+                                                  <div className="text-sm">
+                                                    Notizen: {shift.notes}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      );
+                                    })}
+                                </AnimatePresence>
                               </div>
-                            </div>
+                            </motion.div>
                           ))}
-                        </div>
+                        </AnimatePresence>
                       </div>
+                    </div>
 
-                      <DragOverlay>
-                        {draggedShift && (
-                          <div
-                            className={cn(
-                              "h-12 rounded-md px-2 text-sm font-medium text-white shadow-lg",
-                              "flex items-center justify-center",
-                              {
-                                "bg-green-500": draggedShift.status === "confirmed",
-                                "bg-yellow-500": draggedShift.status === "pending",
-                                "bg-red-500": draggedShift.status === "sick",
-                              }
-                            )}
-                            style={{ width: calculateShiftStyle(draggedShift).width }}
-                          >
-                            {format(parseISO(draggedShift.startTime), "HH:mm")} -
-                            {format(parseISO(draggedShift.endTime), "HH:mm")}
-                          </div>
-                        )}
-                      </DragOverlay>
-                    </DndContext>
-                  )}
-                </ScrollArea>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - AI Recommendations & Actions */}
-          <div className="w-80 border-l border-gray-200 bg-[#1E2A4A]/5">
-            <ScrollArea className="h-[calc(100vh-4rem)]">
-              <div className="p-4 space-y-4">
-                {selectedShift && (
-                  <Card className="bg-white/80 backdrop-blur-sm">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg">Schicht Aktionen</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => setDialogMode("change")}
-                        >
-                          <ArrowLeftRight className="mr-2 h-4 w-4" />
-                          Schicht tauschen
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-red-600"
-                          onClick={() => {
-                            const note = prompt("Grund der Krankmeldung:");
-                            if (note && selectedShift) {
-                              updateShift.mutate({
-                                shiftId: selectedShift.id,
-                                updates: {
-                                  status: "sick",
-                                  notes: note,
-                                },
-                              });
+                    <DragOverlay>
+                      {draggedShift && (
+                        <motion.div
+                          className={cn(
+                            "h-12 rounded-md px-2 text-sm font-medium text-white shadow-lg",
+                            "flex items-center justify-center",
+                            {
+                              "bg-green-500": draggedShift.status === "confirmed",
+                              "bg-yellow-500": draggedShift.status === "pending",
+                              "bg-red-500": draggedShift.status === "sick",
                             }
-                          }}
+                          )}
+                          style={calculateShiftStyle(draggedShift, true)}
+                          initial={{ scale: 1.05 }}
+                          animate={{ scale: 1.05 }}
                         >
-                          <AlertCircle className="mr-2 h-4 w-4" />
-                          Krank melden
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50/50 border-blue-100">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold text-blue-700">
-                        KI-Empfehlungen
-                      </CardTitle>
-                      <CalendarComponent className="h-5 w-5 text-blue-500" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="text-sm text-blue-700/90 font-medium">
-                        Optimierungsvorschläge:
-                      </div>
-                      <div className="space-y-3">
-                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
-                          <div className="font-medium text-blue-800 mb-1">Schichtverteilung</div>
-                          <p className="text-sm text-blue-600/90">
-                            Die aktuelle Verteilung zeigt Lücken im Spätdienst.
-                            Erwägen Sie zusätzliche Schichten zwischen 14:00 und 22:00 Uhr.
-                          </p>
-                        </div>
-                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
-                          <div className="font-medium text-blue-800 mb-1">Qualifikationen</div>
-                          <p className="text-sm text-blue-600/90">
-                            Stellen Sie sicher, dass in jeder Schicht mindestens eine
-                            Pflegefachkraft verfügbar ist.
-                          </p>
-                        </div>
-                        <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
-                          <div className="font-medium text-blue-800 mb-1">Arbeitszeiten</div>
-                          <p className="text-sm text-blue-600/90">
-                            Beachten Sie die Ruhezeiten zwischen den Schichten von
-                            mindestens 11 Stunden.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </ScrollArea>
-          </div>
+                          {format(new Date(draggedShift.startTime), "HH:mm")} -
+                          {format(new Date(draggedShift.endTime), "HH:mm")}
+                        </motion.div>
+                      )}
+                    </DragOverlay>
+                  </DndContext>
+                </ScrollArea>
+              </motion.div>
+            </div>
+          </motion.div>
 
           {/* Shift Dialog */}
           <Dialog open={!!dialogMode} onOpenChange={(open) => !open && setDialogMode(null)}>
@@ -551,7 +567,7 @@ export default function SchedulePage() {
                       <SelectValue placeholder="Mitarbeiter auswählen" />
                     </SelectTrigger>
                     <SelectContent>
-                      {employees?.map((employee) => (
+                      {employees.map((employee) => (
                         <SelectItem key={employee.id} value={String(employee.id)}>
                           {employee.name}
                         </SelectItem>
@@ -586,7 +602,7 @@ export default function SchedulePage() {
                       name="startTime"
                       type="time"
                       defaultValue={selectedShift ?
-                        format(parseISO(selectedShift.startTime), "HH:mm") :
+                        format(new Date(selectedShift.startTime), "HH:mm") :
                         undefined
                       }
                       required
@@ -599,7 +615,7 @@ export default function SchedulePage() {
                       name="endTime"
                       type="time"
                       defaultValue={selectedShift ?
-                        format(parseISO(selectedShift.endTime), "HH:mm") :
+                        format(new Date(selectedShift.endTime), "HH:mm") :
                         undefined
                       }
                       required
