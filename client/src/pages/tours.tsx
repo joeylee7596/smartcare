@@ -453,29 +453,44 @@ export default function Tours() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-background to-muted">
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-blue-50/20 to-white">
       <Sidebar />
       <div className="flex-1">
         <Header />
         <main className="p-8">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-bold mb-1">Tourenplanung</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-2xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+                Tourenplanung
+              </h1>
+              <p className="text-lg text-gray-500">
                 {format(selectedDate, "EEEE, dd. MMMM yyyy", { locale: de })}
               </p>
             </div>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-              <RotateCw className="mr-2 h-4 w-4" />
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-white/80 backdrop-blur-sm border border-white/40
+                hover:bg-blue-50 hover:border-blue-200
+                shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                hover:-translate-y-0.5 hover:scale-105
+                transition-all duration-500 group"
+            >
+              <RotateCw className="mr-2 h-4 w-4 transition-transform duration-500
+                group-hover:scale-110 group-hover:rotate-180" />
               Aktualisieren
             </Button>
           </div>
 
           <div className="grid grid-cols-[350px,1fr,350px] gap-6">
             <div className="space-y-6">
-              <Card className="shadow-lg">
+              <Card className="rounded-2xl border border-white/40 bg-white/80
+                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+                transition-all duration-500">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Mitarbeiter</CardTitle>
+                  <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
+                    bg-clip-text text-transparent">Mitarbeiter</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[300px]">
@@ -491,31 +506,51 @@ export default function Tours() {
                   </ScrollArea>
                 </CardContent>
               </Card>
-              <Card className="shadow-lg">
+              <Card className="rounded-2xl border border-white/40 bg-white/80
+                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+                transition-all duration-500">
                 <CardHeader className="pb-3">
                   <div className="space-y-3">
-                    <CardTitle className="text-base">Patienten</CardTitle>
+                    <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
+                      bg-clip-text text-transparent">Patienten</CardTitle>
 
-                    {/* Enhanced Search */}
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <div className="relative group">
+                      <div className="absolute left-3 top-3 text-gray-400 transition-all duration-300
+                        group-focus-within:scale-110 group-focus-within:text-blue-500">
+                        <Search className="h-4 w-4" />
+                      </div>
                       <Input
                         placeholder="Patient suchen..."
-                        className="pl-8"
+                        className="pl-10 h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                          border-white/40 hover:border-blue-200 focus:border-blue-300
+                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                          focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                          transition-all duration-300"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
 
-                    {/* Date Picker */}
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                          <Calendar className="mr-2 h-4 w-4" />
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left h-12 rounded-xl
+                            bg-gradient-to-r from-white to-blue-50/50
+                            hover:from-blue-50 hover:to-blue-100/50
+                            border border-white/40 hover:border-blue-200
+                            shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                            hover:-translate-y-0.5 hover:scale-[1.02]
+                            transition-all duration-500 group"
+                        >
+                          <Calendar className="mr-2 h-4 w-4 transition-transform duration-500
+                            group-hover:scale-110 group-hover:rotate-12" />
                           {format(selectedDate, "PPP", { locale: de })}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" style={{ zIndex: 100 }}>
+                      <PopoverContent className="w-auto p-0 rounded-xl border border-white/40
+                        bg-white/80 backdrop-blur-sm shadow-xl" style={{ zIndex: 100 }}>
                         <CalendarComponent
                           mode="single"
                           selected={selectedDate}
@@ -525,44 +560,56 @@ export default function Tours() {
                       </PopoverContent>
                     </Popover>
 
-                    {/* Enhanced Filters */}
                     <div className="space-y-2">
                       <Select
                         value={filters.urgency}
                         onValueChange={(value) => setFilters(prev => ({ ...prev, urgency: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                          border-white/40 hover:border-blue-200
+                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                          transition-all duration-300">
                           <SelectValue placeholder="Dringlichkeit" />
                         </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }}>
+                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
+                          bg-white/80 backdrop-blur-sm shadow-xl">
                           <SelectItem value="all">Alle</SelectItem>
                           <SelectItem value="urgent">Dringend</SelectItem>
                           <SelectItem value="normal">Normal</SelectItem>
                         </SelectContent>
                       </Select>
-
                       <Select
                         value={filters.careType}
                         onValueChange={(value) => setFilters(prev => ({ ...prev, careType: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                          border-white/40 hover:border-blue-200
+                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                          transition-all duration-300">
                           <SelectValue placeholder="Pflegeart" />
                         </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }}>
+                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
+                          bg-white/80 backdrop-blur-sm shadow-xl">
                           <SelectItem value="all">Alle</SelectItem>
                           <SelectItem value="basic">Grundpflege</SelectItem>
                           <SelectItem value="medical">Medizinische Pflege</SelectItem>
                         </SelectContent>
                       </Select>
-
                       <Select
                         value={filters.location}
                         onValueChange={(value) => setFilters(prev => ({ ...prev, location: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                          border-white/40 hover:border-blue-200
+                          shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                          hover:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                          transition-all duration-300">
                           <SelectValue placeholder="Standort" />
                         </SelectTrigger>
-                        <SelectContent style={{ zIndex: 100 }}>
+                        <SelectContent style={{ zIndex: 100 }} className="rounded-xl border border-white/40
+                          bg-white/80 backdrop-blur-sm shadow-xl">
                           <SelectItem value="all">Alle Bezirke</SelectItem>
                           <SelectItem value="north">Nord</SelectItem>
                           <SelectItem value="south">Süd</SelectItem>
@@ -589,16 +636,28 @@ export default function Tours() {
               </Card>
             </div>
 
-            <Card className="shadow-lg overflow-hidden relative">
+            <Card className="rounded-2xl border border-white/40 bg-white/80
+              backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+              hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+              transition-all duration-500 overflow-hidden relative">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Karte</CardTitle>
+                <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
+                  bg-clip-text text-transparent">Karte</CardTitle>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg transition-all duration-300
+                        hover:bg-blue-50 hover:text-blue-600
+                        hover:scale-110 hover:rotate-12"
+                    >
                       <Maximize2 className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh]" style={{ zIndex: 1000 }}>
+                  <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] rounded-2xl
+                    border border-white/40 bg-white/80 backdrop-blur-sm
+                    shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)]" style={{ zIndex: 1000 }}>
                     <div className="relative w-full h-full">
                       <MapContainer
                         center={center}
@@ -670,10 +729,14 @@ export default function Tours() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-lg">
+            <Card className="rounded-2xl border border-white/40 bg-white/80
+              backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+              hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
+              transition-all duration-500">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
+                  <CardTitle className="text-base bg-gradient-to-r from-gray-900 to-gray-600
+                    bg-clip-text text-transparent">
                     {selectedEmployee
                       ? `Zeitplan: ${employees.find(e => e.id === selectedEmployee)?.name}`
                       : "Zeitplan: Alle Mitarbeiter"}
@@ -681,12 +744,11 @@ export default function Tours() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-destructive hover:text-destructive"
+                    className="text-red-500 hover:text-red-600 hover:bg-red-50
+                      rounded-lg transition-all duration-300
+                      hover:scale-110"
                     onClick={() => {
-                      // Get tour IDs for the selected employee and date
                       const tourIds = employeeTours.map(tour => tour.id);
-
-                      // Delete each tour
                       tourIds.forEach(id => {
                         updateTourMutation.mutate({
                           id,
@@ -708,7 +770,7 @@ export default function Tours() {
               <CardContent>
                 <ScrollArea className="h-[calc(100vh-350px)]">
                   {employeeTours.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
+                    <div className="text-center py-8 text-gray-500">
                       <Clock className="mx-auto h-12 w-12 mb-3 opacity-50" />
                       <p>Keine Touren für {selectedEmployee ? "diesen Mitarbeiter" : "diesen Tag"} geplant</p>
                       <p className="text-sm">
@@ -721,16 +783,23 @@ export default function Tours() {
                     employeeTours.map((tour) => (
                       <div
                         key={tour.id}
-                        className="p-4 mb-4 rounded-lg bg-card border border-border/40 hover:shadow-lg transition-all duration-200"
+                        className="p-4 mb-4 rounded-xl bg-gradient-to-r from-white to-blue-50/50
+                          border border-white/40 hover:border-blue-200
+                          shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
+                          hover:-translate-y-1 hover:scale-[1.02]
+                          transition-all duration-500 group"
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <div className="p-2 rounded-lg bg-blue-50 text-blue-500
+                              transition-all duration-500 group-hover:scale-110 group-hover:rotate-12">
+                              <Clock className="h-4 w-4" />
+                            </div>
                             <span className="font-medium">
                               {format(parseISO(tour.date.toString()), "HH:mm")}
                             </span>
                           </div>
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-gray-500">
                             {tour.optimizedRoute?.estimatedDuration} min
                           </span>
                         </div>
@@ -740,19 +809,24 @@ export default function Tours() {
                             return (
                               <div
                                 key={index}
-                                className="flex items-center gap-2 text-sm cursor-pointer hover:bg-muted/50 p-2 rounded-md"
+                                className="flex items-center gap-2 text-sm cursor-pointer
+                                  hover:bg-blue-50/50 p-2 rounded-lg
+                                  transition-all duration-300"
                                 onClick={() => setSelectedPatient(patient || null)}
                               >
-                                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">
+                                <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center
+                                  text-blue-500 text-xs font-medium transition-all duration-300
+                                  group-hover:scale-110 group-hover:rotate-12">
                                   {index + 1}
                                 </div>
-                                <span className="flex-1 truncate">
+                                <span className="flex-1 truncate text-gray-700">
                                   {patient?.name || `Patient #${waypoint.patientId}`}
                                 </span>
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-6 w-6"
+                                  className="h-6 w-6 rounded-lg hover:bg-red-50 hover:text-red-500
+                                    transition-all duration-300"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     updateTourMutation.mutate({
