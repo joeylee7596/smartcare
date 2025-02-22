@@ -27,6 +27,8 @@ import {
   MapIcon
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
+import AddTourDialog from "@/components/tours/add-tour-dialog";
+
 
 const WORKING_HOURS = {
   start: 6,
@@ -159,7 +161,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
   );
 }
 
-function TimelineRow({ employee, tours, patients }: { 
+function TimelineRow({ employee, tours, patients }: {
   employee: Employee;
   tours: Tour[];
   patients: Patient[];
@@ -211,6 +213,7 @@ function TimelineRow({ employee, tours, patients }: {
 export default function Tours() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedEmployee, setSelectedEmployee] = useState<number | null>(null);
+  const [showAddTourDialog, setShowAddTourDialog] = useState(false);
 
   const { data: tours = [] } = useQuery<Tour[]>({
     queryKey: ["/api/tours"],
@@ -224,7 +227,7 @@ export default function Tours() {
     queryKey: ["/api/employees"],
   });
 
-  const dateFilteredTours = tours.filter(tour => 
+  const dateFilteredTours = tours.filter(tour =>
     isSameDay(parseISO(tour.date.toString()), selectedDate)
   );
 
@@ -286,6 +289,7 @@ export default function Tours() {
             <Button
               className="bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg"
               size="lg"
+              onClick={() => setShowAddTourDialog(true)}
             >
               <Plus className="mr-2 h-4 w-4" />
               Neue Tour
@@ -309,7 +313,9 @@ export default function Tours() {
                     {employees.map((employee) => (
                       <div
                         key={employee.id}
-                        onClick={() => setSelectedEmployee(employee.id)}
+                        onClick={() => setSelectedEmployee(
+                          selectedEmployee === employee.id ? null : employee.id
+                        )}
                         className={cn(
                           "p-3 rounded-lg cursor-pointer",
                           "transition-all duration-200",
@@ -347,18 +353,20 @@ export default function Tours() {
                   <CardTitle>Tagesübersicht</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <ScrollArea className="h-[calc(100vh-400px)]" orientation="horizontal">
+                  <ScrollArea className="h-[calc(100vh-400px)]">
                     <div className="relative min-w-[600px]">
                       <TimelineHeader />
                       <div className="mt-4">
-                        {employees.map(employee => (
-                          <TimelineRow
-                            key={employee.id}
-                            employee={employee}
-                            tours={dateFilteredTours}
-                            patients={patients}
-                          />
-                        ))}
+                        {employees
+                          .filter(employee => !selectedEmployee || employee.id === selectedEmployee)
+                          .map(employee => (
+                            <TimelineRow
+                              key={employee.id}
+                              employee={employee}
+                              tours={dateFilteredTours}
+                              patients={patients}
+                            />
+                          ))}
                       </div>
                     </div>
                   </ScrollArea>
@@ -379,6 +387,7 @@ export default function Tours() {
                   <div className="h-[300px] rounded-xl overflow-hidden border border-gray-200">
                     <TourMap
                       patientIds={dateFilteredTours.flatMap(t => t.patientIds)}
+                      selectedEmployeeId={selectedEmployee}
                       className="w-full h-full"
                     />
                   </div>
@@ -407,6 +416,15 @@ export default function Tours() {
               </Card>
             </div>
           </div>
+
+          {showAddTourDialog && (
+            <AddTourDialog
+              open={showAddTourDialog}
+              onOpenChange={setShowAddTourDialog}
+              selectedDate={selectedDate}
+              selectedEmployeeId={selectedEmployee}
+            />
+          )}
         </main>
       </div>
     </div>
