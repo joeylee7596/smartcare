@@ -90,18 +90,29 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
       const data = await response.json();
 
       if (data.suggestions) {
-        const enhancedServices = serviceEntries.map((service, index) => ({
-          ...service,
-          description: data.suggestions[index]?.enhancedDescription || service.description
-        }));
+        const enhancedServices = serviceEntries.map((service, index) => {
+          const suggestion = data.suggestions.find(s => s.code === service.code);
+          if (suggestion) {
+            toast({
+              title: "Beschreibung optimiert",
+              description: `Leistung ${service.code} wurde verbessert.`,
+            });
+            return {
+              ...service,
+              description: suggestion.enhancedDescription
+            };
+          }
+          return service;
+        });
         setServiceEntries(enhancedServices);
-      }
 
-      toast({
-        title: "KI-Optimierung abgeschlossen",
-        description: "Die Leistungsbeschreibungen wurden optimiert.",
-      });
+        toast({
+          title: "KI-Optimierung abgeschlossen",
+          description: "Die Leistungsbeschreibungen wurden optimiert.",
+        });
+      }
     } catch (error) {
+      console.error("AI Assistance Error:", error);
       toast({
         title: "Fehler",
         description: "KI-Unterstützung konnte nicht abgerufen werden.",
@@ -122,16 +133,16 @@ export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) 
       return;
     }
 
-    const totalAmount = serviceEntries.reduce((sum, service) => sum + (service.amount || 0), 0);
+    const totalAmount = serviceEntries.reduce((sum, service) => sum + (Number(service.amount) || 0), 0);
 
     onSave({
       patientId: patient.id,
-      date: new Date(selectedDate).toISOString(),
+      date: selectedDate,
       services: serviceEntries.map(service => ({
         ...service,
-        amount: service.amount?.toString() || "0"
+        amount: Number(service.amount) || 0
       })),
-      totalAmount: totalAmount.toString(),
+      totalAmount,
       status: "pending"
     });
   };
