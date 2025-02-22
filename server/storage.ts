@@ -1,10 +1,13 @@
 import {
-  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees,
-  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, type Employee,
-  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, type InsertBilling, type InsertEmployee
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, expiryTracking,
+  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, 
+  type Employee, type ExpiryTracking, type InsertExpiryTracking,
+  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow, 
+  type InsertBilling, type InsertEmployee
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, desc, not } from "drizzle-orm";
+import { eq, and, desc, not, lte, gte, SQL } from "drizzle-orm";
+import { addDays } from "date-fns";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -42,7 +45,7 @@ export interface IStorage {
   createBilling(billing: InsertBilling): Promise<InsuranceBilling>;
   updateBillingStatus(id: number, status: string): Promise<InsuranceBilling>;
 
-  // New Employee methods
+  // Employee methods
   getEmployees(): Promise<Employee[]>;
   getEmployee(id: number): Promise<Employee | undefined>;
   getEmployeeByUserId(userId: number): Promise<Employee | undefined>;
@@ -52,6 +55,14 @@ export interface IStorage {
   getAvailableEmployees(date: Date): Promise<Employee[]>;
   getEmployeeQualifications(id: number): Promise<Employee['qualifications']>;
 
+  // Expiry Tracking methods
+  getExpiryItems(): Promise<ExpiryTracking[]>;
+  getExpiryItemsByStatus(status: string): Promise<ExpiryTracking[]>;
+  getExpiryItemsNearingExpiry(daysThreshold?: number): Promise<ExpiryTracking[]>;
+  createExpiryItem(item: InsertExpiryTracking): Promise<ExpiryTracking>;
+  updateExpiryItem(id: number, item: Partial<InsertExpiryTracking>): Promise<ExpiryTracking>;
+  deleteExpiryItem(id: number): Promise<void>;
+
   sessionStore: session.Store;
 }
 
@@ -60,7 +71,7 @@ export class DatabaseStorage implements IStorage {
 
   constructor() {
     this.sessionStore = new PostgresStore({
-      pool: pool,
+      pool,
       createTableIfMissing: true,
     });
   }
@@ -302,6 +313,66 @@ export class DatabaseStorage implements IStorage {
       .from(employees)
       .where(eq(employees.id, id));
     return employee?.qualifications;
+  }
+
+  // Expiry Tracking implementations
+  async getExpiryItems(): Promise<ExpiryTracking[]> {
+    return db.select().from(expiryTracking).orderBy(desc(expiryTracking.expiryDate));
+  }
+
+  async getExpiryItemsByStatus(status: string): Promise<ExpiryTracking[]> {
+    return db
+      .select()
+      .from(expiryTracking)
+      .where(eq(expiryTracking.status, status))
+      .orderBy(desc(expiryTracking.expiryDate));
+  }
+
+  async getExpiryItemsNearingExpiry(daysThreshold: number = 30): Promise<ExpiryTracking[]> {
+    const today = new Date();
+    const futureDate = addDays(today, daysThreshold);
+
+    return db
+      .select()
+      .from(expiryTracking)
+      .where(
+        and(
+          eq(expiryTracking.status, "active"),
+          gte(expiryTracking.expiryDate, today.toISOString().split('T')[0]),
+          lte(expiryTracking.expiryDate, futureDate.toISOString().split('T')[0])
+        )
+      )
+      .orderBy(desc(expiryTracking.expiryDate));
+  }
+
+  async createExpiryItem(item: InsertExpiryTracking): Promise<ExpiryTracking> {
+    const [created] = await db
+      .insert(expiryTracking)
+      .values({
+        ...item,
+        expiryDate: new Date(item.expiryDate).toISOString().split('T')[0],
+        createdAt: new Date().toISOString().split('T')[0],
+        updatedAt: new Date().toISOString().split('T')[0],
+      })
+      .returning();
+    return created;
+  }
+
+  async updateExpiryItem(id: number, updates: Partial<InsertExpiryTracking>): Promise<ExpiryTracking> {
+    const [updated] = await db
+      .update(expiryTracking)
+      .set({
+        ...updates,
+        expiryDate: updates.expiryDate ? new Date(updates.expiryDate).toISOString().split('T')[0] : undefined,
+        updatedAt: new Date().toISOString().split('T')[0],
+      })
+      .where(eq(expiryTracking.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExpiryItem(id: number): Promise<void> {
+    await db.delete(expiryTracking).where(eq(expiryTracking.id, id));
   }
 }
 

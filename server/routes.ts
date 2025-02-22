@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeSchema } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
+import expiryRoutes from "./routes/expiry";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -158,6 +159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await storage.deleteEmployee(id);
     res.sendStatus(204);
   });
+
+  // Register expiry tracking routes
+  app.use("/api/expiry", expiryRoutes);
 
   const httpServer = createServer(app);
   setupWebSocket(httpServer);

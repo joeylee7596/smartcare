@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, json, boolean, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, json, boolean, decimal, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -145,6 +145,24 @@ export const insuranceBilling = pgTable("insurance_billing", {
   insuranceResponse: text("insurance_response"),
 });
 
+export const expiryTracking = pgTable("expiry_tracking", {
+  id: serial("id").primaryKey(),
+  itemName: text("item_name").notNull(),
+  itemType: text("item_type").notNull(),
+  expiryDate: date("expiry_date").notNull(),
+  quantity: decimal("quantity").notNull(),
+  unit: text("unit").notNull(),
+  locationId: integer("location_id"),
+  patientId: integer("patient_id"),
+  batchNumber: text("batch_number"),
+  notes: text("notes"),
+  warningThreshold: integer("warning_threshold").notNull().default(30),
+  status: text("status").notNull().default("active"),
+  lastChecked: timestamp("last_checked"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users);
 export const insertPatientSchema = createInsertSchema(patients);
 export const insertEmployeeSchema = createInsertSchema(employees);
@@ -156,6 +174,11 @@ export const insertTourSchema = createInsertSchema(tours).extend({
 export const insertDocSchema = createInsertSchema(documentation);
 export const insertWorkflowSchema = createInsertSchema(workflowTemplates);
 export const insertBillingSchema = createInsertSchema(insuranceBilling);
+export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).extend({
+  expiryDate: z.string().or(z.date()).transform(val =>
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -171,6 +194,8 @@ export type WorkflowTemplate = typeof workflowTemplates.$inferSelect;
 export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
 export type InsuranceBilling = typeof insuranceBilling.$inferSelect;
 export type InsertBilling = z.infer<typeof insertBillingSchema>;
+export type ExpiryTracking = typeof expiryTracking.$inferSelect;
+export type InsertExpiryTracking = z.infer<typeof insertExpiryTrackingSchema>;
 
 export const DocumentationStatus = {
   PENDING: "pending",
