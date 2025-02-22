@@ -13,17 +13,19 @@ import Tours from "@/pages/tours";
 import Documentation from "@/pages/documentation";
 import Schedule from "@/pages/schedule";
 import Billing from "@/pages/billing";
+import Settings from "@/pages/settings";
 
 function Router() {
   return (
     <Switch>
+      <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/patients" component={Patients} />
       <ProtectedRoute path="/tours" component={Tours} />
       <ProtectedRoute path="/documentation" component={Documentation} />
       <ProtectedRoute path="/schedule" component={Schedule} />
       <ProtectedRoute path="/billing" component={Billing} />
-      <Route path="/auth" component={AuthPage} />
+      <ProtectedRoute path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
