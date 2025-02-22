@@ -137,7 +137,9 @@ export function PatientGrid({ patients }: PatientGridProps) {
                 shadow-[0_10px_40px_-15px_rgba(0,0,0,0.1),0_0_20px_-5px_rgba(0,0,0,0.05)]
                 hover:shadow-[0_20px_60px_-20px_rgba(59,130,246,0.3),0_0_30px_-10px_rgba(59,130,246,0.2)]
                 backdrop-blur-sm border border-white/40
-                group">
+                group"
+                onClick={() => setSelectedPatient(patient)}
+              >
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
@@ -158,7 +160,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
                       </div>
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -175,7 +177,8 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           backdrop-blur-sm shadow-xl"
                       >
                         <DropdownMenuItem
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedPatient(patient);
                             setShowEditDialog(true);
                           }}
@@ -187,7 +190,8 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           Bearbeiten
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedPatient(patient);
                             getAIInsights(patient);
                           }}
@@ -200,7 +204,8 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           KI-Analyse
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedPatient(patient);
                             setShowCarePrediction(true);
                           }}
@@ -215,7 +220,10 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           className="text-destructive rounded-lg transition-all duration-300
                             hover:bg-red-50 focus:bg-red-50
                             hover:pl-6"
-                          onClick={() => deleteMutation.mutate(patient.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteMutation.mutate(patient.id);
+                          }}
                         >
                           <Trash2 className="mr-2 h-5 w-5" />
                           Löschen
