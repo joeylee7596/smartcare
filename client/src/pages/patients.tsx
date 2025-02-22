@@ -35,18 +35,6 @@ export default function Patients() {
 
   const quickActions = [
     {
-      title: "Vitalzeichen",
-      icon: Pulse,
-      description: "Überwachung & Analyse",
-      color: "bg-gradient-to-br from-blue-50/80 to-blue-100/50 text-blue-600 hover:from-blue-100/80 hover:to-blue-200/50",
-      onClick: () => {
-        toast({
-          title: "KI-Analyse",
-          description: "Starte Vitalzeichen-Monitoring...",
-        });
-      },
-    },
-    {
       title: "Medikamente",
       icon: Pills,
       description: "Smart Medikationsplan",
