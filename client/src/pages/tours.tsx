@@ -44,12 +44,12 @@ function TimelineHeader() {
 
   return (
     <div className="flex border-b border-gray-200 pb-2 sticky top-0 bg-white z-10">
-      <div className="w-64 flex-shrink-0 px-4 font-medium text-gray-500">
+      <div className="w-40 flex-shrink-0 px-4 font-medium text-gray-500">
         Mitarbeiter
       </div>
-      <div className="flex" style={{ width: `${hours.length * 120}px` }}>
+      <div className="flex" style={{ width: `${hours.length * 60}px` }}>
         {hours.map((hour) => (
-          <div key={hour} className="w-[120px] text-center">
+          <div key={hour} className="w-[60px] text-center">
             <span className="text-sm text-gray-500">{formatHour(hour)}</span>
           </div>
         ))}
@@ -70,15 +70,14 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
   const startHour = startTime.getHours() + (startTime.getMinutes() / 60);
   const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
 
-  const totalHours = WORKING_HOURS.end - WORKING_HOURS.start;
-  const hourWidth = 120; // Fixe Breite pro Stunde in Pixeln
+  const hourWidth = 60; // Reduzierte Breite pro Stunde
   const left = (startHour - WORKING_HOURS.start) * hourWidth;
   const width = duration * hourWidth;
 
   return (
     <div
       className={cn(
-        "absolute h-[calc(100%-8px)] m-1 rounded-lg p-2",
+        "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
         "transition-all duration-300 group cursor-pointer",
         "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
         {
@@ -93,7 +92,7 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
       }}
     >
       <div className="h-full flex flex-col justify-center overflow-hidden">
-        <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex items-center gap-1">
           <Clock className="h-3 w-3 text-gray-500" />
           <span className="text-xs font-medium text-gray-700">
             {format(startTime, "HH:mm")}
@@ -119,28 +118,22 @@ function TimelineRow({ employee, tours, patients }: {
 
   return (
     <div className="group">
-      <div className="flex items-center min-h-[100px] relative border-b border-gray-100 last:border-b-0">
-        <div className="w-64 flex-shrink-0 px-4">
+      <div className="flex items-center min-h-[72px] relative border-b border-gray-100 last:border-b-0">
+        <div className="w-40 flex-shrink-0 px-4">
           <div className="font-medium text-gray-700">{employee.name}</div>
           <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
             <Clock className="h-4 w-4" />
             <span>{employeeTours.length} Touren</span>
           </div>
-          {employee.qualifications.nursingDegree && (
-            <Badge variant="secondary" className="mt-2">
-              <Shield className="h-3 w-3 mr-1" />
-              Examiniert
-            </Badge>
-          )}
         </div>
-        <div className="relative" style={{ width: `${hours * 120}px` }}>
+        <div className="relative" style={{ width: `${hours * 60}px` }}>
           {/* Hour markers */}
           <div className="absolute inset-0 flex">
             {Array.from({ length: hours }).map((_, i) => (
               <div
                 key={i}
                 className={cn(
-                  "w-[120px] border-l border-gray-100",
+                  "w-[60px] border-l border-gray-100",
                   "group-hover:border-gray-200 transition-colors duration-200",
                   i === 0 && "border-l-0"
                 )}
@@ -310,7 +303,7 @@ export default function Tours() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[calc(100vh-400px)]" orientation="horizontal">
-                    <div className="relative min-w-[1200px]">
+                    <div className="relative min-w-[600px]"> {/* Adjusted min-width */}
                       <TimelineHeader />
                       {/* Timeline Rows */}
                       <div className="mt-4">
