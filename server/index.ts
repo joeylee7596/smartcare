@@ -1,14 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import aiRouter from "./routes/ai";
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for image uploads
 app.use(express.urlencoded({ extended: false }));
-
-// Register AI routes
-app.use('/api/ai', aiRouter);
 
 app.use((req, res, next) => {
   const start = Date.now();
