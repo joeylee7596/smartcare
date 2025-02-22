@@ -21,7 +21,7 @@ interface AddTourDialogProps {
   selectedEmployeeId: number | null;
 }
 
-export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmployeeId }: AddTourDialogProps) {
+export default function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmployeeId }: AddTourDialogProps) {
   const { toast } = useToast();
   const [selectedPatients, setSelectedPatients] = useState<Patient[]>([]);
   const queryClient = useQueryClient();
@@ -174,7 +174,7 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] relative z-[100]">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Neue Tour planen</DialogTitle>
         </DialogHeader>
@@ -389,5 +389,3 @@ export function AddTourDialog({ open, onOpenChange, selectedDate, selectedEmploy
     </Dialog>
   );
 }
-
-export default AddTourDialog;
