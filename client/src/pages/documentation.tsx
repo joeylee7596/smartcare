@@ -87,27 +87,33 @@ function DocumentationPage() {
   };
 
   const createDocMutation = useMutation({
-    mutationFn: async (data: { content: string; patientId: number; type?: string; status: DocumentationStatus }) => {
+    mutationFn: async (data: { 
+      content: string; 
+      patientId: number; 
+      type: string; 
+      status: DocumentationStatus 
+    }) => {
       const res = await apiRequest("POST", "/api/docs", {
         patientId: data.patientId,
         employeeId: user?.id,
         date: new Date().toISOString(),
         content: data.content.trim(),
-        type: data.type || "Sprachaufnahme",
+        type: data.type,
         status: data.status,
         aiGenerated: true,
-        verified: false,
+        verified: false
       });
 
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Fehler beim Erstellen der Dokumentation");
       }
+
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/docs"] });
-      setActivePatientId(null); // Close recording window
+      setActivePatientId(null); 
 
       toast({
         title: "Dokumentation erstellt",
@@ -116,7 +122,6 @@ function DocumentationPage() {
           : "Die Dokumentation wurde erfolgreich gespeichert.",
       });
 
-      // Send WebSocket message for real-time updates
       sendMessage({
         type: 'DOC_STATUS_UPDATE',
         docId: data.id,
@@ -137,14 +142,35 @@ function DocumentationPage() {
     if (!activePatientId) return;
 
     try {
-      await createDocMutation.mutateAsync({
+      const newDoc = await createDocMutation.mutateAsync({
         content: text,
         patientId: activePatientId,
         type: "KI-Dokumentation",
         status: sendToReview ? DocumentationStatus.REVIEW : DocumentationStatus.PENDING,
       });
+
+      setActivePatientId(null);
+
+      toast({
+        title: "Dokumentation erstellt",
+        description: sendToReview 
+          ? "Die Dokumentation wurde zur Überprüfung weitergeleitet."
+          : "Die Dokumentation wurde gespeichert.",
+      });
+
+      sendMessage({
+        type: 'DOC_STATUS_UPDATE',
+        docId: newDoc.id,
+        status: newDoc.status
+      });
+
     } catch (error) {
       console.error("Failed to create documentation:", error);
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Die Dokumentation konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
     }
   };
 
