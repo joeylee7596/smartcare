@@ -282,7 +282,10 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           shadow-lg shadow-blue-500/5 hover:shadow-blue-500/20
                           hover:-translate-y-0.5 hover:scale-[1.02]
                           transition-all duration-500 group"
-                        onClick={() => setLocation(`/documentation/${patient.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/documentation?patientId=${patient.id}`);
+                        }}
                       >
                         <FileText className="h-5 w-5 mr-2 transition-transform duration-500
                           group-hover:scale-110 group-hover:rotate-6" />
@@ -298,7 +301,10 @@ export function PatientGrid({ patients }: PatientGridProps) {
                           shadow-lg shadow-purple-500/5 hover:shadow-purple-500/20
                           hover:-translate-y-0.5 hover:scale-[1.02]
                           transition-all duration-500 group"
-                        onClick={() => setLocation(`/tours/${patient.id}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLocation(`/tours?patientId=${patient.id}`);
+                        }}
                       >
                         <Calendar className="h-5 w-5 mr-2 transition-transform duration-500
                           group-hover:scale-110 group-hover:rotate-6" />
@@ -321,7 +327,6 @@ export function PatientGrid({ patients }: PatientGridProps) {
                   </div>
                 </CardContent>
 
-                {/* Hover overlay with gradient effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.02] to-transparent
                   opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </Card>
