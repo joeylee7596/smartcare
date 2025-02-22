@@ -43,13 +43,13 @@ function TimelineHeader() {
   );
 
   return (
-    <div className="flex border-b border-gray-200 pb-2">
+    <div className="flex border-b border-gray-200 pb-2 sticky top-0 bg-white z-10">
       <div className="w-64 flex-shrink-0 px-4 font-medium text-gray-500">
         Mitarbeiter
       </div>
-      <div className="flex-1 flex">
+      <div className="flex" style={{ width: `${hours.length * 120}px` }}>
         {hours.map((hour) => (
-          <div key={hour} className="flex-1 text-center">
+          <div key={hour} className="w-[120px] text-center">
             <span className="text-sm text-gray-500">{formatHour(hour)}</span>
           </div>
         ))}
@@ -71,8 +71,9 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
   const duration = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
 
   const totalHours = WORKING_HOURS.end - WORKING_HOURS.start;
-  const startPercentage = ((startHour - WORKING_HOURS.start) / totalHours) * 100;
-  const widthPercentage = (duration / totalHours) * 100;
+  const hourWidth = 120; // Fixe Breite pro Stunde in Pixeln
+  const left = (startHour - WORKING_HOURS.start) * hourWidth;
+  const width = duration * hourWidth;
 
   return (
     <div
@@ -87,8 +88,8 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
         }
       )}
       style={{
-        left: `${startPercentage}%`,
-        width: `${widthPercentage}%`,
+        left: `${left}px`,
+        width: `${width}px`,
       }}
     >
       <div className="h-full flex flex-col justify-center overflow-hidden">
@@ -114,6 +115,7 @@ function TimelineRow({ employee, tours, patients }: {
   patients: Patient[];
 }) {
   const employeeTours = tours.filter(tour => tour.employeeId === employee.id);
+  const hours = WORKING_HOURS.end - WORKING_HOURS.start;
 
   return (
     <div className="group">
@@ -131,14 +133,14 @@ function TimelineRow({ employee, tours, patients }: {
             </Badge>
           )}
         </div>
-        <div className="flex-1 relative px-2">
+        <div className="relative" style={{ width: `${hours * 120}px` }}>
           {/* Hour markers */}
           <div className="absolute inset-0 flex">
-            {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start }).map((_, i) => (
+            {Array.from({ length: hours }).map((_, i) => (
               <div
                 key={i}
                 className={cn(
-                  "flex-1 border-l border-gray-100",
+                  "w-[120px] border-l border-gray-100",
                   "group-hover:border-gray-200 transition-colors duration-200",
                   i === 0 && "border-l-0"
                 )}
@@ -306,21 +308,23 @@ export default function Tours() {
                 <CardHeader className="pb-2">
                   <CardTitle>Tagesübersicht</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="relative">
-                    <TimelineHeader />
-                    {/* Timeline Rows */}
-                    <div className="mt-4">
-                      {employees.map(employee => (
-                        <TimelineRow
-                          key={employee.id}
-                          employee={employee}
-                          tours={dateFilteredTours}
-                          patients={patients}
-                        />
-                      ))}
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[calc(100vh-400px)]" orientation="horizontal">
+                    <div className="relative min-w-[1200px]">
+                      <TimelineHeader />
+                      {/* Timeline Rows */}
+                      <div className="mt-4">
+                        {employees.map(employee => (
+                          <TimelineRow
+                            key={employee.id}
+                            employee={employee}
+                            tours={dateFilteredTours}
+                            patients={patients}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
 
