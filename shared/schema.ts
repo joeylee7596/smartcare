@@ -143,6 +143,7 @@ export const insuranceBilling = pgTable("insurance_billing", {
   submissionDate: timestamp("submission_date"),
   responseDate: timestamp("response_date"),
   insuranceResponse: text("insurance_response"),
+  content: text("content"), // Added new field for storing billing text content
 });
 
 export const expiryTracking = pgTable("expiry_tracking", {
