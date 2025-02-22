@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,13 @@ const getServiceSuggestions = (careLevel: number) => {
 };
 
 export function BillingEditor({ billing, patient, onSave }: BillingEditorProps) {
+  // Automatically fetch suggestions when date changes
+  useEffect(() => {
+    if (selectedDate && patient.id) {
+      getAISuggestions();
+    }
+  }, [selectedDate, patient.id]);
+
   const [serviceEntries, setServiceEntries] = useState(billing?.services || []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
