@@ -245,19 +245,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBilling(billing: InsertBilling): Promise<InsuranceBilling> {
-    const [created] = await db.insert(insuranceBilling).values({
-      patientId: billing.patientId,
-      employeeId: billing.employeeId,
-      date: new Date(billing.date),
-      totalAmount: billing.totalAmount.toString(),
-      services: billing.services.map(service => ({
-        code: service.code,
-        description: service.description,
-        amount: Number(service.amount)
-      })),
-      status: billing.status || "pending",
-    }).returning();
-    return created;
+    try {
+      console.log("Creating billing with data:", billing);
+      const [created] = await db.insert(insuranceBilling).values({
+        patientId: billing.patientId,
+        employeeId: billing.employeeId,
+        date: new Date(billing.date),
+        totalAmount: billing.totalAmount.toString(),
+        services: billing.services.map(service => ({
+          code: service.code || "",
+          description: service.description || "",
+          amount: Number(service.amount) || 0
+        })),
+        status: billing.status || "pending",
+      }).returning();
+      return created;
+    } catch (error) {
+      console.error("Database Error in createBilling:", error);
+      throw error;
+    }
   }
 
   async updateBillingStatus(id: number, status: string): Promise<InsuranceBilling> {

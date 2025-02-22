@@ -212,7 +212,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/billings", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const parsed = insertBillingSchema.safeParse(req.body);
+      console.log("Received billing data:", req.body);
+      const parsed = insertBillingSchema.safeParse({
+        ...req.body,
+        date: new Date(req.body.date)
+      });
+
       if (!parsed.success) {
         console.error("Validation Error:", parsed.error);
         return res.status(400).json({
@@ -220,6 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: parsed.error.issues
         });
       }
+
       const billing = await storage.createBilling(parsed.data);
       res.status(201).json(billing);
     } catch (error) {

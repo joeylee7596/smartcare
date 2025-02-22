@@ -207,7 +207,7 @@ export default function BillingPage() {
                                     body: JSON.stringify({
                                       patientId: billing.patientId,
                                       employeeId: 1, // TODO: Get from auth context
-                                      date: billing.date,
+                                      date: new Date(billing.date).toISOString(),
                                       services: billing.services.map(service => ({
                                         code: service.code,
                                         description: service.description,
@@ -219,8 +219,9 @@ export default function BillingPage() {
                                   });
 
                                   if (!response.ok) {
-                                    const error = await response.json();
-                                    throw new Error(error.message || 'Fehler beim Speichern der Abrechnung');
+                                    const errorData = await response.json();
+                                    console.error("Server Error:", errorData);
+                                    throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
                                   }
 
                                   queryClient.invalidateQueries({ queryKey: ['/api/billings'] });
