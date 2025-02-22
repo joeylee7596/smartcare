@@ -37,7 +37,7 @@ export default function Patients() {
       title: "Vitalzeichen",
       icon: Pulse,
       description: "Automatische Überwachung",
-      color: "bg-blue-50 text-blue-600 hover:bg-blue-100/80",
+      color: "bg-gradient-to-br from-blue-50/80 to-blue-100/50 text-blue-600 hover:from-blue-100/80 hover:to-blue-200/50",
       onClick: () => {
         toast({
           title: "KI-Analyse",
@@ -49,37 +49,37 @@ export default function Patients() {
       title: "Medikamente",
       icon: Pills,
       description: "Smart Medikationsplan",
-      color: "bg-green-50 text-green-600 hover:bg-green-100/80",
+      color: "bg-gradient-to-br from-green-50/80 to-green-100/50 text-green-600 hover:from-green-100/80 hover:to-green-200/50",
       onClick: () => navigate("/medication"),
     },
     {
       title: "Termine",
       icon: CalendarPlus,
       description: "KI-optimierte Planung",
-      color: "bg-purple-50 text-purple-600 hover:bg-purple-100/80",
+      color: "bg-gradient-to-br from-purple-50/80 to-purple-100/50 text-purple-600 hover:from-purple-100/80 hover:to-purple-200/50",
       onClick: () => navigate("/tours/new"),
     },
     {
       title: "Berichte",
       icon: Note,
       description: "Automatische Dokumentation",
-      color: "bg-orange-50 text-orange-600 hover:bg-orange-100/80",
+      color: "bg-gradient-to-br from-orange-50/80 to-orange-100/50 text-orange-600 hover:from-orange-100/80 hover:to-orange-200/50",
       onClick: () => navigate("/documentation"),
     },
   ];
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/50">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
       <Sidebar />
       <div className="flex-1">
         <Header />
         <main className="p-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
                 Patienten
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-lg text-gray-500">
                 {patients.length} Patienten in Betreuung
               </p>
             </div>
@@ -91,15 +91,24 @@ export default function Patients() {
               <Card 
                 key={action.title}
                 onClick={action.onClick}
-                className="cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 rounded-xl shadow-lg hover:shadow-xl border-0"
+                className="relative overflow-hidden cursor-pointer
+                  transition-all duration-500 hover:scale-[1.02] hover:-translate-y-1
+                  rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
+                  hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)]
+                  border border-white/20 backdrop-blur-sm group"
               >
                 <CardContent className={cn(
-                  "p-6 transition-colors duration-300",
+                  "p-6 transition-all duration-500",
                   action.color
                 )}>
-                  <action.icon weight="regular" className="h-8 w-8 mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />
+                  <action.icon 
+                    weight="regular" 
+                    className="h-8 w-8 mb-4 transition-all duration-500 
+                      group-hover:scale-110 group-hover:rotate-6" 
+                  />
                   <h3 className="font-semibold mb-1">{action.title}</h3>
                   <p className="text-sm opacity-90">{action.description}</p>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 </CardContent>
               </Card>
             ))}
@@ -107,12 +116,18 @@ export default function Patients() {
 
           <div className="mb-6">
             <div className="relative max-w-md">
-              <MagnifyingGlass weight="regular" className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+              <div className="absolute left-3 top-3 text-gray-400 transition-transform duration-300 group-focus-within:scale-110">
+                <MagnifyingGlass weight="regular" className="h-5 w-5" />
+              </div>
               <Input
                 placeholder="Patienten suchen..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 h-12 rounded-xl border-gray-200 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 transition-shadow duration-300"
+                className="pl-10 h-12 rounded-xl bg-white/80 backdrop-blur-sm
+                  border-white/40 hover:border-blue-200 focus:border-blue-300
+                  shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
+                  focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
+                  transition-all duration-300 group"
               />
             </div>
           </div>

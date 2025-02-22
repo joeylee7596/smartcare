@@ -34,20 +34,27 @@ function DashboardCard({
 }) {
   return (
     <Card className={cn(
-      "transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 rounded-xl shadow-lg hover:shadow-xl border-0",
-      gradient && "bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-transparent",
+      "relative overflow-hidden transition-all duration-500",
+      "hover:scale-[1.02] hover:-translate-y-1",
+      "rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]",
+      "hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.12)]",
+      "border border-white/20 backdrop-blur-sm",
+      gradient && "bg-gradient-to-br from-blue-500/[0.08] via-blue-400/[0.05] to-transparent",
       className
     )}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className={cn(
-            "p-4 rounded-xl shadow-lg",
-            gradient ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" : "bg-white"
+            "p-4 rounded-2xl shadow-lg transition-transform duration-500 group-hover:scale-110",
+            gradient 
+              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-500/25" 
+              : "bg-white shadow-blue-500/10"
           )}>
             <Icon 
               weight={gradient ? "fill" : "regular"} 
               className={cn(
-                "h-8 w-8 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3",
+                "h-8 w-8 transition-all duration-500",
+                "group-hover:scale-110 group-hover:rotate-6",
                 !gradient && "text-blue-500"
               )} 
             />
@@ -62,6 +69,7 @@ function DashboardCard({
         <div className="mt-4">
           <h3 className="font-medium text-sm text-gray-600">{title}</h3>
         </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
       </CardContent>
     </Card>
   );
@@ -90,14 +98,14 @@ export default function Dashboard() {
   const pendingDocs = docs.filter(doc => doc.status === "pending");
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/50">
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
       <Sidebar />
       <div className="flex-1">
         <Header />
-        <main className="p-6 md:p-8">
+        <main className="p-8">
           {/* Header Section */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
               Willkommen zurück, {user?.name}
             </h1>
             <p className="text-lg text-gray-500">
@@ -133,14 +141,14 @@ export default function Dashboard() {
               value={criticalPatients.length}
               description="Kritische Patienten"
               icon={FirstAidKit}
-              className="bg-gradient-to-br from-red-500/10 via-red-400/5 to-transparent"
+              className="bg-gradient-to-br from-red-500/[0.08] via-red-400/[0.05] to-transparent"
             />
           </div>
 
           {/* Main Content Area */}
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Left Column: Active Tours */}
-            <Card className="lg:col-span-2 rounded-xl shadow-lg border-0">
+            <Card className="lg:col-span-2 rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
               <CardHeader>
                 <CardTitle className="text-xl text-gray-800">Aktive Touren</CardTitle>
               </CardHeader>
@@ -152,7 +160,10 @@ export default function Dashboard() {
                     todaysTours.map((tour) => (
                       <div 
                         key={tour.id} 
-                        className="p-4 rounded-xl border bg-white hover:bg-blue-50 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group"
+                        className="p-4 rounded-2xl border border-white/40 bg-white/80 backdrop-blur-sm
+                          hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-50/50
+                          transition-all duration-500 hover:shadow-lg hover:-translate-y-0.5
+                          group cursor-pointer"
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -178,7 +189,7 @@ export default function Dashboard() {
             </Card>
 
             {/* Right Column: Quick Actions */}
-            <Card className="rounded-xl shadow-lg border-0">
+            <Card className="rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
               <CardHeader>
                 <CardTitle className="text-xl text-gray-800">Schnellzugriff</CardTitle>
               </CardHeader>
@@ -187,31 +198,52 @@ export default function Dashboard() {
                   <Link href="/patients/new">
                     <Button 
                       variant="outline" 
-                      className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
+                      className="w-full justify-start h-14 rounded-xl
+                        bg-gradient-to-r from-white to-blue-50/50
+                        hover:from-blue-50 hover:to-blue-100/50
+                        border border-white/40 hover:border-blue-200
+                        hover:shadow-lg hover:-translate-y-0.5
+                        transition-all duration-500 group"
                     >
-                      <UsersIcon weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <UsersIcon weight="regular" className="mr-3 h-6 w-6 text-blue-500 
+                        transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
                       <span className="font-medium text-gray-700 flex-1">Patient aufnehmen</span>
-                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
+                        group-hover:translate-x-1 transition-all duration-500" />
                     </Button>
                   </Link>
                   <Link href="/tours/new">
                     <Button 
                       variant="outline" 
-                      className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
+                      className="w-full justify-start h-14 rounded-xl
+                        bg-gradient-to-r from-white to-blue-50/50
+                        hover:from-blue-50 hover:to-blue-100/50
+                        border border-white/40 hover:border-blue-200
+                        hover:shadow-lg hover:-translate-y-0.5
+                        transition-all duration-500 group"
                     >
-                      <Path weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <Path weight="regular" className="mr-3 h-6 w-6 text-blue-500 
+                        transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
                       <span className="font-medium text-gray-700 flex-1">Tour planen</span>
-                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
+                        group-hover:translate-x-1 transition-all duration-500" />
                     </Button>
                   </Link>
                   <Link href="/documentation/new">
                     <Button 
                       variant="outline" 
-                      className="w-full justify-start h-14 rounded-xl bg-gradient-to-r from-blue-500/5 to-blue-400/5 hover:from-blue-500/10 hover:to-blue-400/10 border border-blue-100 hover:border-blue-200 hover:shadow-lg transition-all duration-300 group"
+                      className="w-full justify-start h-14 rounded-xl
+                        bg-gradient-to-r from-white to-blue-50/50
+                        hover:from-blue-50 hover:to-blue-100/50
+                        border border-white/40 hover:border-blue-200
+                        hover:shadow-lg hover:-translate-y-0.5
+                        transition-all duration-500 group"
                     >
-                      <ClipboardText weight="regular" className="mr-3 h-6 w-6 text-blue-500 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300" />
+                      <ClipboardText weight="regular" className="mr-3 h-6 w-6 text-blue-500 
+                        transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
                       <span className="font-medium text-gray-700 flex-1">Dokumentation erstellen</span>
-                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+                      <CaretRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100 
+                        group-hover:translate-x-1 transition-all duration-500" />
                     </Button>
                   </Link>
                 </div>
