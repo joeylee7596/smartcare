@@ -263,21 +263,53 @@ export const shifts = pgTable("shifts", {
   notes: text("notes"),
   aiGenerated: boolean("ai_generated").default(false),
   conflictInfo: json("conflict_info").$type<{
-    type?: "overtime" | "rest-period" | "qualification";
+    type?: "overtime" | "rest-period" | "qualification" | "overlap";
     description?: string;
+    severity: "low" | "medium" | "high";
+    affectedShiftIds?: number[];
   }>(),
+  rotationPattern: text("rotation_pattern"), // early, late, night
+  department: text("department").notNull().default("general"),
+  skills: json("required_skills").$type<string[]>().default([]).notNull(),
+  breakDuration: integer("break_duration").notNull().default(30), // in minutes
+  isOnCall: boolean("is_on_call").default(false),
+  replacementNeeded: boolean("replacement_needed").default(false),
+  locationId: integer("location_id"),
   lastModified: timestamp("last_modified").defaultNow(),
   lastModifiedBy: integer("last_modified_by"),
+});
+
+export const shiftTemplates = pgTable("shift_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  department: text("department").notNull(),
+  startTime: text("start_time").notNull(), // Format: "HH:mm"
+  endTime: text("end_time").notNull(), // Format: "HH:mm"
+  type: text("type").notNull(),
+  requiredSkills: json("required_skills").$type<string[]>().default([]).notNull(),
+  minStaffing: integer("min_staffing").notNull().default(1),
+  optimalStaffing: integer("optimal_staffing").notNull().default(1),
+  breakDuration: integer("break_duration").notNull().default(30),
+  priority: integer("priority").notNull().default(1),
+  isActive: boolean("is_active").default(true),
 });
 
 export const shiftPreferences = pgTable("shift_preferences", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull(),
   preferredShiftTypes: json("preferred_shift_types").$type<string[]>().notNull(),
-  preferredDays: json("preferred_days").$type<string[]>().notNull(),
+  preferredDays: json("preferred_days").$type<string[]>().notNull(), // Format: "Monday", "Tuesday", etc.
   maxShiftsPerWeek: integer("max_shifts_per_week").notNull(),
   minRestHours: integer("min_rest_hours").notNull().default(11),
+  preferredDepartments: json("preferred_departments").$type<string[]>().default([]).notNull(),
   blackoutDates: json("blackout_dates").$type<string[]>().notNull(),
+  maxNightShifts: integer("max_night_shifts").notNull().default(3),
+  preferredWorkingHours: json("preferred_working_hours").$type<{
+    [key: string]: { // day of week
+      start: string; // "HH:mm"
+      end: string; // "HH:mm"
+    };
+  }>(),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
@@ -285,7 +317,7 @@ export const shiftChanges = pgTable("shift_changes", {
   id: serial("id").primaryKey(),
   shiftId: integer("shift_id").notNull(),
   requestedBy: integer("requested_by").notNull(),
-  requestType: text("request_type").notNull(),
+  requestType: text("request_type").notNull(), // swap, cancel, modify
   requestStatus: text("request_status").notNull().default("pending"),
   requestDetails: json("request_details").$type<{
     reason: string;
@@ -294,10 +326,13 @@ export const shiftChanges = pgTable("shift_changes", {
       endTime?: string;
       newEmployeeId?: number;
     };
+    urgency: "low" | "medium" | "high";
+    alternativeEmployees?: number[];
   }>().notNull(),
   responseNote: text("response_note"),
   createdAt: timestamp("created_at").defaultNow(),
   respondedAt: timestamp("responded_at"),
+  respondedBy: integer("responded_by"),
 });
 
 export const insertUserSchema = createInsertSchema(users);
@@ -417,9 +452,58 @@ export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).ext
   ),
 });
 
-export const insertShiftSchema = createInsertSchema(shifts);
-export const insertPreferenceSchema = createInsertSchema(shiftPreferences);
-export const insertChangeSchema = createInsertSchema(shiftChanges);
+export const insertShiftSchema = createInsertSchema(shifts, {
+  conflictInfo: z.object({
+    type: z.enum(["overtime", "rest-period", "qualification", "overlap"]).optional(),
+    description: z.string().optional(),
+    severity: z.enum(["low", "medium", "high"]).default("low"),
+    affectedShiftIds: z.array(z.number()).optional()
+  }).nullable(),
+  skills: z.array(z.string()).default([]),
+  rotationPattern: z.enum(["early", "late", "night"]).optional(),
+  department: z.string().default("general"),
+  breakDuration: z.number().int().min(0).max(120),
+}).extend({
+  startTime: z.string().or(z.date()).transform(val =>
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  endTime: z.string().or(z.date()).transform(val =>
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
+
+export const insertTemplateSchema = createInsertSchema(shiftTemplates).extend({
+  requiredSkills: z.array(z.string()).default([]),
+  minStaffing: z.number().int().min(1),
+  optimalStaffing: z.number().int().min(1),
+  priority: z.number().int().min(1).max(5),
+});
+
+export const insertPreferenceSchema = createInsertSchema(shiftPreferences).extend({
+  preferredShiftTypes: z.array(z.string()).default([]),
+  preferredDays: z.array(z.enum([
+    "Monday", "Tuesday", "Wednesday", "Thursday",
+    "Friday", "Saturday", "Sunday"
+  ])).default([]),
+  maxShiftsPerWeek: z.number().int().min(1).max(7),
+  minRestHours: z.number().int().min(8).max(48),
+  preferredDepartments: z.array(z.string()).default([]),
+  maxNightShifts: z.number().int().min(0).max(7),
+});
+
+export const insertChangeSchema = createInsertSchema(shiftChanges).extend({
+  requestType: z.enum(["swap", "cancel", "modify"]),
+  requestDetails: z.object({
+    reason: z.string().min(1),
+    proposedChanges: z.object({
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      newEmployeeId: z.number().optional(),
+    }).optional(),
+    urgency: z.enum(["low", "medium", "high"]).default("low"),
+    alternativeEmployees: z.array(z.number()).optional(),
+  }),
+});
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -444,6 +528,8 @@ export type ShiftPreference = typeof shiftPreferences.$inferSelect;
 export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
 export type ShiftChange = typeof shiftChanges.$inferSelect;
 export type InsertChange = z.infer<typeof insertChangeSchema>;
+export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
+export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
 
 // Add base patient schema for AI validation
 export const patientSchema = z.object({
