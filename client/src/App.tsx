@@ -11,7 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import Tours from "@/pages/tours";
 import Documentation from "@/pages/documentation";
-import Schedule from "@/pages/schedule";
+import { ModernRoster } from "@/components/scheduling/modern-roster";
 import Billing from "@/pages/billing";
 import Settings from "@/pages/settings";
 
@@ -23,7 +23,7 @@ function Router() {
       <ProtectedRoute path="/patients" component={Patients} />
       <ProtectedRoute path="/tours" component={Tours} />
       <ProtectedRoute path="/documentation" component={Documentation} />
-      <ProtectedRoute path="/schedule" component={Schedule} />
+      <ProtectedRoute path="/schedule" component={ModernRoster} />
       <ProtectedRoute path="/billing" component={Billing} />
       <ProtectedRoute path="/settings" component={Settings} />
       <Route component={NotFound} />

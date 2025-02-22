@@ -4,7 +4,7 @@ import {
   type Shift, type ShiftPreference, type ShiftChange,
   type InsertShift, type InsertPreference, type InsertChange,
   type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow,
-  type InsertBilling, type InsertEmployee, type ExpiryTracking, type InsertExpiryTracking
+  type InsertBilling, type InsertEmployee, type ExpiryTracking, type InsertExpiryTracking, type ShiftTemplate, type InsertTemplate
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, not, lte, gte, between } from "drizzle-orm";
@@ -70,6 +70,7 @@ export interface IStorage {
   createShift(shift: InsertShift): Promise<Shift>;
   updateShift(id: number, shift: Partial<InsertShift>): Promise<Shift>;
   deleteShift(id: number): Promise<void>;
+  getShift(id: number): Promise<Shift | undefined>;
 
   // Shift preferences methods
   getEmployeePreferences(employeeId: number): Promise<ShiftPreference | undefined>;
@@ -79,6 +80,8 @@ export interface IStorage {
   getShiftChanges(shiftId: number): Promise<ShiftChange[]>;
   createShiftChange(change: InsertChange): Promise<ShiftChange>;
   updateShiftChange(id: number, change: Partial<InsertChange>): Promise<ShiftChange>;
+  getShiftTemplates(): Promise<ShiftTemplate[]>;
+  createShiftTemplate(template: InsertTemplate): Promise<ShiftTemplate>;
   sessionStore: session.Store;
 }
 
@@ -457,6 +460,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(shifts).where(eq(shifts.id, id));
   }
 
+  async getShift(id: number): Promise<Shift | undefined> {
+    const [shift] = await db.select().from(shifts).where(eq(shifts.id, id));
+    return shift;
+  }
+
   async getEmployeePreferences(employeeId: number): Promise<ShiftPreference | undefined> {
     const [preferences] = await db
       .select()
@@ -524,6 +532,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(shiftChanges.id, id))
       .returning();
     return updated;
+  }
+  async getShiftTemplates(): Promise<ShiftTemplate[]> {
+    return db.select().from(shiftTemplates);
+  }
+
+  async createShiftTemplate(template: InsertTemplate): Promise<ShiftTemplate> {
+    const [created] = await db.insert(shiftTemplates).values(template).returning();
+    return created;
   }
 }
 
