@@ -6,6 +6,7 @@ import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeS
 import { setupWebSocket } from "./websocket";
 import expiryRoutes from "./routes/expiry";
 import aiRoutes from "./routes/ai";
+import { insertBillingSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -195,6 +196,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     await storage.deleteShift(id);
     res.sendStatus(204);
+  });
+
+  // Billing routes
+  app.get("/api/billings/:patientId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const patientId = parseInt(req.params.patientId);
+    if (isNaN(patientId)) {
+      return res.status(400).json({ error: "Invalid patient ID" });
+    }
+    const billings = await storage.getBillings(patientId);
+    res.json(billings);
+  });
+
+  app.post("/api/billings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const parsed = insertBillingSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const billing = await storage.createBilling(parsed.data);
+    res.status(201).json(billing);
+  });
+
+  app.patch("/api/billings/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid billing ID" });
+    }
+    const { status } = req.body;
+    if (typeof status !== "string") {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+    const billing = await storage.updateBillingStatus(id, status);
+    res.json(billing);
   });
 
   // Register expiry tracking routes
