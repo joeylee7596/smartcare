@@ -13,10 +13,14 @@ import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import type { Employee, Shift } from "@shared/schema";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { queryClient } from "@/lib/queryClient";
 
 export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [filterEmployeeType, setFilterEmployeeType] = useState<"all" | "full-time" | "part-time">("all");
+  const [isNewShiftDialogOpen, setIsNewShiftDialogOpen] = useState(false);
 
   // Fetch employees and shifts
   const { data: employees, isLoading: isLoadingEmployees } = useQuery<Employee[]>({
@@ -25,6 +29,28 @@ export default function SchedulePage() {
 
   const { data: shifts, isLoading: isLoadingShifts } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", selectedDate.toISOString()],
+  });
+
+  // Create new shift mutation
+  const createShift = useMutation({
+    mutationFn: async (newShift: {
+      employeeId: number;
+      startTime: string;
+      endTime: string;
+      type: string;
+    }) => {
+      const response = await fetch("/api/shifts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newShift),
+      });
+      if (!response.ok) throw new Error("Failed to create shift");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      setIsNewShiftDialogOpen(false);
+    },
   });
 
   // Fetch AI recommendations
@@ -47,6 +73,28 @@ export default function SchedulePage() {
     },
     enabled: !!employees && !!shifts,
   });
+
+  const handleCreateShift = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const employeeId = Number(formData.get("employeeId"));
+    const startTime = formData.get("startTime") as string;
+    const endTime = formData.get("endTime") as string;
+    const type = formData.get("type") as string;
+
+    if (!employeeId || !startTime || !endTime || !type) return;
+
+    const newShift = {
+      employeeId,
+      startTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${startTime}`).toISOString(),
+      endTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${endTime}`).toISOString(),
+      type,
+    };
+
+    createShift.mutate(newShift);
+  };
 
   return (
     <div className="flex h-screen">
@@ -118,10 +166,84 @@ export default function SchedulePage() {
                     {shifts?.length || 0} Schichten geplant
                   </p>
                 </div>
-                <Button>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  Neue Schicht
-                </Button>
+                <Dialog open={isNewShiftDialogOpen} onOpenChange={setIsNewShiftDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      Neue Schicht
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Neue Schicht erstellen</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateShift} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="employeeId">Mitarbeiter</Label>
+                        <Select name="employeeId" required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Mitarbeiter auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {employees?.map((employee) => (
+                              <SelectItem key={employee.id} value={String(employee.id)}>
+                                {employee.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Schichttyp</Label>
+                        <Select name="type" required>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Schichttyp auswählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="regular">Regulär</SelectItem>
+                            <SelectItem value="on-call">Bereitschaft</SelectItem>
+                            <SelectItem value="overtime">Überstunden</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="startTime">Startzeit</Label>
+                          <Input
+                            id="startTime"
+                            name="startTime"
+                            type="time"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="endTime">Endzeit</Label>
+                          <Input
+                            id="endTime"
+                            name="endTime"
+                            type="time"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsNewShiftDialogOpen(false)}
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button type="submit" disabled={createShift.isPending}>
+                          {createShift.isPending ? "Wird erstellt..." : "Schicht erstellen"}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               {/* Schedule Grid */}

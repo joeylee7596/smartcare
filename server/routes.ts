@@ -2,12 +2,16 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeSchema } from "@shared/schema";
+import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeSchema, insertShiftSchema } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
 import expiryRoutes from "./routes/expiry";
+import aiRoutes from "./routes/ai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Use AI routes
+  app.use("/api/ai", aiRoutes);
 
   // Documentation
   app.get("/api/docs", async (req, res) => {
@@ -157,6 +161,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const id = parseInt(req.params.id);
     await storage.deleteEmployee(id);
+    res.sendStatus(204);
+  });
+
+  // Shifts
+  app.get("/api/shifts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date(startDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    const shifts = await storage.getShifts(startDate, endDate);
+    res.json(shifts);
+  });
+
+  app.post("/api/shifts", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const parsed = insertShiftSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error);
+    const shift = await storage.createShift(parsed.data);
+    res.status(201).json(shift);
+  });
+
+  app.patch("/api/shifts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    const shift = await storage.updateShift(id, req.body);
+    res.json(shift);
+  });
+
+  app.delete("/api/shifts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const id = parseInt(req.params.id);
+    await storage.deleteShift(id);
     res.sendStatus(204);
   });
 
