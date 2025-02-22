@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { EditPatientDialog } from "./edit-patient-dialog";
 import { useLocation } from "wouter";
 import { CarePredictionDialog } from "./care-prediction-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface PatientGridProps {
   patients: Patient[];
