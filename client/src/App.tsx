@@ -11,6 +11,8 @@ import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import Tours from "@/pages/tours";
 import Documentation from "@/pages/documentation";
+import Schedule from "@/pages/schedule";
+import Billing from "@/pages/billing";
 
 function Router() {
   return (
@@ -19,6 +21,8 @@ function Router() {
       <ProtectedRoute path="/patients" component={Patients} />
       <ProtectedRoute path="/tours" component={Tours} />
       <ProtectedRoute path="/documentation" component={Documentation} />
+      <ProtectedRoute path="/schedule" component={Schedule} />
+      <ProtectedRoute path="/billing" component={Billing} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

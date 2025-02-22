@@ -8,7 +8,9 @@ import {
   Path,
   ClipboardText,
   Gear,
-  CaretLeft
+  CaretLeft,
+  Calendar,
+  CurrencyCircleDollar
 } from "phosphor-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,8 @@ const primaryNavigation = [
   { name: "Patienten", href: "/patients", icon: UsersThree },
   { name: "Touren", href: "/tours", icon: Path },
   { name: "Dokumentation", href: "/documentation", icon: ClipboardText },
+  { name: "Dienstplan", href: "/schedule", icon: Calendar },
+  { name: "Abrechnung", href: "/billing", icon: CurrencyCircleDollar },
 ];
 
 const secondaryNavigation = [
@@ -90,19 +94,19 @@ export function Sidebar() {
                         className={cn(
                           "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
                           "hover:scale-[1.02] active:scale-[0.98]",
-                          isActive 
-                            ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
+                          isActive
+                            ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5"
                             : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                           isCollapsed ? "justify-center p-2" : "px-3 py-2.5"
                         )}
                       >
-                        <Icon 
-                          weight={isActive ? "fill" : "regular"} 
+                        <Icon
+                          weight={isActive ? "fill" : "regular"}
                           className={cn(
                             "transition-all duration-300",
                             isCollapsed ? "h-6 w-6" : "h-5 w-5 mr-3",
                             "group-hover:scale-110 group-hover:rotate-3"
-                          )} 
+                          )}
                         />
                         {!isCollapsed && (
                           <span className="transition-opacity duration-500">{item.name}</span>
@@ -133,19 +137,19 @@ export function Sidebar() {
                         className={cn(
                           "w-full justify-start text-white/70 hover:text-white transition-all duration-300 relative group overflow-hidden",
                           "hover:scale-[1.02] active:scale-[0.98]",
-                          isActive 
-                            ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5" 
+                          isActive
+                            ? "bg-white/10 text-white shadow-lg shadow-blue-500/10 border border-white/5"
                             : "hover:bg-white/5 hover:shadow-lg hover:shadow-blue-500/5",
                           isCollapsed ? "justify-center p-2" : "px-3 py-2.5"
                         )}
                       >
-                        <Icon 
+                        <Icon
                           weight={isActive ? "fill" : "regular"}
                           className={cn(
                             "transition-all duration-300",
                             isCollapsed ? "h-6 w-6" : "h-5 w-5 mr-3",
                             "group-hover:scale-110 group-hover:rotate-3"
-                          )} 
+                          )}
                         />
                         {!isCollapsed && (
                           <span className="transition-opacity duration-500">{item.name}</span>
