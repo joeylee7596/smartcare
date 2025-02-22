@@ -26,11 +26,21 @@ import {
   ChevronRight,
   MapIcon
 } from "lucide-react";
+import { TourMap } from "@/components/tours/tour-map";
 
 const WORKING_HOURS = {
   start: 6,
   end: 22
 };
+
+const EMPLOYEE_COLORS = [
+  { light: "bg-blue-100 hover:bg-blue-200", border: "border-blue-200", text: "text-blue-700" },
+  { light: "bg-purple-100 hover:bg-purple-200", border: "border-purple-200", text: "text-purple-700" },
+  { light: "bg-green-100 hover:bg-green-200", border: "border-green-200", text: "text-green-700" },
+  { light: "bg-amber-100 hover:bg-amber-200", border: "border-amber-200", text: "text-amber-700" },
+  { light: "bg-red-100 hover:bg-red-200", border: "border-red-200", text: "text-red-700" },
+  { light: "bg-indigo-100 hover:bg-indigo-200", border: "border-indigo-200", text: "text-indigo-700" },
+];
 
 function formatHour(hour: number) {
   return `${String(hour).padStart(2, '0')}:00`;
@@ -58,20 +68,24 @@ function TimelineHeader() {
   );
 }
 
+function getEmployeeColor(employeeId: number) {
+  return EMPLOYEE_COLORS[employeeId % EMPLOYEE_COLORS.length];
+}
+
 interface TimelineEventProps {
   tour: Tour;
   patients: Patient[];
+  employeeColor: typeof EMPLOYEE_COLORS[0];
 }
 
-function TimelineEvent({ tour, patients }: TimelineEventProps) {
-  const hourWidth = 60; // Breite pro Stunde in Pixeln
+function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
+  const hourWidth = 60;
   const baseDate = parseISO(tour.date.toString());
 
-  // Beispielhafte Besuchszeiten (später durch echte Daten ersetzen)
   const visits = tour.patientIds.map((patientId, index) => {
     const patient = patients.find(p => p.id === patientId);
-    const visitStart = addMinutes(baseDate, index * 45); // 45 Minuten zwischen Besuchen
-    const visitDuration = 30; // 30 Minuten pro Besuch
+    const visitStart = addMinutes(baseDate, index * 45);
+    const visitDuration = 30;
 
     return {
       patient,
@@ -82,7 +96,6 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
 
   return (
     <>
-      {/* Verbindungslinien zwischen den Besuchen */}
       {visits.map((visit, index) => {
         if (index === visits.length - 1) return null;
 
@@ -105,7 +118,6 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
         );
       })}
 
-      {/* Besuchsbalken */}
       {visits.map((visit, index) => {
         const startHour = visit.start.getHours() + (visit.start.getMinutes() / 60);
         const duration = (visit.end.getTime() - visit.start.getTime()) / (1000 * 60 * 60);
@@ -120,11 +132,8 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
               "absolute h-[calc(100%-6px)] m-1 rounded-lg p-1.5",
               "transition-all duration-300 group cursor-pointer",
               "hover:shadow-lg hover:-translate-y-0.5 hover:z-10",
-              {
-                "bg-green-100 border border-green-200 hover:bg-green-200": tour.status === "active",
-                "bg-blue-100 border border-blue-200 hover:bg-blue-200": tour.status === "completed",
-                "bg-amber-100 border border-amber-200 hover:bg-amber-200": tour.status === "scheduled"
-              }
+              employeeColor.light,
+              employeeColor.border
             )}
             style={{
               left: `${left}px`,
@@ -134,12 +143,12 @@ function TimelineEvent({ tour, patients }: TimelineEventProps) {
           >
             <div className="h-full flex flex-col justify-center overflow-hidden">
               <div className="flex items-center gap-1">
-                <Clock className="h-3 w-3 text-gray-500" />
-                <span className="text-xs font-medium text-gray-700">
+                <Clock className={cn("h-3 w-3", employeeColor.text)} />
+                <span className="text-xs font-medium text-gray-900">
                   {format(visit.start, "HH:mm")}
                 </span>
               </div>
-              <div className="text-xs font-medium text-gray-700 truncate">
+              <div className={cn("text-xs font-medium truncate", employeeColor.text)}>
                 {visit.patient?.name}
               </div>
             </div>
@@ -157,19 +166,19 @@ function TimelineRow({ employee, tours, patients }: {
 }) {
   const employeeTours = tours.filter(tour => tour.employeeId === employee.id);
   const hours = WORKING_HOURS.end - WORKING_HOURS.start;
+  const employeeColor = getEmployeeColor(employee.id);
 
   return (
     <div className="group">
-      <div className="flex items-center min-h-[72px] relative border-b border-gray-100 last:border-b-0">
+      <div className="flex items-center min-h-[72px] relative border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors duration-200">
         <div className="w-40 flex-shrink-0 px-4">
-          <div className="font-medium text-gray-700">{employee.name}</div>
+          <div className={cn("font-medium", employeeColor.text)}>{employee.name}</div>
           <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
             <Clock className="h-4 w-4" />
             <span>{employeeTours.length} Touren</span>
           </div>
         </div>
         <div className="relative" style={{ width: `${hours * 60}px` }}>
-          {/* Hour markers */}
           <div className="absolute inset-0 flex">
             {Array.from({ length: hours }).map((_, i) => (
               <div
@@ -183,15 +192,14 @@ function TimelineRow({ employee, tours, patients }: {
             ))}
           </div>
 
-          {/* Background */}
           <div className="absolute inset-0 bg-gray-50/50 rounded-xl" />
 
-          {/* Events */}
           {employeeTours.map(tour => (
             <TimelineEvent
               key={tour.id}
               tour={tour}
               patients={patients}
+              employeeColor={employeeColor}
             />
           ))}
         </div>
@@ -226,7 +234,6 @@ export default function Tours() {
       <div className="flex-1">
         <Header />
         <main className="p-8">
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
@@ -285,9 +292,7 @@ export default function Tours() {
             </Button>
           </div>
 
-          {/* Main Content */}
           <div className="grid grid-cols-[280px,1fr] gap-6">
-            {/* Left Sidebar - Staff */}
             <Card>
               <CardHeader>
                 <CardTitle>Mitarbeiter</CardTitle>
@@ -336,18 +341,15 @@ export default function Tours() {
               </CardContent>
             </Card>
 
-            {/* Right Content Area */}
             <div className="space-y-6">
-              {/* Timeline */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle>Tagesübersicht</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                   <ScrollArea className="h-[calc(100vh-400px)]" orientation="horizontal">
-                    <div className="relative min-w-[600px]"> {/* Adjusted min-width */}
+                    <div className="relative min-w-[600px]">
                       <TimelineHeader />
-                      {/* Timeline Rows */}
                       <div className="mt-4">
                         {employees.map(employee => (
                           <TimelineRow
@@ -363,7 +365,6 @@ export default function Tours() {
                 </CardContent>
               </Card>
 
-              {/* Map Card */}
               <Card>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
@@ -375,22 +376,20 @@ export default function Tours() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px] rounded-xl bg-gray-100 flex items-center justify-center">
-                    <MapIcon className="h-12 w-12 text-gray-400" />
+                  <div className="h-[300px] rounded-xl overflow-hidden border border-gray-200">
+                    <TourMap
+                      patientIds={dateFilteredTours.flatMap(t => t.patientIds)}
+                      className="w-full h-full"
+                    />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* AI Recommendations */}
-              <Card className="rounded-2xl border border-white/40 bg-white/80
-                backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]
-                hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)]
-                transition-all duration-500">
+              <Card className="rounded-2xl border border-white/40 bg-white/80 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)] hover:shadow-[0_30px_60px_-15px_rgba(59,130,246,0.2)] transition-all duration-500">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <Brain className="h-5 w-5 text-blue-500" />
-                    <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600
-                      bg-clip-text text-transparent">
+                    <CardTitle className="text-lg bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
                       KI-Empfehlungen
                     </CardTitle>
                   </div>
