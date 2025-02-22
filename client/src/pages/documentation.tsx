@@ -89,18 +89,14 @@ function DocumentationPage() {
   const createDocMutation = useMutation({
     mutationFn: async (data: { content: string; patientId: number; type?: string; status: DocumentationStatus }) => {
       const res = await apiRequest("POST", "/api/docs", {
-        ...data,
+        patientId: data.patientId,
+        employeeId: user?.id,
         date: new Date().toISOString(),
+        content: data.content.trim(),
         type: data.type || "Sprachaufnahme",
+        status: data.status,
         aiGenerated: true,
         verified: false,
-        employeeId: user?.id,
-        status: data.status,
-        content: data.content.trim(), // Ensure content is properly formatted
-        reviewNotes: null,
-        reviewerId: null,
-        reviewDate: null,
-        audioRecordingUrl: null,
       });
 
       if (!res.ok) {
