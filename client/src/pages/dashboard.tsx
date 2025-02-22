@@ -13,7 +13,10 @@ import {
   Activity,
   Calendar,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  Wand2,
+  HelpCircle
 } from "lucide-react";
 import { Patient, Tour, Documentation, Employee } from "@shared/schema";
 import { format } from "date-fns";
@@ -28,10 +31,19 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 // Background pattern component
 const BackgroundPattern = () => (
@@ -179,8 +191,145 @@ function ActivityFeed({ activities }: { activities: any[] }) {
   );
 }
 
+// Quick Action component
+function QuickAction({ 
+  icon: Icon, 
+  label, 
+  description, 
+  onClick,
+  shortcut 
+}: { 
+  icon: React.ComponentType<any>;
+  label: string;
+  description: string;
+  onClick: () => void;
+  shortcut?: string;
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <motion.div
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            className="cursor-pointer"
+          >
+            <Button
+              variant="outline"
+              className="w-full justify-between p-4 h-auto rounded-xl
+                bg-gradient-to-r from-white to-blue-50/50
+                hover:from-blue-50 hover:to-blue-100/50
+                border border-white/40 hover:border-blue-200
+                hover:shadow-lg
+                transition-all duration-500 group"
+              onClick={onClick}
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <Icon className="h-5 w-5 text-blue-600
+                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-gray-700">{label}</div>
+                  <div className="text-sm text-gray-500 mt-1">{description}</div>
+                </div>
+              </div>
+              {shortcut && (
+                <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 bg-gray-100 rounded">
+                  {shortcut}
+                </kbd>
+              )}
+            </Button>
+          </motion.div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{description}</p>
+          {shortcut && <p className="text-xs text-gray-500">Shortcut: {shortcut}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+// AI Assistant Dialog component
+function AIAssistantDialog() {
+  const { toast } = useToast();
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          className="fixed right-6 bottom-6 h-14 w-14 rounded-full shadow-xl
+            bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
+            transition-all duration-300 hover:scale-110"
+        >
+          <Wand2 className="h-6 w-6 text-white" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>KI-Assistent</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 h-auto p-4"
+            onClick={() => {
+              toast({
+                title: "Tour-Optimierung gestartet",
+                description: "Der KI-Assistent analysiert Ihre Touren...",
+              });
+            }}
+          >
+            <Route className="h-5 w-5 text-blue-600" />
+            <div className="text-left">
+              <div className="font-medium">Tour optimieren</div>
+              <div className="text-sm text-gray-500">Lassen Sie die KI Ihre Touren automatisch optimieren</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 h-auto p-4"
+            onClick={() => {
+              toast({
+                title: "Dokumentation wird erstellt",
+                description: "Die KI erstellt einen Dokumentationsvorschlag...",
+              });
+            }}
+          >
+            <FileText className="h-5 w-5 text-blue-600" />
+            <div className="text-left">
+              <div className="font-medium">Dokumentation erstellen</div>
+              <div className="text-sm text-gray-500">Automatische Erstellung einer Pflegedokumentation</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3 h-auto p-4"
+            onClick={() => {
+              toast({
+                title: "Dienstplan-Analyse gestartet",
+                description: "Die KI analysiert Ihren Dienstplan...",
+              });
+            }}
+          >
+            <Calendar className="h-5 w-5 text-blue-600" />
+            <div className="text-left">
+              <div className="font-medium">Dienstplan analysieren</div>
+              <div className="text-sm text-gray-500">KI-gestützte Analyse und Optimierung des Dienstplans</div>
+            </div>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
@@ -247,6 +396,57 @@ export default function Dashboard() {
     { name: 'PG 5', count: patients.filter(p => p.careLevel === 5).length },
   ];
 
+  const quickActions = [
+    {
+      icon: Users,
+      label: "Patient aufnehmen",
+      description: "Schnelle Patientenaufnahme mit KI-Unterstützung",
+      shortcut: "⌘ + N",
+      onClick: () => {
+        toast({
+          title: "Patientenaufnahme gestartet",
+          description: "Die KI-gestützte Aufnahme wird vorbereitet...",
+        });
+      }
+    },
+    {
+      icon: Route,
+      label: "Schnell-Tour",
+      description: "KI erstellt optimierte Tour basierend auf aktuellen Patienten",
+      shortcut: "⌘ + T",
+      onClick: () => {
+        toast({
+          title: "Tour wird erstellt",
+          description: "Die KI optimiert die Route...",
+        });
+      }
+    },
+    {
+      icon: Brain,
+      label: "Smart-Dokumentation",
+      description: "Automatische Dokumentation mit Spracheingabe",
+      shortcut: "⌘ + D",
+      onClick: () => {
+        toast({
+          title: "Dokumentation wird vorbereitet",
+          description: "Spracherkennung wird initialisiert...",
+        });
+      }
+    },
+    {
+      icon: Calendar,
+      label: "Dienstplan-Assistent",
+      description: "KI-gestützte Dienstplanerstellung",
+      shortcut: "⌘ + S",
+      onClick: () => {
+        toast({
+          title: "Dienstplan-Assistent",
+          description: "Die KI analysiert verfügbare Mitarbeiter...",
+        });
+      }
+    }
+  ];
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white relative">
       <BackgroundPattern />
@@ -254,7 +454,6 @@ export default function Dashboard() {
       <div className="flex-1">
         <Header />
         <main className="p-8">
-          {/* Header Section */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -269,7 +468,13 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* Overview Cards */}
+          {/* Quick Actions Grid */}
+          <div className="grid gap-4 md:grid-cols-2 mb-8">
+            {quickActions.map((action, index) => (
+              <QuickAction key={index} {...action} />
+            ))}
+          </div>
+
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -314,9 +519,7 @@ export default function Dashboard() {
             />
           </motion.div>
 
-          {/* Main Content Area */}
           <div className="grid gap-6 lg:grid-cols-7">
-            {/* Left Column: Care Level Distribution */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -334,7 +537,7 @@ export default function Dashboard() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                         <XAxis dataKey="name" stroke="#6B7280" />
                         <YAxis stroke="#6B7280" />
-                        <Tooltip
+                        <RechartsTooltip
                           contentStyle={{
                             backgroundColor: 'white',
                             border: '1px solid #E5E7EB',
@@ -354,7 +557,6 @@ export default function Dashboard() {
               </Card>
             </motion.div>
 
-            {/* Right Column: Recent Activity */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -373,61 +575,8 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8"
-          >
-            {[
-              {
-                href: "/patients/new",
-                icon: Users,
-                label: "Neuer Patient"
-              },
-              {
-                href: "/tours/new",
-                icon: Route,
-                label: "Tour planen"
-              },
-              {
-                href: "/documentation/new",
-                icon: Brain,
-                label: "KI-Dokumentation"
-              },
-              {
-                href: "/schedule",
-                icon: Calendar,
-                label: "Dienstplan"
-              }
-            ].map((action) => (
-              <Link key={action.href} href={action.href}>
-                <motion.div
-                  whileHover={{ scale: 1.02, y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between h-14 rounded-xl
-                      bg-gradient-to-r from-white to-blue-50/50
-                      hover:from-blue-50 hover:to-blue-100/50
-                      border border-white/40 hover:border-blue-200
-                      hover:shadow-lg
-                      transition-all duration-500 group"
-                  >
-                    <div className="flex items-center">
-                      <action.icon className="mr-3 h-5 w-5 text-blue-500
-                        transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                      <span className="font-medium text-gray-700">{action.label}</span>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-blue-400 opacity-0 group-hover:opacity-100
-                      group-hover:translate-x-1 transition-all duration-500" />
-                  </Button>
-                </motion.div>
-              </Link>
-            ))}
-          </motion.div>
+          {/* Floating AI Assistant Button */}
+          <AIAssistantDialog />
         </main>
       </div>
     </div>
