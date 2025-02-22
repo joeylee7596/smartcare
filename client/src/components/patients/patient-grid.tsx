@@ -135,12 +135,15 @@ export function PatientGrid({ patients }: PatientGridProps) {
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
-                      <CardTitle className="text-xl font-bold">{patient.name}</CardTitle>
+                      <CardTitle className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                        {patient.name}
+                      </CardTitle>
                       <div className="flex items-center gap-2">
                         <Badge
                           variant={patient.careLevel >= 4 ? "destructive" :
                             patient.careLevel >= 3 ? "secondary" : "default"}
-                          className="text-xs"
+                          className="text-xs rounded-lg font-medium px-2.5 py-0.5 
+                            transition-all duration-300 group-hover:scale-105"
                         >
                           Pflegegrad {patient.careLevel}
                         </Badge>
@@ -148,16 +151,27 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 rounded-full transition-all duration-300
+                            hover:bg-blue-50 hover:text-blue-600"
+                        >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent 
+                        align="end"
+                        className="w-48 rounded-xl border border-white/40 bg-white/80 
+                          backdrop-blur-sm shadow-lg"
+                      >
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedPatient(patient);
                             setShowEditDialog(true);
                           }}
+                          className="rounded-lg transition-colors duration-300
+                            hover:bg-blue-50 hover:text-blue-600 focus:bg-blue-50 focus:text-blue-600"
                         >
                           <Edit className="mr-2 h-4 w-4" />
                           Bearbeiten
@@ -168,6 +182,8 @@ export function PatientGrid({ patients }: PatientGridProps) {
                             getAIInsights(patient);
                           }}
                           disabled={aiLoading}
+                          className="rounded-lg transition-colors duration-300
+                            hover:bg-purple-50 hover:text-purple-600 focus:bg-purple-50 focus:text-purple-600"
                         >
                           <Brain className="mr-2 h-4 w-4" />
                           KI-Analyse
@@ -177,12 +193,15 @@ export function PatientGrid({ patients }: PatientGridProps) {
                             setSelectedPatient(patient);
                             setShowCarePrediction(true);
                           }}
+                          className="rounded-lg transition-colors duration-300
+                            hover:bg-green-50 hover:text-green-600 focus:bg-green-50 focus:text-green-600"
                         >
                           <Brain className="mr-2 h-4 w-4" />
                           Pflegebedarfsprognose
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-destructive"
+                          className="text-destructive rounded-lg transition-colors duration-300
+                            hover:bg-red-50 focus:bg-red-50"
                           onClick={() => deleteMutation.mutate(patient.id)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
@@ -197,21 +216,29 @@ export function PatientGrid({ patients }: PatientGridProps) {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex items-center space-x-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate">{patient.address}</span>
+                        <div className="p-1.5 rounded-lg bg-blue-50 text-blue-500 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <span className="truncate text-gray-600">{patient.address}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate">{patient.emergencyContact}</span>
+                        <div className="p-1.5 rounded-lg bg-green-50 text-green-500 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
+                          <Phone className="h-4 w-4" />
+                        </div>
+                        <span className="truncate text-gray-600">{patient.emergencyContact}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
-                        <Heart className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate">{patient.insuranceProvider}</span>
+                        <div className="p-1.5 rounded-lg bg-purple-50 text-purple-500 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
+                          <Heart className="h-4 w-4" />
+                        </div>
+                        <span className="truncate text-gray-600">{patient.insuranceProvider}</span>
                       </div>
                       {patient.lastVisit && (
                         <div className="flex items-center space-x-2 text-sm">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="truncate">
+                          <div className="p-1.5 rounded-lg bg-orange-50 text-orange-500 transition-all duration-300 group-hover:scale-110 group-hover:rotate-6">
+                            <Calendar className="h-4 w-4" />
+                          </div>
+                          <span className="truncate text-gray-600">
                             {format(new Date(patient.lastVisit), "dd.MM.yyyy")}
                           </span>
                         </div>
@@ -222,31 +249,46 @@ export function PatientGrid({ patients }: PatientGridProps) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 rounded-xl bg-gradient-to-r from-white to-blue-50/50
+                          hover:from-blue-50 hover:to-blue-100/50
+                          border border-white/40 hover:border-blue-200
+                          shadow-sm hover:shadow-lg hover:-translate-y-0.5
+                          transition-all duration-300 group"
                         onClick={() => setLocation(`/documentation/${patient.id}`)}
                       >
-                        <FileText className="h-4 w-4 mr-2" />
+                        <FileText className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6" />
                         Dokumentation
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 rounded-xl bg-gradient-to-r from-white to-purple-50/50
+                          hover:from-purple-50 hover:to-purple-100/50
+                          border border-white/40 hover:border-purple-200
+                          shadow-sm hover:shadow-lg hover:-translate-y-0.5
+                          transition-all duration-300 group"
                         onClick={() => setLocation(`/tours/${patient.id}`)}
                       >
-                        <Calendar className="h-4 w-4 mr-2" />
+                        <Calendar className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6" />
                         Termine
                       </Button>
                     </div>
 
                     {patient.notes && (
-                      <div className="mt-2 p-2 bg-muted rounded-md flex items-center gap-2 text-sm">
-                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                        {patient.notes}
+                      <div className="mt-2 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-amber-100/50
+                        border border-amber-200/50 flex items-center gap-2 text-sm">
+                        <div className="p-1.5 rounded-lg bg-amber-100 text-amber-600">
+                          <AlertTriangle className="h-4 w-4" />
+                        </div>
+                        <p className="text-amber-700">{patient.notes}</p>
                       </div>
                     )}
                   </div>
                 </CardContent>
+
+                {/* Hover overlay with gradient effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/[0.02] to-transparent 
+                  opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               </Card>
             </motion.div>
           ))}
@@ -262,9 +304,12 @@ export function PatientGrid({ patients }: PatientGridProps) {
           />
 
           <Dialog open={showAIInsights} onOpenChange={setShowAIInsights}>
-            <DialogContent>
+            <DialogContent className="rounded-2xl border border-white/20 backdrop-blur-sm
+              shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
               <DialogHeader>
-                <DialogTitle>KI-Analyse: {selectedPatient.name}</DialogTitle>
+                <DialogTitle className="text-xl bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+                  KI-Analyse: {selectedPatient.name}
+                </DialogTitle>
                 <DialogDescription>
                   Automatisch generierte Erkenntnisse basierend auf den Patientendaten
                 </DialogDescription>
@@ -275,7 +320,7 @@ export function PatientGrid({ patients }: PatientGridProps) {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : (
-                  <div className="space-y-4 text-sm whitespace-pre-wrap">
+                  <div className="space-y-4 text-sm whitespace-pre-wrap text-gray-600">
                     {aiInsights}
                   </div>
                 )}

@@ -10,14 +10,15 @@ import {
   Pill as Pills, 
   CalendarPlus, 
   Note,
-  MagnifyingGlass
+  MagnifyingGlass,
+  UserPlus
 } from "phosphor-react";
 import { useState } from "react";
 import { Patient } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 
 export default function Patients() {
   const [search, setSearch] = useState("");
@@ -83,7 +84,24 @@ export default function Patients() {
                 {patients.length} Patienten in Betreuung
               </p>
             </div>
-            <AddPatientDialog />
+            <div className="flex items-center gap-4">
+              <AddPatientDialog>
+                <Button 
+                  size="lg"
+                  className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600
+                    hover:from-blue-600 hover:to-blue-700
+                    text-white shadow-lg shadow-blue-500/25
+                    hover:shadow-xl hover:shadow-blue-500/30
+                    hover:-translate-y-0.5 transition-all duration-300 group"
+                >
+                  <UserPlus weight="regular" 
+                    className="mr-2 h-5 w-5 transition-transform duration-300 
+                      group-hover:scale-110 group-hover:rotate-6" 
+                  />
+                  Patient hinzufügen
+                </Button>
+              </AddPatientDialog>
+            </div>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
