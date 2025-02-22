@@ -24,7 +24,7 @@ import {
   Shield,
   ChevronLeft,
   ChevronRight,
-  MapIcon
+  MapIcon,
 } from "lucide-react";
 import { TourMap } from "@/components/tours/tour-map";
 import AddTourDialog from "@/components/tours/add-tour-dialog";
@@ -37,7 +37,7 @@ import {
 
 const WORKING_HOURS = {
   start: 6,
-  end: 22
+  end: 22,
 };
 
 const EMPLOYEE_COLORS = [
@@ -50,7 +50,7 @@ const EMPLOYEE_COLORS = [
 ];
 
 function formatHour(hour: number) {
-  return `${String(hour).padStart(2, '0')}:00`;
+  return `${String(hour).padStart(2, "0")}:00`;
 }
 
 function TimelineHeader() {
@@ -79,6 +79,13 @@ function getEmployeeColor(employeeId: number) {
   return EMPLOYEE_COLORS[employeeId % EMPLOYEE_COLORS.length];
 }
 
+interface Visit {
+  patient: Patient;
+  start: Date;
+  duration: number;
+  end: Date;
+}
+
 interface TimelineEventProps {
   tour: Tour;
   patients: Patient[];
@@ -86,51 +93,61 @@ interface TimelineEventProps {
 }
 
 function getRandomDuration(careLevel: number): number {
-  const baseDuration = 20 + (careLevel * 5);
+  const baseDuration = 20 + careLevel * 5;
   const variation = baseDuration * 0.15;
-  return Math.round(baseDuration + (Math.random() * variation * 2 - variation));
+  return Math.round(baseDuration + Math.random() * variation * 2 - variation);
 }
 
 function calculateTravelTime(from: string, to: string): number {
-  const [fromLat, fromLng] = from.split(',').map(parseFloat);
-  const [toLat, toLng] = to.split(',').map(parseFloat);
+  const [fromLat, fromLng] = from.split(",").map(parseFloat);
+  const [toLat, toLng] = to.split(",").map(parseFloat);
 
   if (!fromLat || !fromLng || !toLat || !toLng) return 15;
 
   const dx = Math.abs(fromLat - toLat);
   const dy = Math.abs(fromLng - toLng);
-  const distance = Math.sqrt(dx * dx + dy * dy) * 111; 
+  const distance = Math.sqrt(dx * dx + dy * dy) * 111;
 
-  const baseTime = Math.round(distance * 2); 
-  const trafficVariation = Math.round(baseTime * 0.3 * (Math.random() - 0.5)); 
+  const baseTime = Math.round(distance * 2);
+  const trafficVariation = Math.round(baseTime * 0.3 * (Math.random() - 0.5));
 
-  return Math.max(5, Math.min(60, baseTime + trafficVariation)); 
+  return Math.max(5, Math.min(60, baseTime + trafficVariation));
 }
 
 function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
   const hourWidth = 60;
   const baseDate = parseISO(tour.date.toString());
 
-  const visits = tour.patientIds.map((patientId, index) => {
-    const patient = patients.find(p => p.id === patientId);
-    const visitDuration = patient ? getRandomDuration(patient.careLevel) : 30;
+  // Calculate visits and their timings
+  let currentTime = baseDate;
+  const visits: Visit[] = [];
 
-    let visitStart = baseDate;
-    if (index > 0) {
-      const prevPatient = patients.find(p => p.id === tour.patientIds[index - 1]);
-      if (prevPatient && patient) {
+  for (let i = 0; i < tour.patientIds.length; i++) {
+    const patientId = tour.patientIds[i];
+    const patient = patients.find((p) => p.id === patientId);
+
+    if (!patient) continue;
+
+    // Add travel time from previous location if not first visit
+    if (i > 0) {
+      const prevPatient = patients.find((p) => p.id === tour.patientIds[i - 1]);
+      if (prevPatient) {
         const travelTime = calculateTravelTime(prevPatient.address, patient.address);
-        visitStart = addMinutes(visitStart, travelTime);
+        currentTime = addMinutes(currentTime, travelTime);
       }
     }
 
-    return {
+    const visitDuration = getRandomDuration(patient.careLevel);
+    const visit: Visit = {
       patient,
-      start: visitStart,
+      start: currentTime,
       duration: visitDuration,
-      end: addMinutes(visitStart, visitDuration)
+      end: addMinutes(currentTime, visitDuration),
     };
-  });
+
+    visits.push(visit);
+    currentTime = visit.end;
+  }
 
   return (
     <>
@@ -140,10 +157,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
         const startX = ((visit.end.getHours() + visit.end.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
         const nextVisit = visits[index + 1];
         const endX = ((nextVisit.start.getHours() + nextVisit.start.getMinutes() / 60) - WORKING_HOURS.start) * hourWidth;
-        const travelTime = calculateTravelTime(
-          visit.patient?.address || '',
-          nextVisit.patient?.address || ''
-        );
+        const travelTime = calculateTravelTime(visit.patient.address, nextVisit.patient.address);
 
         return (
           <div
@@ -151,15 +165,13 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
             className="absolute h-0 border-t-2 border-dashed border-gray-300 group"
             style={{
               left: `${startX}px`,
-              top: '50%',
+              top: "50%",
               width: `${endX - startX}px`,
-              transform: 'translateY(-50%)',
-              zIndex: 0
+              transform: "translateY(-50%)",
+              zIndex: 0,
             }}
           >
-            <div className="absolute top-0 left-1/2 -translate-y-full -translate-x-1/2 
-              opacity-0 group-hover:opacity-100 transition-opacity duration-200
-              bg-white px-2 py-1 rounded shadow-lg text-xs text-gray-600">
+            <div className="absolute top-0 left-1/2 -translate-y-full -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-2 py-1 rounded shadow-lg text-xs text-gray-600">
               {travelTime} Min. Fahrzeit
             </div>
           </div>
@@ -167,8 +179,8 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
       })}
 
       {visits.map((visit, index) => {
-        const startHour = visit.start.getHours() + (visit.start.getMinutes() / 60);
-        const duration = visit.duration / 60; 
+        const startHour = visit.start.getHours() + visit.start.getMinutes() / 60;
+        const duration = visit.duration / 60;
 
         const left = (startHour - WORKING_HOURS.start) * hourWidth;
         const width = duration * hourWidth;
@@ -188,7 +200,7 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                   style={{
                     left: `${left}px`,
                     width: `${width}px`,
-                    zIndex: 1
+                    zIndex: 1,
                   }}
                 >
                   <div className="h-full flex flex-col justify-center overflow-hidden">
@@ -199,22 +211,22 @@ function TimelineEvent({ tour, patients, employeeColor }: TimelineEventProps) {
                       </span>
                     </div>
                     <div className={cn("text-xs font-medium truncate", employeeColor.text)}>
-                      {visit.patient?.name}
+                      {visit.patient.name}
                     </div>
                   </div>
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top" className="bg-white p-3 rounded-xl shadow-xl border border-gray-200">
                 <div className="space-y-2">
-                  <div className="font-medium">{visit.patient?.name}</div>
+                  <div className="font-medium">{visit.patient.name}</div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                     <div className="text-gray-500">Pflegegrad:</div>
-                    <div className="font-medium">{visit.patient?.careLevel}</div>
+                    <div className="font-medium">{visit.patient.careLevel}</div>
                     <div className="text-gray-500">Besuchsdauer:</div>
                     <div className="font-medium">{visit.duration} Min.</div>
                     <div className="text-gray-500">Adresse:</div>
-                    <div className="font-medium">{visit.patient?.address}</div>
-                    {visit.patient?.notes && (
+                    <div className="font-medium">{visit.patient.address}</div>
+                    {visit.patient.notes && (
                       <>
                         <div className="text-gray-500">Notizen:</div>
                         <div className="font-medium">{visit.patient.notes}</div>
@@ -236,7 +248,7 @@ function TimelineRow({ employee, tours, patients }: {
   tours: Tour[];
   patients: Patient[];
 }) {
-  const employeeTours = tours.filter(tour => tour.employeeId === employee.id);
+  const employeeTours = tours.filter((tour) => tour.employeeId === employee.id);
   const hours = WORKING_HOURS.end - WORKING_HOURS.start;
   const employeeColor = getEmployeeColor(employee.id);
 
@@ -266,13 +278,8 @@ function TimelineRow({ employee, tours, patients }: {
 
           <div className="absolute inset-0 bg-gray-50/50 rounded-xl" />
 
-          {employeeTours.map(tour => (
-            <TimelineEvent
-              key={tour.id}
-              tour={tour}
-              patients={patients}
-              employeeColor={employeeColor}
-            />
+          {employeeTours.map((tour) => (
+            <TimelineEvent key={tour.id} tour={tour} patients={patients} employeeColor={employeeColor} />
           ))}
         </div>
       </div>
@@ -297,9 +304,7 @@ export default function Tours() {
     queryKey: ["/api/employees"],
   });
 
-  const dateFilteredTours = tours.filter(tour =>
-    isSameDay(parseISO(tour.date.toString()), selectedDate)
-  );
+  const dateFilteredTours = tours.filter((tour) => isSameDay(parseISO(tour.date.toString()), selectedDate));
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -371,10 +376,7 @@ export default function Tours() {
               <CardHeader>
                 <CardTitle>Mitarbeiter</CardTitle>
                 <div className="mt-2">
-                  <Input
-                    placeholder="Suchen..."
-                    className="w-full"
-                  />
+                  <Input placeholder="Suchen..." className="w-full" />
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -383,9 +385,9 @@ export default function Tours() {
                     {employees.map((employee) => (
                       <div
                         key={employee.id}
-                        onClick={() => setSelectedEmployee(
-                          selectedEmployee === employee.id ? null : employee.id
-                        )}
+                        onClick={() =>
+                          setSelectedEmployee(selectedEmployee === employee.id ? null : employee.id)
+                        }
                         className={cn(
                           "p-3 rounded-lg cursor-pointer",
                           "transition-all duration-200",
@@ -399,7 +401,8 @@ export default function Tours() {
                             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
                               <Clock className="h-4 w-4" />
                               <span>
-                                {dateFilteredTours.filter(t => t.employeeId === employee.id).length} Touren
+                                {dateFilteredTours.filter((t) => t.employeeId === employee.id).length}{" "}
+                                Touren
                               </span>
                             </div>
                           </div>
@@ -428,8 +431,8 @@ export default function Tours() {
                       <TimelineHeader />
                       <div className="mt-4">
                         {employees
-                          .filter(employee => !selectedEmployee || employee.id === selectedEmployee)
-                          .map(employee => (
+                          .filter((employee) => !selectedEmployee || employee.id === selectedEmployee)
+                          .map((employee) => (
                             <TimelineRow
                               key={employee.id}
                               employee={employee}
@@ -456,7 +459,7 @@ export default function Tours() {
                 <CardContent>
                   <div className="h-[300px] rounded-xl overflow-hidden border border-gray-200">
                     <TourMap
-                      patientIds={dateFilteredTours.flatMap(t => t.patientIds)}
+                      patientIds={dateFilteredTours.flatMap((t) => t.patientIds)}
                       selectedEmployeeId={selectedEmployee}
                       className="w-full h-full"
                     />
@@ -508,7 +511,7 @@ function formatQualification(key: string): string {
     dementiaCare: "Demenzbetreuung",
     palliativeCare: "Palliativpflege",
     lifting: "Hebetechniken",
-    firstAid: "Erste Hilfe"
+    firstAid: "Erste Hilfe",
   };
   return mapping[key] || key;
 }
