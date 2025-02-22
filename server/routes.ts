@@ -2,11 +2,19 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertPatientSchema, insertTourSchema, insertDocSchema, insertEmployeeSchema, insertShiftSchema } from "@shared/schema";
+import { 
+  insertPatientSchema, 
+  insertTourSchema, 
+  insertDocSchema, 
+  insertEmployeeSchema, 
+  insertShiftSchema, 
+  ShiftStatus 
+} from "@shared/schema";
 import { setupWebSocket } from "./websocket";
 import expiryRoutes from "./routes/expiry";
 import aiRoutes from "./routes/ai";
 import { insertBillingSchema } from "@shared/schema";
+import { endOfDay } from "date-fns";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -168,27 +176,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Shifts
   app.get("/api/shifts", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
-    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
 
-    const shifts = await storage.getShifts(startDate, endDate);
-    res.json(shifts);
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : endOfDay(startDate);
+
+    try {
+      const shifts = await storage.getShifts(startDate, endDate);
+      res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching shifts:", error);
+      res.status(500).json({ error: "Failed to fetch shifts" });
+    }
   });
 
   app.post("/api/shifts", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const parsed = insertShiftSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json(parsed.error);
-    const shift = await storage.createShift(parsed.data);
-    res.status(201).json(shift);
+
+    try {
+      const parsed = insertShiftSchema.safeParse({
+        ...req.body,
+        startTime: new Date(req.body.startTime),
+        endTime: new Date(req.body.endTime),
+        status: req.body.status || ShiftStatus.PENDING
+      });
+
+      if (!parsed.success) {
+        console.error("Validation Error:", parsed.error);
+        return res.status(400).json(parsed.error);
+      }
+
+      const shift = await storage.createShift(parsed.data);
+      res.status(201).json(shift);
+    } catch (error) {
+      console.error("Error creating shift:", error);
+      res.status(500).json({ error: "Failed to create shift" });
+    }
   });
 
   app.patch("/api/shifts/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const id = parseInt(req.params.id);
-    const shift = await storage.updateShift(id, req.body);
-    res.json(shift);
+
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid shift ID" });
+      }
+
+      const updates = {
+        ...req.body,
+        startTime: req.body.startTime ? new Date(req.body.startTime) : undefined,
+        endTime: req.body.endTime ? new Date(req.body.endTime) : undefined
+      };
+
+      const shift = await storage.updateShift(id, updates);
+      res.json(shift);
+    } catch (error) {
+      console.error("Error updating shift:", error);
+      res.status(500).json({ error: "Failed to update shift" });
+    }
   });
 
   app.delete("/api/shifts/:id", async (req, res) => {

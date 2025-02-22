@@ -55,7 +55,6 @@ export default function SchedulePage() {
 
   const { data: shiftChanges, isLoading: isLoadingChanges } = useQuery<ShiftChange[]>({
     queryKey: ["/api/shift-changes"],
-    enabled: !!selectedShift,
   });
 
   // Create new shift mutation
@@ -66,6 +65,7 @@ export default function SchedulePage() {
       endTime: string;
       type: string;
       notes?: string;
+      status: string;
     }) => {
       const response = await fetch("/api/shifts", {
         method: "POST",
@@ -94,6 +94,7 @@ export default function SchedulePage() {
         endTime: string;
         type: string;
         notes: string;
+        status: string;
       }>;
     }) => {
       const response = await fetch(`/api/shifts/${shiftId}`, {
@@ -110,75 +111,6 @@ export default function SchedulePage() {
       setSelectedShift(null);
     },
   });
-
-  // Report sick mutation
-  const reportSick = useMutation({
-    mutationFn: async ({ shiftId, note }: { shiftId: number; note: string }) => {
-      const response = await fetch(`/api/shifts/${shiftId}/sick`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
-      });
-      if (!response.ok) throw new Error("Failed to report sick");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      setSelectedShift(null);
-    },
-  });
-
-  // Request shift change mutation
-  const requestShiftChange = useMutation({
-    mutationFn: async ({
-      shiftId,
-      type,
-      details,
-    }: {
-      shiftId: number;
-      type: "swap" | "cancel" | "modify";
-      details: {
-        reason: string;
-        proposedChanges?: {
-          startTime?: string;
-          endTime?: string;
-          newEmployeeId?: number;
-        };
-      };
-    }) => {
-      const response = await fetch(`/api/shifts/${shiftId}/change-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, details }),
-      });
-      if (!response.ok) throw new Error("Failed to request shift change");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/shift-changes"] });
-      setDialogMode(null);
-    },
-  });
-
-  // Handle drag end event
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (!active || !over || !draggedShift) return;
-
-    const newEmployeeId = parseInt(over.id as string);
-    if (newEmployeeId === draggedShift.employeeId) return;
-
-    updateShift.mutate({
-      shiftId: draggedShift.id,
-      updates: {
-        employeeId: newEmployeeId,
-      },
-    });
-
-    setDraggedShift(null);
-  };
 
   // Helper function to calculate shift position and width
   const calculateShiftStyle = (shift: Shift) => {
@@ -198,7 +130,7 @@ export default function SchedulePage() {
   };
 
   // Filter shifts for selected date
-  const todaysShifts = shifts?.filter(shift => 
+  const todaysShifts = shifts?.filter(shift =>
     isSameDay(parseISO(shift.startTime), selectedDate)
   ) || [];
 
@@ -221,6 +153,7 @@ export default function SchedulePage() {
       endTime: new Date(`${format(selectedDate, "yyyy-MM-dd")}T${endTime}`).toISOString(),
       type,
       notes,
+      status: "pending",
     };
 
     if (dialogMode === "create") {
@@ -233,29 +166,48 @@ export default function SchedulePage() {
     }
   };
 
+  // Handle drag end event
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!active || !over || !draggedShift) return;
+
+    const newEmployeeId = parseInt(over.id as string);
+    if (newEmployeeId === draggedShift.employeeId) return;
+
+    updateShift.mutate({
+      shiftId: draggedShift.id,
+      updates: {
+        employeeId: newEmployeeId,
+      },
+    });
+
+    setDraggedShift(null);
+  };
+
   return (
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex">
-          {/* Left Panel - Filters */}
-          <div className="w-64 border-r border-gray-200 bg-[#1E2A4A]/5 overflow-y-auto">
-            <ScrollArea className="h-full px-3 py-4">
-              <div className="space-y-4">
+          {/* Left Panel - Calendar & Filters */}
+          <div className="w-64 border-r border-gray-200 bg-[#1E2A4A]/5">
+            <ScrollArea className="h-[calc(100vh-4rem)] p-4">
+              <div className="space-y-6">
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">Datum</Label>
+                  <Label className="text-base font-semibold mb-2 block">Datum</Label>
                   <Calendar
                     mode="single"
                     selected={selectedDate}
                     onSelect={(date) => date && setSelectedDate(date)}
-                    className="rounded-md border w-full max-w-[240px] bg-white"
+                    className="rounded-md border w-full max-w-[240px] bg-white shadow-sm"
                     locale={de}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Mitarbeitertyp</Label>
+                  <Label className="text-base font-semibold">Filter</Label>
                   <div className="space-y-1">
                     <Button
                       variant={filterEmployeeType === "all" ? "default" : "ghost"}
@@ -312,24 +264,24 @@ export default function SchedulePage() {
 
           {/* Center Panel - Schedule */}
           <div className="flex-1 min-w-0 bg-white">
-            <div className="h-full p-6">
+            <div className="h-full p-6 flex flex-col">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight text-gray-900">
                     Dienstplan für {format(selectedDate, "EEEE, d. MMMM yyyy", { locale: de })}
                   </h1>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 mt-1">
                     {todaysShifts.length} Schichten geplant
                   </p>
                 </div>
-                <Button onClick={() => setDialogMode("create")}>
+                <Button onClick={() => setDialogMode("create")} className="shadow-sm">
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   Neue Schicht
                 </Button>
               </div>
 
               {/* Schedule Grid */}
-              <div className="h-[calc(100%-4rem)] rounded-lg border border-gray-200 bg-white/50 backdrop-blur-sm">
+              <div className="flex-1 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <ScrollArea className="h-full">
                   {isLoadingShifts ? (
                     <div className="flex items-center justify-center h-full">
@@ -346,7 +298,7 @@ export default function SchedulePage() {
                     >
                       <div className="p-4">
                         {/* Time scale */}
-                        <div className="relative h-8 mb-4">
+                        <div className="relative h-8 mb-4 border-b border-gray-100">
                           {Array.from({ length: WORKING_HOURS.end - WORKING_HOURS.start + 1 }).map((_, i) => (
                             <div
                               key={i}
@@ -358,22 +310,24 @@ export default function SchedulePage() {
                           ))}
                         </div>
 
-                        {/* Shifts */}
+                        {/* Employee rows with shifts */}
                         <div className="space-y-4">
                           {employees?.map(employee => (
-                            <div 
+                            <div
                               key={employee.id}
                               id={String(employee.id)}
-                              className="relative h-16 border-t border-gray-100 first:border-t-0 hover:bg-gray-50 transition-colors"
+                              className="relative h-16 border border-gray-100 rounded-md hover:bg-gray-50/50 transition-colors"
                             >
-                              <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center pr-4">
+                              {/* Employee info */}
+                              <div className="absolute left-0 top-0 bottom-0 w-48 flex items-center px-4 bg-white border-r border-gray-100">
                                 <div className="truncate">
                                   <div className="font-medium">{employee.name}</div>
                                   <div className="text-sm text-gray-500">{employee.role}</div>
                                 </div>
                               </div>
 
-                              <div className="relative ml-48 h-full bg-gray-50/50">
+                              {/* Timeline with shifts */}
+                              <div className="relative ml-48 h-full bg-gray-50/50 rounded-r-md">
                                 {/* Time slots background */}
                                 <div className="absolute inset-0 grid grid-cols-16 gap-0">
                                   {Array.from({ length: 16 }).map((_, i) => (
@@ -396,10 +350,10 @@ export default function SchedulePage() {
                                     return (
                                       <TooltipProvider key={shift.id}>
                                         <Tooltip>
-                                          <TooltipTrigger>
+                                          <TooltipTrigger asChild>
                                             <div
                                               className={cn(
-                                                "absolute top-2 h-12 rounded-md cursor-pointer transition-all group",
+                                                "absolute top-2 h-12 rounded-md cursor-pointer transition-all group shadow-sm",
                                                 "flex items-center justify-between px-2 text-sm font-medium text-white",
                                                 {
                                                   "bg-green-500 hover:bg-green-600": shift.status === "confirmed",
@@ -416,7 +370,7 @@ export default function SchedulePage() {
                                               onDragStart={() => setDraggedShift(shift)}
                                             >
                                               <div className="truncate">
-                                                {format(parseISO(shift.startTime), "HH:mm")} - 
+                                                {format(parseISO(shift.startTime), "HH:mm")} -
                                                 {format(parseISO(shift.endTime), "HH:mm")}
                                               </div>
                                               <Button
@@ -437,7 +391,7 @@ export default function SchedulePage() {
                                             <div className="space-y-1">
                                               <div className="font-medium">{employee.name}</div>
                                               <div className="text-sm">
-                                                {format(parseISO(shift.startTime), "HH:mm")} - 
+                                                {format(parseISO(shift.startTime), "HH:mm")} -
                                                 {format(parseISO(shift.endTime), "HH:mm")}
                                               </div>
                                               <div className="text-sm">
@@ -465,7 +419,7 @@ export default function SchedulePage() {
                         {draggedShift && (
                           <div
                             className={cn(
-                              "h-12 rounded-md px-2 text-sm font-medium text-white",
+                              "h-12 rounded-md px-2 text-sm font-medium text-white shadow-lg",
                               "flex items-center justify-center",
                               {
                                 "bg-green-500": draggedShift.status === "confirmed",
@@ -475,7 +429,7 @@ export default function SchedulePage() {
                             )}
                             style={{ width: calculateShiftStyle(draggedShift).width }}
                           >
-                            {format(parseISO(draggedShift.startTime), "HH:mm")} - 
+                            {format(parseISO(draggedShift.startTime), "HH:mm")} -
                             {format(parseISO(draggedShift.endTime), "HH:mm")}
                           </div>
                         )}
@@ -488,8 +442,8 @@ export default function SchedulePage() {
           </div>
 
           {/* Right Panel - AI Recommendations & Actions */}
-          <div className="w-80 border-l border-gray-200 bg-[#1E2A4A]/5 overflow-y-auto">
-            <ScrollArea className="h-full">
+          <div className="w-80 border-l border-gray-200 bg-[#1E2A4A]/5">
+            <ScrollArea className="h-[calc(100vh-4rem)]">
               <div className="p-4 space-y-4">
                 {selectedShift && (
                   <Card className="bg-white/80 backdrop-blur-sm">
@@ -512,7 +466,13 @@ export default function SchedulePage() {
                           onClick={() => {
                             const note = prompt("Grund der Krankmeldung:");
                             if (note && selectedShift) {
-                              reportSick.mutate({ shiftId: selectedShift.id, note });
+                              updateShift.mutate({
+                                shiftId: selectedShift.id,
+                                updates: {
+                                  status: "sick",
+                                  notes: note,
+                                },
+                              });
                             }
                           }}
                         >
@@ -542,21 +502,21 @@ export default function SchedulePage() {
                         <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
                           <div className="font-medium text-blue-800 mb-1">Schichtverteilung</div>
                           <p className="text-sm text-blue-600/90">
-                            Die aktuelle Verteilung zeigt Lücken im Spätdienst. 
+                            Die aktuelle Verteilung zeigt Lücken im Spätdienst.
                             Erwägen Sie zusätzliche Schichten zwischen 14:00 und 22:00 Uhr.
                           </p>
                         </div>
                         <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
                           <div className="font-medium text-blue-800 mb-1">Qualifikationen</div>
                           <p className="text-sm text-blue-600/90">
-                            Stellen Sie sicher, dass in jeder Schicht mindestens eine 
+                            Stellen Sie sicher, dass in jeder Schicht mindestens eine
                             Pflegefachkraft verfügbar ist.
                           </p>
                         </div>
                         <div className="rounded-md bg-white/80 backdrop-blur-sm p-3 border border-blue-100">
                           <div className="font-medium text-blue-800 mb-1">Arbeitszeiten</div>
                           <p className="text-sm text-blue-600/90">
-                            Beachten Sie die Ruhezeiten zwischen den Schichten von 
+                            Beachten Sie die Ruhezeiten zwischen den Schichten von
                             mindestens 11 Stunden.
                           </p>
                         </div>
@@ -574,146 +534,108 @@ export default function SchedulePage() {
               <DialogHeader>
                 <DialogTitle>
                   {dialogMode === "create" ? "Neue Schicht erstellen" :
-                   dialogMode === "edit" ? "Schicht bearbeiten" :
-                   "Schicht ändern"}
+                    dialogMode === "edit" ? "Schicht bearbeiten" :
+                      "Schicht ändern"}
                 </DialogTitle>
               </DialogHeader>
 
-              {dialogMode === "change" ? (
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Art der Änderung</Label>
-                    <Select
-                      onValueChange={(value) => {
-                        if (selectedShift) {
-                          requestShiftChange.mutate({
-                            shiftId: selectedShift.id,
-                            type: value as "swap" | "cancel" | "modify",
-                            details: {
-                              reason: "Änderungsanfrage",
-                            },
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Bitte wählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="swap">Mit anderem Mitarbeiter tauschen</SelectItem>
-                        <SelectItem value="cancel">Schicht absagen</SelectItem>
-                        <SelectItem value="modify">Arbeitszeit ändern</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <form onSubmit={handleSubmitShift} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employeeId">Mitarbeiter</Label>
+                  <Select
+                    name="employeeId"
+                    defaultValue={selectedShift?.employeeId.toString()}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Mitarbeiter auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {employees?.map((employee) => (
+                        <SelectItem key={employee.id} value={String(employee.id)}>
+                          {employee.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="type">Schichttyp</Label>
+                  <Select
+                    name="type"
+                    defaultValue={selectedShift?.type}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Schichttyp auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="regular">Regulär</SelectItem>
+                      <SelectItem value="on-call">Bereitschaft</SelectItem>
+                      <SelectItem value="overtime">Überstunden</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Grund der Änderung</Label>
-                    <Textarea
-                      placeholder="Bitte geben Sie den Grund für die Änderung an"
-                      className="min-h-[100px]"
+                    <Label htmlFor="startTime">Startzeit</Label>
+                    <Input
+                      id="startTime"
+                      name="startTime"
+                      type="time"
+                      defaultValue={selectedShift ?
+                        format(parseISO(selectedShift.startTime), "HH:mm") :
+                        undefined
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">Endzeit</Label>
+                    <Input
+                      id="endTime"
+                      name="endTime"
+                      type="time"
+                      defaultValue={selectedShift ?
+                        format(parseISO(selectedShift.endTime), "HH:mm") :
+                        undefined
+                      }
+                      required
                     />
                   </div>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmitShift} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeId">Mitarbeiter</Label>
-                    <Select 
-                      name="employeeId" 
-                      defaultValue={selectedShift?.employeeId.toString()}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Mitarbeiter auswählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employees?.map((employee) => (
-                          <SelectItem key={employee.id} value={String(employee.id)}>
-                            {employee.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Schichttyp</Label>
-                    <Select 
-                      name="type" 
-                      defaultValue={selectedShift?.type}
-                      required
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Schichttyp auswählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="regular">Regulär</SelectItem>
-                        <SelectItem value="on-call">Bereitschaft</SelectItem>
-                        <SelectItem value="overtime">Überstunden</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notizen</Label>
+                  <Textarea
+                    id="notes"
+                    name="notes"
+                    placeholder="Zusätzliche Informationen zur Schicht"
+                    defaultValue={selectedShift?.notes || ""}
+                  />
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startTime">Startzeit</Label>
-                      <Input
-                        id="startTime"
-                        name="startTime"
-                        type="time"
-                        defaultValue={selectedShift ? 
-                          format(parseISO(selectedShift.startTime), "HH:mm") :
-                          undefined
-                        }
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="endTime">Endzeit</Label>
-                      <Input
-                        id="endTime"
-                        name="endTime"
-                        type="time"
-                        defaultValue={selectedShift ? 
-                          format(parseISO(selectedShift.endTime), "HH:mm") :
-                          undefined
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="notes">Notizen</Label>
-                    <Textarea
-                      id="notes"
-                      name="notes"
-                      placeholder="Zusätzliche Informationen zur Schicht"
-                      defaultValue={selectedShift?.notes || ""}
-                    />
-                  </div>
-
-                  <DialogFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setDialogMode(null)}
-                    >
-                      Abbrechen
-                    </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={dialogMode === "create" ? createShift.isPending : updateShift.isPending}
-                    >
-                      {dialogMode === "create" ? 
-                        (createShift.isPending ? "Wird erstellt..." : "Schicht erstellen") :
-                        (updateShift.isPending ? "Wird gespeichert..." : "Änderungen speichern")
-                      }
-                    </Button>
-                  </DialogFooter>
-                </form>
-              )}
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogMode(null)}
+                  >
+                    Abbrechen
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={dialogMode === "create" ? createShift.isPending : updateShift.isPending}
+                  >
+                    {dialogMode === "create" ?
+                      (createShift.isPending ? "Wird erstellt..." : "Schicht erstellen") :
+                      (updateShift.isPending ? "Wird gespeichert..." : "Änderungen speichern")
+                    }
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
