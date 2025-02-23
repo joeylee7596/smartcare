@@ -13,6 +13,7 @@ import {
 import { setupWebSocket } from "./websocket";
 import expiryRoutes from "./routes/expiry";
 import aiRoutes from "./routes/ai";
+import analyticsRoutes from "./routes/analytics";
 import { insertBillingSchema } from "@shared/schema";
 import { endOfDay } from "date-fns";
 
@@ -21,6 +22,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Use AI routes
   app.use("/api/ai", aiRoutes);
+
+  // Use analytics routes
+  app.use("/api/analytics", analyticsRoutes);
 
   // Documentation
   app.get("/api/docs", async (req, res) => {
