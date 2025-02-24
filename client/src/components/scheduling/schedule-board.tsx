@@ -194,7 +194,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       return newShift;
     },
     onMutate: async (newShiftData) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: shiftsQueryKey });
+
+      // Snapshot the previous value
+      const previousShifts = queryClient.getQueryData<Shift[]>(shiftsQueryKey) || [];
 
       const optimisticShift = {
         id: Date.now(), 
@@ -215,9 +219,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         },
       };
 
-      queryClient.setQueryData<Shift[]>(shiftsQueryKey, (old = []) => [...old, optimisticShift]);
+      // Optimistically update to the new value
+      queryClient.setQueryData<Shift[]>(shiftsQueryKey, [...previousShifts, optimisticShift]);
 
-      return { previousShifts: old };
+      // Return a context object with the snapshotted value
+      return { previousShifts };
     },
     onError: (error, variables, context) => {
       if (context?.previousShifts) {
