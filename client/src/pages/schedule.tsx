@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,14 +22,20 @@ import {
   Clock,
   Settings2,
   Wand2,
+  Plus,
+  AlertTriangle,
 } from "lucide-react";
 import type { Employee, Shift, ShiftTemplate } from "@shared/schema";
 import { DailyRoster } from "@/components/tours/daily-roster";
+import { ShiftTemplatesDialog } from "@/components/scheduling/shift-templates-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<"daily" | "weekly">("daily");
   const [scheduleMode, setScheduleMode] = useState<"manual" | "auto">("manual");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   // Fetch data
   const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<Employee[]>({
@@ -45,6 +51,35 @@ export default function SchedulePage() {
 
   const { data: templates = [], isLoading: isLoadingTemplates } = useQuery<ShiftTemplate[]>({
     queryKey: ["/api/shift-templates"],
+  });
+
+  // Apply template mutation
+  const applyTemplate = useMutation({
+    mutationFn: async (template: ShiftTemplate) => {
+      const response = await fetch("/api/shifts/from-template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          templateId: template.id,
+          date: selectedDate.toISOString(),
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to apply template");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Erfolg",
+        description: "Schicht wurde erstellt",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Schicht konnte nicht erstellt werden",
+        variant: "destructive",
+      });
+    },
   });
 
   // Loading state
@@ -134,11 +169,26 @@ export default function SchedulePage() {
                       <Users className="mr-2 h-4 w-4" />
                       Mitarbeiter verwalten
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setTemplateDialogOpen(true)}
+                    >
                       <Clock className="mr-2 h-4 w-4" />
-                      Schichtvorlagen
+                      Schichtvorlage erstellen
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => {
+                        if (scheduleMode === "auto") {
+                          toast({
+                            title: "KI-Analyse wird gestartet",
+                            description: "Die optimale Schichtplanung wird berechnet...",
+                          });
+                        }
+                      }}
+                    >
                       <Brain className="mr-2 h-4 w-4" />
                       KI-Analyse
                     </Button>
@@ -147,7 +197,16 @@ export default function SchedulePage() {
 
                 {/* Templates Section */}
                 <div className="space-y-2">
-                  <Label className="text-base font-semibold">Schichtvorlagen</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Schichtvorlagen</Label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setTemplateDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                   <ScrollArea className="h-48 rounded-md border">
                     <div className="p-2 space-y-2">
                       {templates.map((template) => (
@@ -156,6 +215,7 @@ export default function SchedulePage() {
                           variant="outline"
                           className="w-full justify-start text-left"
                           size="sm"
+                          onClick={() => applyTemplate.mutate(template)}
                         >
                           <div>
                             <div className="font-medium">{template.name}</div>
@@ -193,6 +253,11 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      <ShiftTemplatesDialog 
+        open={templateDialogOpen}
+        onOpenChange={setTemplateDialogOpen}
+      />
     </div>
   );
 }

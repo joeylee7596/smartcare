@@ -1,4 +1,4 @@
-import { Employee, Tour } from "@shared/schema";
+import { Employee, Tour, Shift } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -27,19 +27,19 @@ import { Button } from "@/components/ui/button";
 
 interface DailyRosterProps {
   employees: Employee[];
-  tours: Tour[];
+  shifts: Shift[];
   selectedDate: Date;
 }
 
-export function DailyRoster({ employees, tours, selectedDate }: DailyRosterProps) {
+export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProps) {
   // Get the start of the week for the selected date
   const weekStart = startOfWeek(selectedDate, { locale: de });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   // Helper function to get shift type icon
   const getShiftIcon = (startHour: number) => {
-    if (startHour >= 6 && startHour < 12) return <Sun className="h-4 w-4 text-yellow-500" />;
-    if (startHour >= 12 && startHour < 18) return <Coffee className="h-4 w-4 text-orange-500" />;
+    if (startHour >= 6 && startHour < 14) return <Sun className="h-4 w-4 text-yellow-500" />;
+    if (startHour >= 14 && startHour < 22) return <Coffee className="h-4 w-4 text-orange-500" />;
     return <Moon className="h-4 w-4 text-blue-500" />;
   };
 
@@ -94,9 +94,9 @@ export function DailyRoster({ employees, tours, selectedDate }: DailyRosterProps
                 <CardContent className="pt-4">
                   <div className="grid grid-cols-7 gap-2">
                     {weekDays.map((day, index) => {
-                      const dayTours = tours.filter(
-                        tour => tour.employeeId === employee.id && isSameDay(parseISO(tour.date.toString()), day)
-                      ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                      const dayShifts = shifts.filter(
+                        shift => shift.employeeId === employee.id && isSameDay(parseISO(shift.startTime.toString()), day)
+                      ).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
                       const workingHours = employee.workingHours[format(day, 'EEEE', { locale: de }).toLowerCase()];
                       const isWorkingDay = workingHours?.isWorkingDay;
@@ -118,8 +118,8 @@ export function DailyRoster({ employees, tours, selectedDate }: DailyRosterProps
                           </div>
                           {isWorkingDay ? (
                             <div className="space-y-1">
-                              {dayTours.map((tour) => (
-                                <HoverCard key={tour.id}>
+                              {dayShifts.map((shift) => (
+                                <HoverCard key={shift.id}>
                                   <HoverCardTrigger asChild>
                                     <div 
                                       className={clsx(
@@ -130,15 +130,15 @@ export function DailyRoster({ employees, tours, selectedDate }: DailyRosterProps
                                       )}
                                     >
                                       <div className="flex items-center gap-2">
-                                        {getShiftIcon(new Date(tour.date).getHours())}
+                                        {getShiftIcon(new Date(shift.startTime).getHours())}
                                         <span className="text-sm">
-                                          {format(parseISO(tour.date.toString()), "HH:mm")}
+                                          {format(parseISO(shift.startTime.toString()), "HH:mm")}
                                         </span>
                                       </div>
-                                      {tour.optimizationScore && (
+                                      {shift.optimizationScore && (
                                         <div className="flex items-center text-xs">
                                           <Brain className="h-3 w-3 text-purple-500 mr-1" />
-                                          {tour.optimizationScore}%
+                                          {shift.optimizationScore}%
                                         </div>
                                       )}
                                     </div>
@@ -146,20 +146,23 @@ export function DailyRoster({ employees, tours, selectedDate }: DailyRosterProps
                                   <HoverCardContent className="w-80 p-0">
                                     <div className="p-4">
                                       <div className="flex items-center justify-between mb-2">
-                                        <h4 className="font-medium">Tour Details</h4>
+                                        <h4 className="font-medium">Schicht Details</h4>
                                         <Badge variant="outline">
-                                          {tour.patientIds.length} Patienten
+                                          {shift.type}
                                         </Badge>
                                       </div>
                                       <div className="space-y-2 text-sm text-gray-500">
                                         <div className="flex items-center gap-2">
                                           <Clock className="h-4 w-4" />
-                                          <span>{format(parseISO(tour.date.toString()), "HH:mm")}</span>
+                                          <span>
+                                            {format(parseISO(shift.startTime.toString()), "HH:mm")} - 
+                                            {format(parseISO(shift.endTime.toString()), "HH:mm")}
+                                          </span>
                                         </div>
-                                        {tour.economicIndicator && (
+                                        {shift.notes && (
                                           <div className="flex items-center gap-2">
                                             <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                            <span>Wirtschaftlichkeit: {tour.economicIndicator}</span>
+                                            <span>{shift.notes}</span>
                                           </div>
                                         )}
                                       </div>
