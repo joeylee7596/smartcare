@@ -420,13 +420,14 @@ export class DatabaseStorage implements IStorage {
 
   // Implement new shift-related methods
   async getShifts(startDate: Date, endDate: Date): Promise<Shift[]> {
+    console.log('Fetching shifts for:', { startDate, endDate }); // Debug logging
     return db
       .select()
       .from(shifts)
       .where(
         and(
           gte(shifts.startTime, startDate),
-          lte(shifts.endTime, endDate)
+          lte(shifts.startTime, endDate)
         )
       )
       .orderBy(shifts.startTime);

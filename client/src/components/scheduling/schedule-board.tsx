@@ -142,13 +142,20 @@ export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimi
   });
 
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
+    queryKey: ["/api/shifts", { start: weekStart.toISOString(), end: weekEnd.toISOString(), department }],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/shifts", {
+      const searchParams = new URLSearchParams({
         start: weekStart.toISOString(),
         end: weekEnd.toISOString(),
         department,
       });
+
+      console.log('Fetching shifts with params:', searchParams.toString()); 
+      const res = await apiRequest(
+        "GET", 
+        `/api/shifts?${searchParams.toString()}`
+      );
+
       if (!res.ok) throw new Error("Failed to fetch shifts");
       return res.json();
     },
