@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, closestCenter } from "@dnd-kit/core";
-import { SortableContext, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { format, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
@@ -147,7 +145,7 @@ function DroppableCell({ children, id, onDrop }: { children: React.ReactNode; id
 }
 
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
-  const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const queryClient = useQueryClient();
@@ -218,7 +216,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
       });
-      setDraggedShift(null);
     },
   });
 
@@ -261,28 +258,27 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
+    setActiveId(null);
+
     if (!over) return;
 
-    const [targetDate, targetEmployeeId] = over.id.toString().split("_");
-    const draggedId = active.id.toString();
+    const [employeeId, date] = over.id.toString().split("_");
+    const [type] = active.id.toString().split("_");
 
-    // Check if we're dragging a new shift or an existing one
-    if (draggedId.startsWith("new_")) {
-      const shiftType = draggedId.split("_")[1];
+    if (type && employeeId && date) {
       createShiftMutation.mutate({
-        employeeId: parseInt(targetEmployeeId),
-        type: shiftType,
-        date: new Date(targetDate),
-      });
-    } else if (draggedShift) {
-      updateShiftMutation.mutate({
-        id: draggedShift.id,
-        updates: {
-          employeeId: parseInt(targetEmployeeId),
-          startTime: new Date(targetDate),
-        },
+        employeeId: parseInt(employeeId),
+        type,
+        date: new Date(date),
       });
     }
+  };
+
+  // Handle drag start
+  const handleDragStart = (event: DragEndEvent) => {
+    const { active } = event;
+    setActiveId(active.id.toString());
   };
 
   return (
@@ -290,6 +286,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
+      onDragStart={handleDragStart}
     >
       <Card className="mt-6">
         <CardHeader className="pb-4 border-b">
@@ -300,13 +297,14 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 return (
                   <div
                     key={type}
-                    data-draggable
-                    id={`new_${type}`}
+                    draggable
+                    id={`${type}`}
                     className={`
                       flex items-center gap-2 p-3 rounded-lg
                       ${info.bgColor} border-2 border-dashed cursor-grab
                       hover:border-solid hover:shadow-sm transition-all
                       group relative
+                      ${activeId === type ? 'opacity-50' : ''}
                     `}
                   >
                     <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
@@ -387,25 +385,50 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       );
 
                       return (
-                        <DroppableCell
+                        <div
                           key={dateStr}
-                          id={`${dateStr}_${employee.id}`}
-                          onDrop={() => {}}
+                          id={`${employee.id}_${dateStr}`}
+                          className={`
+                            p-2 min-h-[100px] border-l relative
+                            ${activeId ? 'bg-blue-50/30 border-2 border-dashed border-blue-200' : ''}
+                            hover:bg-gray-50/50
+                            transition-all
+                          `}
                         >
-                          <SortableContext items={dayShifts.map(s => s.id)}>
-                            <AnimatePresence>
-                              {dayShifts.map((shift) => {
-                                const shiftInfo = ShiftTypes[shift.type as keyof typeof ShiftTypes];
-                                return (
-                                  <SortableShift
-                                    key={shift.id}
-                                    shift={shift}
-                                    info={shiftInfo}
-                                  />
-                                );
-                              })}
-                            </AnimatePresence>
-                          </SortableContext>
+                          {dayShifts.map((shift) => {
+                            const shiftInfo = ShiftTypes[shift.type as keyof typeof ShiftTypes];
+                            const Icon = shiftInfo.icon;
+
+                            return (
+                              <div
+                                key={shift.id}
+                                className={`
+                                  p-2 mb-1 rounded-md
+                                  ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${shiftInfo.bgColor} border`}
+                                  hover:shadow-md transition-all
+                                `}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Icon className={`h-4 w-4 ${shiftInfo.color}`} />
+                                    <span className="text-sm font-medium">
+                                      {shiftInfo.label}
+                                    </span>
+                                  </div>
+                                  {shift.aiOptimized && (
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Sparkles className="h-4 w-4 text-green-500" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        KI-optimierte Schicht
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
 
                           {dayShifts.length === 0 && (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
@@ -413,7 +436,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                               <span className="text-xs mt-1">Schicht hinzufügen</span>
                             </div>
                           )}
-                        </DroppableCell>
+                        </div>
                       );
                     })}
                   </div>
