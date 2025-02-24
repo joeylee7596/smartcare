@@ -54,7 +54,7 @@ export default function Schedule() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // KI-Optimierung Mutation
+  // KI-Optimierung
   const optimizeScheduleMutation = useMutation({
     mutationFn: async () => {
       try {
@@ -94,7 +94,7 @@ export default function Schedule() {
     },
   });
 
-  // Präferenzen aktualisieren
+  // Mitarbeiter-Präferenzen aktualisieren
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: {
       employeeId: number;
@@ -117,14 +117,6 @@ export default function Schedule() {
       });
     },
   });
-
-  const handleOptimize = async () => {
-    try {
-      await optimizeScheduleMutation.mutateAsync();
-    } catch (error) {
-      console.error("Optimization error:", error);
-    }
-  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -182,7 +174,7 @@ export default function Schedule() {
           <ScheduleBoard
             selectedDate={selectedDate}
             department={department}
-            onOptimize={handleOptimize}
+            onOptimize={() => optimizeScheduleMutation.mutate()}
           />
 
           {/* Preferences Dialog */}
