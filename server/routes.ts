@@ -236,20 +236,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shifts", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : endOfDay(startDate);
+
     try {
-      const startDate = req.query.start ? new Date(req.query.start as string) : new Date();
-      const endDate = req.query.end ? new Date(req.query.end as string) : endOfDay(startDate);
-
-      console.log("Fetching shifts with params:", {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        department: req.query.department
-      });
-
       const shifts = await storage.getShifts(startDate, endDate);
-
-      console.log("Found shifts:", shifts);
-
       res.json(shifts);
     } catch (error) {
       console.error("Error fetching shifts:", error);
