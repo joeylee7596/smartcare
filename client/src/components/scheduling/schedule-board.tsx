@@ -8,8 +8,8 @@ import {
   Sun,
   Moon,
   Coffee,
-  Sparkles,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -130,18 +130,17 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const { toast } = useToast();
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1, locale: de });
+  const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const shiftsQueryKey = ["/api/shifts", { start: weekStart.toISOString(), end: weekEnd.toISOString(), department }];
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", {
-      start: weekStart.toISOString(),
-      end: addDays(weekStart, 6).toISOString(),
-      department,
-    }],
+    queryKey: shiftsQueryKey,
   });
 
   const createShiftMutation = useMutation({
@@ -194,20 +193,47 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       const newShift = await res.json();
       return newShift;
     },
-    onSuccess: (newShift) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      queryClient.setQueryData<Shift[]>(["/api/shifts"], (old = []) => [...old, newShift]);
+    onMutate: async (newShiftData) => {
+      await queryClient.cancelQueries({ queryKey: shiftsQueryKey });
 
-      toast({
-        title: "Schicht erstellt",
-        description: "Die neue Schicht wurde erfolgreich angelegt.",
-      });
+      const optimisticShift = {
+        id: Date.now(), 
+        employeeId: newShiftData.employeeId,
+        type: newShiftData.type,
+        startTime: newShiftData.date.toISOString(),
+        endTime: addDays(newShiftData.date,1).toISOString(),
+        department: department,
+        status: "scheduled",
+        notes: "",
+        aiGenerated: false,
+        aiOptimized: false,
+        conflictInfo: {
+          type: "overlap",
+          description: "Checking for conflicts",
+          severity: "low",
+          status: "pending"
+        },
+      };
+
+      queryClient.setQueryData<Shift[]>(shiftsQueryKey, (old = []) => [...old, optimisticShift]);
+
+      return { previousShifts: old };
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      if (context?.previousShifts) {
+        queryClient.setQueryData(shiftsQueryKey, context.previousShifts);
+      }
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
         variant: "destructive",
+      });
+    },
+    onSuccess: (newShift) => {
+      queryClient.invalidateQueries({ queryKey: shiftsQueryKey });
+      toast({
+        title: "Schicht erstellt",
+        description: "Die neue Schicht wurde erfolgreich angelegt.",
       });
     },
   });
