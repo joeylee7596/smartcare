@@ -28,19 +28,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Brain,
   Calendar as CalendarIcon,
   Settings2,
-  AlertTriangle,
 } from "lucide-react";
 import { ScheduleBoard } from "@/components/scheduling/schedule-board";
 
@@ -64,24 +57,37 @@ export default function Schedule() {
   // KI-Optimierung Mutation
   const optimizeScheduleMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/shifts/optimize", {
-        date: selectedDate.toISOString(),
-        department,
-        optimizationMode: "balanced", // Berücksichtigt sowohl Effizienz als auch Präferenzen
-      });
-      if (!res.ok) throw new Error("Optimierung fehlgeschlagen");
-      return res.json();
+      try {
+        const res = await apiRequest("POST", "/api/shifts/optimize", {
+          date: selectedDate.toISOString(),
+          department,
+          optimizationParams: {
+            mode: "balanced",
+            considerPreferences: true,
+            maxIterations: 100,
+          },
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || "Optimierung fehlgeschlagen");
+        }
+
+        return res.json();
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "Optimierung fehlgeschlagen");
+      }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({
         title: "Dienstplan optimiert",
-        description: `Die KI hat ${data.changesCount} Änderungen vorgenommen und dabei die Mitarbeiterpräferenzen berücksichtigt.`,
+        description: `Die KI hat ${data.optimizationResults.changesCount} Änderungen vorgenommen und dabei die Mitarbeiterpräferenzen berücksichtigt.`,
       });
     },
     onError: (error) => {
       toast({
-        title: "Fehler",
+        title: "Fehler bei der Optimierung",
         description: error instanceof Error ? error.message : "Die Optimierung konnte nicht durchgeführt werden.",
         variant: "destructive",
       });
@@ -111,6 +117,14 @@ export default function Schedule() {
       });
     },
   });
+
+  const handleOptimize = async () => {
+    try {
+      await optimizeScheduleMutation.mutateAsync();
+    } catch (error) {
+      console.error("Optimization error:", error);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -168,7 +182,7 @@ export default function Schedule() {
           <ScheduleBoard
             selectedDate={selectedDate}
             department={department}
-            onOptimize={() => optimizeScheduleMutation.mutate()}
+            onOptimize={handleOptimize}
           />
 
           {/* Preferences Dialog */}

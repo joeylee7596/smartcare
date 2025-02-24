@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -16,6 +16,7 @@ import {
   Moon,
   Coffee,
   UserCheck,
+  Plus,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -36,15 +37,18 @@ interface ScheduleBoardProps {
   onOptimize: () => void;
 }
 
-// Helper function to get shift type icon and color
-const getShiftInfo = (startHour: number) => {
-  if (startHour >= 6 && startHour < 14) {
-    return { icon: Sun, color: "text-yellow-500", label: "Früh" };
+// Helper function to get shift type info
+const getShiftInfo = (type: string) => {
+  switch (type) {
+    case "early":
+      return { icon: Sun, color: "text-yellow-500", label: "Früh (6-14)" };
+    case "late":
+      return { icon: Coffee, color: "text-orange-500", label: "Spät (14-22)" };
+    case "night":
+      return { icon: Moon, color: "text-blue-500", label: "Nacht (22-6)" };
+    default:
+      return { icon: Clock, color: "text-gray-500", label: "Unbekannt" };
   }
-  if (startHour >= 14 && startHour < 22) {
-    return { icon: Coffee, color: "text-orange-500", label: "Spät" };
-  }
-  return { icon: Moon, color: "text-blue-500", label: "Nacht" };
 };
 
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
@@ -66,11 +70,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   // Fetch data
-  const { data: employees = [], isLoading: loadingEmployees } = useQuery<Employee[]>({
+  const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
-  const { data: shifts = [], isLoading: loadingShifts } = useQuery<Shift[]>({
+  const { data: shifts = [] } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: weekStart.toISOString(),
       end: addDays(weekStart, 6).toISOString(),
@@ -94,56 +98,88 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     },
   });
 
-  // Handle drag & drop
+  // Create shift mutation
+  const createShiftMutation = useMutation({
+    mutationFn: async (data: { employeeId: number; type: string; date: string }) => {
+      const startTime = new Date(data.date);
+      const endTime = new Date(data.date);
+
+      switch (data.type) {
+        case "early":
+          startTime.setHours(6, 0);
+          endTime.setHours(14, 0);
+          break;
+        case "late":
+          startTime.setHours(14, 0);
+          endTime.setHours(22, 0);
+          break;
+        case "night":
+          startTime.setHours(22, 0);
+          endTime.setDate(endTime.getDate() + 1);
+          endTime.setHours(6, 0);
+          break;
+      }
+
+      const res = await apiRequest("POST", "/api/shifts", {
+        employeeId: data.employeeId,
+        type: data.type,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        department,
+      });
+
+      if (!res.ok) throw new Error("Failed to create shift");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      toast({
+        title: "Schicht erstellt",
+        description: "Die neue Schicht wurde erfolgreich angelegt.",
+      });
+    },
+  });
+
+  // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || !draggedShift) return;
+    if (!over || !active?.id) return;
 
-    const [employeeId, dateStr, pattern] = over.id.toString().split("-");
-    const targetDate = new Date(dateStr);
+    const [type, date, employeeId] = over.id.toString().split("_");
 
-    // Calculate new times based on pattern
-    let startTime = new Date(targetDate);
-    let endTime = new Date(targetDate);
-
-    switch (pattern) {
-      case "early":
-        startTime.setHours(6, 0);
-        endTime.setHours(14, 0);
-        break;
-      case "late":
-        startTime.setHours(14, 0);
-        endTime.setHours(22, 0);
-        break;
-      case "night":
-        startTime.setHours(22, 0);
-        endTime = addDays(endTime, 1);
-        endTime.setHours(6, 0);
-        break;
+    if (draggedShift) {
+      // Update existing shift
+      updateShiftMutation.mutate({
+        id: draggedShift.id,
+        updates: {
+          type,
+          employeeId: parseInt(employeeId),
+          date: date,
+        },
+      });
+    } else {
+      // Create new shift
+      createShiftMutation.mutate({
+        employeeId: parseInt(employeeId),
+        type,
+        date,
+      });
     }
 
-    updateShiftMutation.mutate({
-      id: draggedShift.id,
-      updates: {
-        employeeId: parseInt(employeeId),
-        startTime,
-        endTime,
-        type: pattern,
-      },
-    });
+    setDraggedShift(null);
   };
 
-  // Group shifts by employee and day
-  const shiftsByEmployeeAndDay = shifts.reduce((acc, shift) => {
-    const dateKey = format(new Date(shift.startTime), "yyyy-MM-dd");
-    const empKey = shift.employeeId;
+  // Group shifts by date and employee
+  const shiftsByDateAndEmployee = shifts.reduce((acc, shift) => {
+    const date = format(new Date(shift.startTime), "yyyy-MM-dd");
+    const employeeId = shift.employeeId;
 
-    if (!acc[empKey]) acc[empKey] = {};
-    if (!acc[empKey][dateKey]) acc[empKey][dateKey] = [];
+    if (!acc[date]) acc[date] = {};
+    if (!acc[date][employeeId]) acc[date][employeeId] = [];
 
-    acc[empKey][dateKey].push(shift);
+    acc[date][employeeId].push(shift);
     return acc;
-  }, {} as Record<number, Record<string, Shift[]>>);
+  }, {} as Record<string, Record<number, Shift[]>>);
 
   return (
     <DndContext
@@ -155,9 +191,29 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              Wochendienstplan
+              <div className="flex gap-4">
+                {["early", "late", "night"].map(type => {
+                  const info = getShiftInfo(type);
+                  const Icon = info.icon;
+                  return (
+                    <Badge 
+                      key={type}
+                      variant="outline" 
+                      className="cursor-grab"
+                      data-draggable
+                      id={`new_${type}`}
+                    >
+                      <Icon className={`h-4 w-4 mr-2 ${info.color}`} />
+                      {info.label}
+                    </Badge>
+                  );
+                })}
+              </div>
             </CardTitle>
-            <Button onClick={onOptimize} className="bg-gradient-to-r from-blue-500 to-blue-600">
+            <Button 
+              onClick={onOptimize} 
+              className="bg-gradient-to-r from-blue-500 to-blue-600"
+            >
               <Brain className="h-4 w-4 mr-2" />
               KI-Optimierung starten
             </Button>
@@ -167,7 +223,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           <ScrollArea className="h-[calc(100vh-280px)]">
             <div className="min-w-[1200px]">
               {/* Header row with dates */}
-              <div className="grid grid-cols-[250px_repeat(7,1fr)] gap-2 mb-4">
+              <div className="grid grid-cols-[200px_repeat(7,1fr)] gap-2 mb-4">
                 <div className="px-4 py-2">Mitarbeiter</div>
                 {weekDays.map((day) => (
                   <div
@@ -193,7 +249,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 {employees.map((employee) => (
                   <div
                     key={employee.id}
-                    className="grid grid-cols-[250px_repeat(7,1fr)] gap-2"
+                    className="grid grid-cols-[200px_repeat(7,1fr)] gap-2"
                   >
                     {/* Employee info */}
                     <div className="px-4 py-2">
@@ -216,61 +272,68 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                     {/* Shift cells for each day */}
                     {weekDays.map((day) => {
-                      const dateKey = format(day, "yyyy-MM-dd");
-                      const shifts = shiftsByEmployeeAndDay[employee.id]?.[dateKey] || [];
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const dayShifts = shiftsByDateAndEmployee[dateStr]?.[employee.id] || [];
 
                       return (
                         <div
-                          key={dateKey}
+                          key={dateStr}
                           className="grid grid-rows-3 gap-1 p-2 rounded-md border hover:bg-gray-50/50"
                         >
-                          {["early", "late", "night"].map((pattern) => {
-                            const patternShifts = shifts.filter((s) => s.type === pattern);
+                          {["early", "late", "night"].map((type) => {
+                            const info = getShiftInfo(type);
+                            const Icon = info.icon;
+                            const shiftsOfType = dayShifts.filter(s => s.type === type);
+
                             return (
                               <div
-                                key={`${employee.id}-${dateKey}-${pattern}`}
-                                id={`${employee.id}-${dateKey}-${pattern}`}
-                                className="min-h-[40px] rounded-md border border-dashed border-gray-200 p-1"
+                                key={`${type}_${dateStr}_${employee.id}`}
+                                id={`${type}_${dateStr}_${employee.id}`}
+                                className={`
+                                  min-h-[40px] rounded-md border border-dashed
+                                  ${shiftsOfType.length > 0 ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'}
+                                  p-1 transition-colors
+                                `}
                                 data-droppable
                               >
-                                {patternShifts.map((shift) => {
-                                  const shiftInfo = getShiftInfo(new Date(shift.startTime).getHours());
-                                  const ShiftIcon = shiftInfo.icon;
-
-                                  return (
-                                    <motion.div
-                                      key={shift.id}
-                                      id={shift.id.toString()}
-                                      data-draggable
-                                      className={`
-                                        group p-2 rounded-md cursor-move
-                                        ${shift.aiOptimized ? 'bg-green-50 border-l-4 border-green-500' : 'bg-blue-50/50'}
-                                      `}
-                                      initial={{ opacity: 0, y: 5 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      onMouseDown={() => setDraggedShift(shift)}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          <ShiftIcon className={`h-4 w-4 ${shiftInfo.color}`} />
-                                          <span className="text-sm">
-                                            {format(new Date(shift.startTime), "HH:mm")}
-                                          </span>
-                                        </div>
-                                        {shift.aiOptimized && (
-                                          <Tooltip>
-                                            <TooltipTrigger>
-                                              <Sparkles className="h-4 w-4 text-green-500" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                              KI-optimierte Schicht
-                                            </TooltipContent>
-                                          </Tooltip>
-                                        )}
+                                {shiftsOfType.map((shift) => (
+                                  <motion.div
+                                    key={shift.id}
+                                    id={shift.id.toString()}
+                                    data-draggable
+                                    className="group p-2 rounded-md cursor-grab bg-white shadow-sm border border-gray-100"
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    onMouseDown={() => setDraggedShift(shift)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Icon className={`h-4 w-4 ${info.color}`} />
+                                        <span className="text-sm">
+                                          {format(new Date(shift.startTime), "HH:mm")}
+                                        </span>
                                       </div>
-                                    </motion.div>
-                                  );
-                                })}
+                                      {shift.aiOptimized && (
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Sparkles className="h-4 w-4 text-green-500" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            KI-optimierte Schicht
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                ))}
+
+                                {shiftsOfType.length === 0 && (
+                                  <div
+                                    className="flex items-center justify-center h-full text-gray-400 text-sm"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
