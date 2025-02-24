@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { format, addDays, startOfWeek, parseISO, isSameDay } from "date-fns";
+import { format, addDays, startOfWeek, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -34,7 +33,7 @@ const ShiftTypes = {
 } as const;
 
 function ShiftBadge({ type, onDelete }: { type: keyof typeof ShiftTypes; onDelete?: () => void }) {
-  const info = ShiftTypes[type];
+  const info = ShiftTypes[type] || ShiftTypes.early; // Fallback to early if type is invalid
   const Icon = info.icon;
 
   return (
@@ -72,7 +71,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     queryKey: ["/api/employees", { department }],
   });
 
-  const { data: shifts = [], isLoading } = useQuery<Shift[]>({
+  const { data: shifts = [], isLoading, error } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
@@ -97,6 +96,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
   if (isLoading) {
     return <div>Lade Schichtplan...</div>;
+  }
+
+  if (error) {
+    return <div>Fehler beim Laden des Schichtplans</div>;
   }
 
   return (
@@ -148,9 +151,17 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 </div>
 
                 {weekDays.map((day) => {
+                  // Safe date comparison
+                  const dayFormatted = format(day, 'yyyy-MM-dd');
                   const dayShifts = shifts.filter(shift => {
-                    return shift.employeeId === employee.id && 
-                           isSameDay(new Date(shift.startTime), day);
+                    try {
+                      const shiftDate = new Date(shift.startTime);
+                      return shift.employeeId === employee.id && 
+                             format(shiftDate, 'yyyy-MM-dd') === dayFormatted;
+                    } catch (e) {
+                      console.error("Error processing shift:", e);
+                      return false;
+                    }
                   });
 
                   return (
@@ -159,13 +170,22 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       className="p-2 min-h-[100px] border-l"
                     >
                       <div className="space-y-2">
-                        {dayShifts.map((shift) => (
-                          <ShiftBadge
-                            key={shift.id}
-                            type={shift.type as keyof typeof ShiftTypes}
-                            onDelete={() => deleteShiftMutation.mutate(shift.id)}
-                          />
-                        ))}
+                        {dayShifts.map((shift) => {
+                          // Validate shift type
+                          const shiftType = shift.type as keyof typeof ShiftTypes;
+                          if (!ShiftTypes[shiftType]) {
+                            console.warn(`Invalid shift type: ${shift.type}`);
+                            return null;
+                          }
+
+                          return (
+                            <ShiftBadge
+                              key={shift.id}
+                              type={shiftType}
+                              onDelete={() => deleteShiftMutation.mutate(shift.id)}
+                            />
+                          );
+                        })}
                       </div>
                     </div>
                   );
