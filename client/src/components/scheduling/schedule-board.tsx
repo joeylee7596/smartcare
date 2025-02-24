@@ -76,13 +76,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Debug-Ausgaben
-  useEffect(() => {
-    console.log("Wochenstart:", weekStart.toISOString());
-    console.log("Wochenende:", weekEnd.toISOString());
-  }, [weekStart, weekEnd]);
-
-  // Mitarbeiter und Schichten laden
+  // Fetch employees and shifts
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
@@ -95,13 +89,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }],
   });
 
-  // Debug-Ausgaben
-  useEffect(() => {
-    console.log("Geladene Schichten:", shifts);
-    console.log("Mitarbeiter:", employees);
-  }, [shifts, employees]);
-
-  // Schicht erstellen Mutation
+  // Create shift mutation
   const createShiftMutation = useMutation({
     mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
       let startTime = new Date(data.date);
@@ -127,13 +115,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           endTime.setHours(23, 59);
           break;
       }
-
-      console.log("Erstelle neue Schicht:", {
-        employeeId: data.employeeId,
-        type: data.type,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-      });
 
       const shiftData = {
         employeeId: data.employeeId,
@@ -243,24 +224,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 </div>
 
                 {weekDays.map((day) => {
-                  // Debug-Ausgabe für jeden Tag
                   const formattedDay = format(day, 'yyyy-MM-dd');
-                  console.log(`Suche Schichten für ${employee.name} am ${formattedDay}`);
-
                   const dayShifts = shifts.filter(s => {
-                    const shiftStart = format(new Date(s.startTime), 'yyyy-MM-dd');
-                    const match = s.employeeId === employee.id && shiftStart === formattedDay;
-                    console.log('Shift:', {
-                      shiftId: s.id,
-                      employeeId: s.employeeId,
-                      shiftStart,
-                      formattedDay,
-                      matches: match
-                    });
-                    return match;
+                    return s.employeeId === employee.id && 
+                           format(new Date(s.startTime), 'yyyy-MM-dd') === formattedDay;
                   });
-
-                  console.log(`Gefundene Schichten:`, dayShifts);
 
                   return (
                     <div
