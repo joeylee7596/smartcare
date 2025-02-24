@@ -335,31 +335,33 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="h-[calc(100vh-280px)]">
-          <div className="min-w-[1200px]">
-            {/* Header row with dates */}
-            <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b">
-              <div className="p-4 font-medium">Mitarbeiter</div>
-              {weekDays.map((day) => (
-                <div
-                  key={day.toISOString()}
-                  className={`p-4 text-center ${
-                    format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                      ? 'bg-blue-50'
-                      : ''
-                  }`}
-                >
-                  <div className="font-medium">
-                    {format(day, "EEEE", { locale: de })}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {format(day, "dd.MM.")}
-                  </div>
+      <CardContent className="p-0 relative">
+        {/* Fixed header row with dates */}
+        <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm shadow-sm">
+          <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b">
+            <div className="p-4 font-medium">Mitarbeiter</div>
+            {weekDays.map((day) => (
+              <div
+                key={day.toISOString()}
+                className={`p-4 text-center ${
+                  format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                    ? 'bg-blue-50/80'
+                    : ''
+                }`}
+              >
+                <div className="font-medium">
+                  {format(day, "EEEE", { locale: de })}
                 </div>
-              ))}
-            </div>
+                <div className="text-sm text-gray-500">
+                  {format(day, "dd.MM.")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
+        <ScrollArea className="h-[calc(100vh-400px)]">
+          <div className="min-w-[1200px]">
             {/* Employee rows */}
             <div>
               {employees.map((employee) => (
