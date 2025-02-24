@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,7 +53,7 @@ function ShiftBadge({ type, onDelete }: { type: keyof typeof ShiftTypes; onDelet
       <div className="flex items-center gap-2">
         <Icon className={`h-4 w-4 ${info.color}`} />
         <span className="text-sm font-medium">{info.label}</span>
-        <span className="text-xs text-gray-500">({info.time})</span>
+        <span className="text-xs text-gray-500">{info.time}</span>
       </div>
       {onDelete && (
         <Button
@@ -76,7 +76,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Fetch employees and shifts
+  // Mitarbeiter und Schichten laden
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
@@ -89,7 +89,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }],
   });
 
-  // Create shift mutation
+  // Schicht erstellen Mutation
   const createShiftMutation = useMutation({
     mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
       let startTime = new Date(data.date);
@@ -226,8 +226,9 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 {weekDays.map((day) => {
                   const formattedDay = format(day, 'yyyy-MM-dd');
                   const dayShifts = shifts.filter(s => {
+                    const shiftStart = new Date(s.startTime);
                     return s.employeeId === employee.id && 
-                           format(new Date(s.startTime), 'yyyy-MM-dd') === formattedDay;
+                           format(shiftStart, 'yyyy-MM-dd') === formattedDay;
                   });
 
                   return (
