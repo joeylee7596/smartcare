@@ -308,7 +308,7 @@ export const expiryTracking = pgTable("expiry_tracking", {
   id: serial("id").primaryKey(),
   itemName: text("item_name").notNull(),
   itemType: text("item_type").notNull(),
-  expiryDate: date("expiry_date").notNull(),
+  expiryDate: timestamp("expiry_date").notNull(),
   quantity: decimal("quantity").notNull(),
   unit: text("unit").notNull(),
   locationId: integer("location_id"),
