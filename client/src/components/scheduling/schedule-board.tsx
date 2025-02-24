@@ -86,8 +86,8 @@ function ShiftCard({ shift }: { shift: Shift }) {
     <motion.div
       className={`
         p-3 mb-2 rounded-lg
-        ${shift.aiOptimized 
-          ? 'bg-gradient-to-br from-white/80 via-green-50/50 to-emerald-50/30 border-l-2 border-green-400/50' 
+        ${shift.aiOptimized
+          ? 'bg-gradient-to-br from-white/80 via-green-50/50 to-emerald-50/30 border-l-2 border-green-400/50'
           : 'bg-gradient-to-br from-white/80 via-white/60 to-transparent'}
         backdrop-blur-[4px]
         border border-white/30
@@ -280,6 +280,29 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       <CardContent className="p-0">
         <ScrollArea className="h-[calc(100vh-280px)] pr-4">
           <div className="space-y-6">
+            {/* Week header with dates */}
+            <div className="grid grid-cols-7 gap-2 mb-6 px-2">
+              {weekDays.map((day) => (
+                <div
+                  key={day.toISOString()}
+                  className={`
+                    text-center p-3 rounded-lg
+                    ${format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                      ? 'bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-100'
+                      : 'bg-gradient-to-br from-gray-50/50 to-transparent'}
+                    backdrop-blur-[2px]
+                  `}
+                >
+                  <div className="font-medium text-gray-900">
+                    {format(day, "EEEE", { locale: de })}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {format(day, "dd.MM.", { locale: de })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
             {employees.map((employee) => (
               <Card key={employee.id} className="overflow-hidden border border-gray-100">
                 <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white">
@@ -306,8 +329,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                           className={`
                             p-2 min-h-[120px] relative
                             border-l 
-                            ${dragOverCell === cellId 
-                              ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]' 
+                            ${dragOverCell === cellId
+                              ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]'
                               : 'hover:bg-gradient-to-br hover:from-gray-50/40 hover:to-transparent'}
                             transition-all duration-500
                             rounded-lg
