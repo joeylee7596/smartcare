@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { FileText, Plus, Download, Search, Calendar, Filter, Clock, Euro, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,19 @@ import { BillingEditor } from "@/components/billing/billing-editor";
 import { motion, AnimatePresence } from "framer-motion";
 import { BillingCard } from "@/components/billing/billing-card";
 import { DocumentationCheckDialog } from "@/components/billing/documentation-check-dialog";
+
+// Hilfsfunktion für sichere Datumsformatierung
+const formatSafeDate = (dateString: string | Date | null | undefined, defaultValue: string = "Nicht verfügbar"): string => {
+  if (!dateString) return defaultValue;
+
+  try {
+    const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
+    return isValid(date) ? format(date, "dd. MMMM yyyy", { locale: de }) : defaultValue;
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return defaultValue;
+  }
+};
 
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -61,9 +74,16 @@ export default function BillingPage() {
 
   const groupedBillings = billings && Array.isArray(billings) 
     ? (billings as InsuranceBilling[]).reduce((acc, billing) => {
-        const month = format(new Date(billing.date), "yyyy-MM");
-        if (!acc[month]) acc[month] = [];
-        acc[month].push(billing);
+        if (!billing.date) return acc;
+        try {
+          const date = parseISO(billing.date);
+          if (!isValid(date)) return acc;
+          const month = format(date, "yyyy-MM");
+          if (!acc[month]) acc[month] = [];
+          acc[month].push(billing);
+        } catch (error) {
+          console.error('Error processing billing date:', error);
+        }
         return acc;
       }, {} as Record<string, InsuranceBilling[]>)
     : {};
@@ -71,108 +91,29 @@ export default function BillingPage() {
   const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
     .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
-  const createBilling = useMutation({
-    mutationFn: async (billing: Partial<InsuranceBilling>) => {
-      if (!billing.date || !billing.services || !billing.totalAmount) {
-        throw new Error('Ungültige Abrechnungsdaten');
-      }
-
-      const response = await fetch('/api/billings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId: selectedPatient?.id,
-          employeeId: 1,
-          date: billing.date,
-          services: billing.services,
-          totalAmount: billing.totalAmount.toString(),
-          status: "draft"
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
-      ]).then(() => {
-        setIsNewBillingOpen(false);
-        toast({
-          title: 'Gespeichert',
-          description: 'Die Abrechnung wurde als Entwurf gespeichert.',
-        });
-      });
-    },
-    onError: (error) => {
-      console.error('Saving Error:', error);
-      toast({
-        title: 'Fehler',
-        description: error instanceof Error ? error.message : 'Die Abrechnung konnte nicht erstellt werden.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const updateBillingStatus = useMutation({
-    mutationFn: async ({ billingId, newStatus }: { billingId: number; newStatus: string }) => {
-      const response = await fetch(`/api/billings/${billingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) throw new Error('Status konnte nicht aktualisiert werden');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
-      toast({
-        title: 'Aktualisiert',
-        description: 'Der Status wurde erfolgreich aktualisiert.',
-      });
-    },
-    onError: () => {
-      toast({
-        title: 'Fehler',
-        description: 'Status konnte nicht aktualisiert werden.',
-        variant: 'destructive',
-      });
-    },
-  });
-
-  const checkMissingDocumentation = async () => {
-    if (!selectedPatient) return;
+  const getLastBillingDate = (): string => {
+    if (!Array.isArray(billings) || billings.length === 0) {
+      return "Keine Abrechnungen";
+    }
 
     try {
-      const result = await refetchDocCheck();
-      const missingDocs = result.data?.missingDocs || [];
-      if (missingDocs.length > 0) {
-        setMissingDocs(missingDocs);
-        setShowDocCheck(true);
-      } else {
-        setIsNewBillingOpen(true);
-      }
+      const validBillings = (billings as InsuranceBilling[])
+        .filter(b => b.date)
+        .sort((a, b) => {
+          const dateA = parseISO(a.date);
+          const dateB = parseISO(b.date);
+          return isValid(dateB) && isValid(dateA) 
+            ? dateB.getTime() - dateA.getTime() 
+            : 0;
+        });
+
+      return validBillings.length > 0 
+        ? formatSafeDate(validBillings[0].date, "Datum nicht verfügbar")
+        : "Keine Abrechnungen";
     } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Dokumentationen konnten nicht überprüft werden",
-        variant: "destructive",
-      });
+      console.error('Error getting last billing date:', error);
+      return "Datum nicht verfügbar";
     }
-  };
-
-  const handleCreateDocumentation = (item: { id: number; date: string; type: string }) => {
-    window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
-  };
-
-  const handleSaveBilling = (billing: Partial<InsuranceBilling>) => {
-    createBilling.mutate(billing);
   };
 
   if (isPatientsError || isBillingsError) {
@@ -190,21 +131,6 @@ export default function BillingPage() {
       </div>
     );
   }
-
-  const getLastBillingDate = () => {
-    if (!Array.isArray(billings) || billings.length === 0) {
-      return "Keine Abrechnungen";
-    }
-    try {
-      const sortedBillings = [...billings].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      return format(new Date(sortedBillings[0].date), "dd. MMMM yyyy", { locale: de });
-    } catch (error) {
-      console.error('Date formatting error:', error);
-      return "Datum nicht verfügbar";
-    }
-  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">

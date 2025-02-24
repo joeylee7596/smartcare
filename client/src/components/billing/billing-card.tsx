@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InsuranceBilling, Patient } from "@shared/schema";
-import { format } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
 import { FileText, Send, CheckCircle, XCircle, Clock, FileEdit, Euro } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,19 @@ interface BillingCardProps {
   patient: Patient;
   onSubmit: () => void;
 }
+
+// Hilfsfunktion für sichere Datumsformatierung
+const formatSafeDate = (dateString: string | Date | null | undefined, defaultValue: string = "Nicht verfügbar"): string => {
+  if (!dateString) return defaultValue;
+
+  try {
+    const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
+    return isValid(date) ? format(date, "dd. MMMM yyyy", { locale: de }) : defaultValue;
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return defaultValue;
+  }
+};
 
 export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
   const statusConfig = {
@@ -78,7 +91,7 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Datum</span>
             <span className="font-medium">
-              {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
+              {formatSafeDate(billing.date)}
             </span>
           </div>
           <div className="flex justify-between text-sm">
@@ -123,7 +136,7 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           <div className="flex items-center justify-center gap-2 text-green-600 bg-green-50 rounded-md p-2">
             <Euro className="h-4 w-4" />
             <span className="text-sm font-medium">
-              Bezahlt am {format(new Date(billing.responseDate), "dd.MM.yyyy", { locale: de })}
+              Bezahlt am {formatSafeDate(billing.responseDate)}
             </span>
           </div>
         )}
