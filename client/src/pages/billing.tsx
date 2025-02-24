@@ -11,9 +11,8 @@ import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BillingEditor } from "@/components/billing/billing-editor";
-import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { BillingCard } from "@/components/billing/billing-card";
 import { DocumentationCheckDialog } from "@/components/billing/documentation-check-dialog";
@@ -84,7 +83,7 @@ export default function BillingPage() {
         body: JSON.stringify({
           patientId: selectedPatient?.id,
           employeeId: 1,
-          date: new Date(billing.date).toISOString(),
+          date: billing.date,
           services: billing.services,
           totalAmount: billing.totalAmount.toString(),
           status: "draft"
@@ -191,6 +190,21 @@ export default function BillingPage() {
       </div>
     );
   }
+
+  const getLastBillingDate = () => {
+    if (!Array.isArray(billings) || billings.length === 0) {
+      return "Keine Abrechnungen";
+    }
+    try {
+      const sortedBillings = [...billings].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      return format(new Date(sortedBillings[0].date), "dd. MMMM yyyy", { locale: de });
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return "Datum nicht verfügbar";
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -304,11 +318,7 @@ export default function BillingPage() {
                             </p>
                             <p className="text-sm text-gray-500 flex items-center gap-2">
                               <Clock className="h-4 w-4" />
-                              Letzte Abrechnung: {
-                                Array.isArray(billings) && billings.length > 0
-                                  ? format(new Date(billings[0].date), "dd. MMMM yyyy", { locale: de })
-                                  : "Keine Abrechnungen"
-                              }
+                              Letzte Abrechnung: {getLastBillingDate()}
                             </p>
                           </div>
                         </div>
