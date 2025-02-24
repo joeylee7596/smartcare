@@ -1,6 +1,87 @@
-import { type Patient, type Employee, type Tour } from "@shared/schema";
+import { type Patient, type Employee, type Tour, type InsuranceBilling } from "@shared/schema";
 import { startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, format } from "date-fns";
 import { de } from "date-fns/locale";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+export const analytics = {
+  async generateBillingInsights(billings: InsuranceBilling[]) {
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+      const prompt = `Analysiere die folgenden Abrechnungsdaten und generiere aussagekräftige Insights:
+${JSON.stringify(billings, null, 2)}
+
+Berücksichtige dabei:
+1. Auffällige Muster bei Ablehnungen
+2. Optimierungspotenzial bei der Dokumentation
+3. Effizienzsteigerungen bei der Abrechnung
+4. Vorschläge zur Umsatzsteigerung
+
+Formatiere die Antwort als Array von Objekten mit title und description.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        // Fallback falls das JSON-Parsing fehlschlägt
+        return [{
+          title: "KI-Analyse",
+          description: text
+        }];
+      }
+    } catch (error) {
+      console.error("Error generating billing insights:", error);
+      return [];
+    }
+  },
+
+  async analyzeBillingTrends(billings: InsuranceBilling[]) {
+    // Gruppiere Abrechnungen nach Status und berechne Trends
+    const trends = billings.reduce((acc, billing) => {
+      const week = format(new Date(billing.date), 'yyyy-ww');
+      if (!acc[week]) {
+        acc[week] = {
+          totalAmount: 0,
+          count: 0,
+          avgAmount: 0,
+          acceptanceRate: 0,
+          paidCount: 0,
+          rejectedCount: 0
+        };
+      }
+
+      acc[week].totalAmount += Number(billing.totalAmount || 0);
+      acc[week].count++;
+      acc[week].avgAmount = acc[week].totalAmount / acc[week].count;
+
+      if (billing.status === 'paid') acc[week].paidCount++;
+      if (billing.status === 'rejected') acc[week].rejectedCount++;
+
+      acc[week].acceptanceRate = (acc[week].paidCount / acc[week].count) * 100;
+
+      return acc;
+    }, {} as Record<string, {
+      totalAmount: number;
+      count: number;
+      avgAmount: number;
+      acceptanceRate: number;
+      paidCount: number;
+      rejectedCount: number;
+    }>);
+
+    return Object.entries(trends)
+      .map(([week, data]) => ({
+        week,
+        ...data
+      }))
+      .sort((a, b) => a.week.localeCompare(b.week));
+  }
+};
 
 export interface PatientAnalytics {
   totalPatients: number;
