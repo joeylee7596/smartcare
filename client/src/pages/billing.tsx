@@ -151,7 +151,9 @@ export default function BillingPage() {
       return response.json();
     },
     onSuccess: () => {
+      // Unmittelbar nach dem Speichern aktualisieren wir die Queries
       Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/billings"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
       ]).then(() => {
@@ -184,6 +186,8 @@ export default function BillingPage() {
       return response.json();
     },
     onSuccess: () => {
+      // Beide Queries für Abrechnungen aktualisieren
+      queryClient.invalidateQueries({ queryKey: ["/api/billings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
       toast({
         title: 'Aktualisiert',
