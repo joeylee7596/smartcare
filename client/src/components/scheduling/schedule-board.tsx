@@ -140,28 +140,30 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           break;
       }
 
-      const res = await apiRequest("POST", "/api/shifts", {
+      const shiftData = {
         employeeId: data.employeeId,
         type: data.type,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
-        breakDuration: 30, // 30 Minuten Pause
+        breakDuration: 30,
         conflictInfo: {
-          type: null,
-          description: null,
+          type: "overlap",
+          description: "Checking for conflicts",
           severity: "low",
-          status: "none"
+          status: "pending"
         },
-        notes: null,
+        notes: "",
         aiGenerated: false,
         aiOptimized: false,
         status: "scheduled"
-      });
+      };
+
+      const res = await apiRequest("POST", "/api/shifts", shiftData);
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Failed to create shift");
+        throw new Error(error.message || "Schicht konnte nicht erstellt werden");
       }
       return res.json();
     },
