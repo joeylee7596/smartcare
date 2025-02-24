@@ -110,8 +110,8 @@ export default function BillingPage() {
           if (!a.date || !b.date) return 0;
           const dateA = parseISO(a.date);
           const dateB = parseISO(b.date);
-          return isValid(dateB) && isValid(dateA) 
-            ? dateB.getTime() - dateA.getTime() 
+          return isValid(dateB) && isValid(dateA)
+            ? dateB.getTime() - dateA.getTime()
             : 0;
         });
 
@@ -205,18 +205,40 @@ export default function BillingPage() {
     try {
       const result = await refetchDocCheck();
       const missingDocs = result.data?.missingDocs || [];
+
       if (missingDocs.length > 0) {
         setMissingDocs(missingDocs);
         setShowDocCheck(true);
       } else {
         setIsNewBillingOpen(true);
       }
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Dokumentationen konnten nicht überprüft werden",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      // Prüfen ob es sich um einen 404-Fehler (keine Dokumentation) handelt
+      if (error?.response?.status === 404) {
+        toast({
+          title: "Keine Dokumentation gefunden",
+          description: "Möchten Sie eine neue Dokumentation anlegen?",
+          action: (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const today = format(new Date(), "yyyy-MM-dd");
+                window.location.href = `/documentation?patientId=${selectedPatient.id}&date=${today}&type=tour`;
+              }}
+            >
+              Dokumentation anlegen
+            </Button>
+          ),
+        });
+      } else {
+        // Für andere Fehler zeigen wir eine informativere Meldung
+        toast({
+          title: "Dokumentationsprüfung fehlgeschlagen",
+          description: "Bitte versuchen Sie es später erneut oder erstellen Sie eine neue Dokumentation.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -228,16 +250,24 @@ export default function BillingPage() {
     createBilling.mutate(billing);
   };
 
-  // Render error state
-  if (isPatientsError || isBillingsError) {
+  // Fehlerbehandlung verbessern - nur kritische Fehler führen zum Neuladen
+  if (isPatientsError && isBillingsError) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
         <Sidebar />
         <div className="flex-1">
           <Header />
           <main className="p-8">
-            <div className="text-center text-red-600">
-              Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.
+            <div className="text-center space-y-4">
+              <div className="text-red-600 font-medium">
+                Es ist ein kritischer Fehler aufgetreten.
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
+                Seite neu laden
+              </Button>
             </div>
           </main>
         </div>
@@ -273,7 +303,7 @@ export default function BillingPage() {
                   <div className="relative mb-4">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <Input
-                      className="pl-9 h-11 rounded-xl bg-white/80 
+                      className="pl-9 h-11 rounded-xl bg-white/80
                         border-white/40 hover:border-blue-200 focus:border-blue-300
                         shadow-[0_4px_12px_-2px_rgba(0,0,0,0.05)]
                         focus:shadow-[0_4px_16px_-4px_rgba(59,130,246,0.15)]
@@ -301,7 +331,7 @@ export default function BillingPage() {
                             transition={{ duration: 0.2 }}
                           >
                             <Card
-                              className={`cursor-pointer transition-all duration-300 
+                              className={`cursor-pointer transition-all duration-300
                                 hover:scale-[1.02] hover:-translate-y-1
                                 group ${
                                   selectedPatient?.id === patient.id
@@ -323,8 +353,8 @@ export default function BillingPage() {
                                       </p>
                                     </div>
                                   </div>
-                                  <ChevronRight className="h-5 w-5 text-gray-400 
-                                    opacity-0 group-hover:opacity-100 
+                                  <ChevronRight className="h-5 w-5 text-gray-400
+                                    opacity-0 group-hover:opacity-100
                                     transform translate-x-4 group-hover:translate-x-0
                                     transition-all duration-500" />
                                 </div>
