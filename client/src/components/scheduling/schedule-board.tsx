@@ -80,7 +80,7 @@ function ShiftCard({ shift, onDelete }: { shift: Shift; onDelete: () => void }) 
     <motion.div
       className={`
         p-2 mb-1 rounded-md group
-        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
+        ${shift.aiGenerated ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
         hover:shadow-md transition-all relative
       `}
       initial={{ opacity: 0, y: 5 }}
@@ -93,7 +93,7 @@ function ShiftCard({ shift, onDelete }: { shift: Shift; onDelete: () => void }) 
           <span className="text-sm font-medium">{info.label}</span>
         </div>
         <div className="flex items-center gap-2">
-          {shift.aiOptimized && (
+          {shift.aiGenerated && (
             <Tooltip>
               <TooltipTrigger>
                 <Sparkles className="h-4 w-4 text-green-500" />
@@ -174,7 +174,15 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
-        status: "scheduled"
+        status: "scheduled",
+        breakDuration: 30, // Required field
+        conflictInfo: { // Required field
+          type: "overlap",
+          description: "Neue Schicht",
+          severity: "low"
+        },
+        skills: [],
+        rotationPattern: data.type === "early" ? "early" : data.type === "late" ? "late" : data.type === "night" ? "night" : undefined
       };
 
       const res = await apiRequest("POST", "/api/shifts", shiftData);
