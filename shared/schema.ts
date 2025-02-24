@@ -327,26 +327,28 @@ export const shifts = pgTable("shifts", {
   employeeId: integer("employee_id").notNull(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
-  status: text("status").notNull().default("pending"),
   type: text("type").notNull(),
+  status: text("status").notNull().default("scheduled"),
   notes: text("notes"),
-  aiGenerated: boolean("ai_generated").default(false),
-  conflictInfo: json("conflict_info").$type<{
-    type?: "overtime" | "rest-period" | "qualification" | "overlap";
-    description?: string;
-    severity: "low" | "medium" | "high";
-    affectedShiftIds?: number[];
-  }>(),
-  rotationPattern: text("rotation_pattern"), // early, late, night
   department: text("department").notNull().default("general"),
-  skills: json("required_skills").$type<string[]>().default([]).notNull(),
-  breakDuration: integer("break_duration").notNull().default(30), // in minutes
+  breakDuration: integer("break_duration").notNull().default(30),
   isOnCall: boolean("is_on_call").default(false),
   replacementNeeded: boolean("replacement_needed").default(false),
-  locationId: integer("location_id"),
   lastModified: timestamp("last_modified").defaultNow(),
   lastModifiedBy: integer("last_modified_by"),
-  // New AI optimization fields
+
+  // New fields
+  priority: integer("priority").default(1),
+  color: text("color"),
+  description: text("description"),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  reason: text("reason"), // For sick leave, vacation, etc.
+  attachmentUrl: text("attachment_url"), // For documents like sick notes
+
+  // AI fields
+  aiGenerated: boolean("ai_generated").default(false),
+  aiOptimized: boolean("ai_optimized").default(false),
   aiOptimizationScore: decimal("ai_optimization_score"),
   aiSuggestions: json("ai_suggestions").$type<{
     suggestedChanges: Array<{
@@ -354,7 +356,7 @@ export const shifts = pgTable("shifts", {
       currentValue: string;
       suggestedValue: string;
       reason: string;
-      impact: number; // 0-1 score
+      impact: number;
     }>;
     workloadBalance: {
       score: number;
@@ -364,17 +366,14 @@ export const shifts = pgTable("shifts", {
       score: number;
       conflicts: string[];
     };
-    patientCareQuality: {
-      score: number;
-      recommendations: string[];
-    };
   }>(),
-  dragDropMetadata: json("drag_drop_metadata").$type<{
-    position: { x: number; y: number };
-    size: { width: number; height: number };
-    zIndex: number;
-    isDragged: boolean;
-    lastDragPosition?: { x: number; y: number };
+
+  // Conflict checking
+  conflictInfo: json("conflict_info").$type<{
+    type?: "overtime" | "rest-period" | "qualification" | "overlap";
+    description?: string;
+    severity: "low" | "medium" | "high";
+    affectedShiftIds?: number[];
   }>(),
 });
 
@@ -632,10 +631,10 @@ export const shiftChangeSchema = z.object({
   respondedBy: z.number().optional(),
 });
 
-export const insertChangeSchema = shiftChangeSchema.omit({ 
-  id: true, 
+export const insertChangeSchema = shiftChangeSchema.omit({
+  id: true,
   createdAt: true,
-  respondedAt: true 
+  respondedAt: true
 });
 
 export type ShiftChange = z.infer<typeof shiftChangeSchema>;
@@ -681,6 +680,29 @@ export const patientSchema = z.object({
 });
 
 
+export const ShiftType = {
+  // Regular shifts
+  EARLY: "early",
+  LATE: "late",
+  NIGHT: "night",
+
+  // Special events
+  VACATION: "vacation",
+  SICK: "sick",
+  OVERTIME_REDUCTION: "overtime_reduction",
+  TRAINING: "training",
+  ON_CALL: "on-call",
+  HOLIDAY: "holiday",
+} as const;
+
+export const ShiftStatus = {
+  DRAFT: "draft",
+  SCHEDULED: "scheduled",
+  CONFIRMED: "confirmed",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+} as const;
+
 export const DocumentationStatus = {
   PENDING: "pending",
   REVIEW: "review",
@@ -688,18 +710,6 @@ export const DocumentationStatus = {
 } as const;
 
 export type DocumentationStatusType = typeof DocumentationStatus[keyof typeof DocumentationStatus];
-
-export const ShiftStatus = {
-  PENDING: "pending",
-  CONFIRMED: "confirmed",
-  REJECTED: "rejected",
-} as const;
-
-export const ShiftType = {
-  REGULAR: "regular",
-  ON_CALL: "on-call",
-  OVERTIME: "overtime",
-} as const;
 
 export const ChangeRequestType = {
   SWAP: "swap",
