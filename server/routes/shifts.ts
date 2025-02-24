@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { z } from "zod";
-import { insertShiftSchema, insertTemplateSchema, insertPreferenceSchema, insertChangeSchema } from "@shared/schema";
+import { insertShiftSchema } from "@shared/schema";
 import { startOfWeek, endOfWeek, addDays, isWithinInterval, parseISO } from "date-fns";
 
 const router = Router();
@@ -11,12 +11,13 @@ router.get("/", async (req, res) => {
   try {
     const startDate = new Date(req.query.startDate as string);
     const endDate = new Date(req.query.endDate as string);
-    
+    const department = req.query.department as string;
+
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       throw new Error("Invalid date range");
     }
 
-    const shifts = await storage.getShifts(startDate, endDate);
+    const shifts = await storage.getShifts(startDate, endDate, department);
     res.json(shifts);
   } catch (error) {
     console.error("Error fetching shifts:", error);
@@ -46,7 +47,7 @@ router.get("/employee/:employeeId", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const shift = insertShiftSchema.parse(req.body);
-    
+
     // Check for conflicts
     const conflicts = await checkShiftConflicts(shift);
     if (conflicts.length > 0) {
@@ -104,10 +105,24 @@ router.patch("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Ungültige Schicht-ID" });
+    }
+
+    // Check if shift exists
+    const shift = await storage.getShift(id);
+    if (!shift) {
+      return res.status(404).json({ message: "Schicht nicht gefunden" });
+    }
+
     await storage.deleteShift(id);
     res.status(204).end();
   } catch (error) {
-    res.status(400).json({ error: "Could not delete shift" });
+    console.error("Error deleting shift:", error);
+    res.status(500).json({ 
+      message: "Die Schicht konnte nicht gelöscht werden",
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
   }
 });
 

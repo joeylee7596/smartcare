@@ -220,15 +220,27 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const deleteShiftMutation = useMutation({
     mutationFn: async (shiftId: number) => {
       const res = await apiRequest("DELETE", `/api/shifts/${shiftId}`);
-      if (!res.ok) throw new Error("Schicht konnte nicht gelöscht werden");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Schicht konnte nicht gelöscht werden");
+      }
       return res.json();
     },
     onSuccess: () => {
+      // Invalidate and refetch shifts after deletion
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({
         title: "Schicht gelöscht",
         description: "Die Schicht wurde erfolgreich entfernt.",
       });
+    },
+    onError: (error) => {
+      toast({
+        title: "Fehler",
+        description: error instanceof Error ? error.message : "Die Schicht konnte nicht gelöscht werden",
+        variant: "destructive",
+      });
+      console.error("Error deleting shift:", error);
     },
   });
 
