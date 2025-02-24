@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays } from "date-fns";
 import { de } from "date-fns/locale";
 import { useState } from "react";
 import {
@@ -23,32 +23,82 @@ import {
   Settings2,
   Wand2,
   Plus,
+  FileText,
+  RefreshCw,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import type { Employee, Shift, ShiftTemplate } from "@shared/schema";
-import { DailyRoster } from "@/components/tours/daily-roster";
+import { ModernRoster } from "@/components/scheduling/modern-roster";
 import { ShiftTemplatesDialog } from "@/components/scheduling/shift-templates-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<"daily" | "weekly">("daily");
   const [scheduleMode, setScheduleMode] = useState<"manual" | "auto">("manual");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [department, setDepartment] = useState("all");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Fetch data with proper typing
-  const { data: employees = [] } = useQuery<Employee[]>({
+  // Enhanced data fetching with proper typing
+  const { data: employees = [], isLoading: loadingEmployees } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
 
-  const { data: shifts = [] } = useQuery<Shift[]>({
+  const { data: shifts = [], isLoading: loadingShifts } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: startOfWeek(selectedDate, { locale: de }).toISOString(),
       end: endOfWeek(selectedDate, { locale: de }).toISOString(),
     }],
   });
 
-  const { data: templates = [] } = useQuery<ShiftTemplate[]>({
+  const { data: templates = [], isLoading: loadingTemplates } = useQuery<ShiftTemplate[]>({
     queryKey: ["/api/shift-templates"],
   });
+
+  // AI Optimization Mutation
+  const optimizeScheduleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/schedule/optimize", {
+        startDate: startOfWeek(selectedDate).toISOString(),
+        endDate: endOfWeek(selectedDate).toISOString(),
+        department,
+      });
+      if (!res.ok) throw new Error("Optimierung fehlgeschlagen");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      toast({
+        title: "Dienstplan optimiert",
+        description: "Die KI hat den Dienstplan erfolgreich optimiert.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Die Optimierung konnte nicht durchgeführt werden.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Quick Stats
+  const stats = {
+    totalShifts: shifts.length,
+    coveredShifts: shifts.filter(s => s.employeeId).length,
+    openShifts: shifts.filter(s => !s.employeeId).length,
+    activeEmployees: new Set(shifts.map(s => s.employeeId)).size,
+  };
+
+  const handleOptimize = () => {
+    optimizeScheduleMutation.mutate();
+  };
 
   return (
     <div className="flex h-screen">
@@ -72,6 +122,31 @@ export default function Schedule() {
                   />
                 </div>
 
+                {/* Stats Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Übersicht</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <div className="text-muted-foreground">Gesamt</div>
+                      <div className="font-medium">{stats.totalShifts} Schichten</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Besetzt</div>
+                      <div className="font-medium">{stats.coveredShifts} Schichten</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Offen</div>
+                      <div className="font-medium text-yellow-600">{stats.openShifts} Schichten</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Aktiv</div>
+                      <div className="font-medium">{stats.activeEmployees} Mitarbeiter</div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* View Controls */}
                 <div className="space-y-2">
                   <Label className="text-base font-semibold">Ansicht</Label>
@@ -85,6 +160,22 @@ export default function Schedule() {
                     <SelectContent>
                       <SelectItem value="daily">Tagesansicht</SelectItem>
                       <SelectItem value="weekly">Wochenansicht</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Department Filter */}
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">Abteilung</Label>
+                  <Select value={department} onValueChange={setDepartment}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Alle Abteilungen</SelectItem>
+                      <SelectItem value="general">Allgemeinpflege</SelectItem>
+                      <SelectItem value="intensive">Intensivpflege</SelectItem>
+                      <SelectItem value="palliative">Palliativpflege</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -118,8 +209,20 @@ export default function Schedule() {
                 <div className="space-y-2">
                   <Label className="text-base font-semibold">Schnellzugriff</Label>
                   <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => handleOptimize()}
+                      disabled={optimizeScheduleMutation.isPending}
+                    >
+                      <Brain className="mr-2 h-4 w-4 text-blue-500" />
+                      KI-Optimierung starten
+                      {optimizeScheduleMutation.isPending && (
+                        <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
+                      )}
+                    </Button>
                     <Button variant="outline" className="w-full justify-start">
-                      <Users className="mr-2 h-4 w-4" />
+                      <Users className="mr-2 h-4 w-4 text-purple-500" />
                       Mitarbeiter verwalten
                     </Button>
                     <Button 
@@ -127,15 +230,39 @@ export default function Schedule() {
                       className="w-full justify-start"
                       onClick={() => setTemplateDialogOpen(true)}
                     >
-                      <Clock className="mr-2 h-4 w-4" />
-                      Schichtvorlage erstellen
+                      <Clock className="mr-2 h-4 w-4 text-green-500" />
+                      Schichtvorlagen
                     </Button>
                     <Button variant="outline" className="w-full justify-start">
-                      <Brain className="mr-2 h-4 w-4" />
-                      KI-Analyse starten
+                      <FileText className="mr-2 h-4 w-4 text-orange-500" />
+                      Dokumentation erstellen
                     </Button>
                   </div>
                 </div>
+
+                {/* AI Insights */}
+                <Card className="bg-blue-50/50">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-500" />
+                      <CardTitle className="text-sm font-medium">KI-Erkenntnisse</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    <div className="space-y-2">
+                      {stats.openShifts > 0 && (
+                        <div className="flex items-center gap-2 text-yellow-600">
+                          <AlertTriangle className="h-4 w-4" />
+                          <span>{stats.openShifts} offene Schichten zu besetzen</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-blue-600">
+                        <Brain className="h-4 w-4" />
+                        <span>Optimierungsvorschläge verfügbar</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* Templates Section */}
                 <div className="space-y-2">
@@ -175,22 +302,12 @@ export default function Schedule() {
 
           {/* Main Content - Roster */}
           <div className="flex-1 overflow-hidden bg-white">
-            <div className="h-full p-6">
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  Dienstplan für {format(selectedDate, "EEEE, d. MMMM yyyy", { locale: de })}
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  {shifts.length} Schichten • {employees.length} Mitarbeiter
-                </p>
-              </div>
-
-              <DailyRoster
-                employees={employees}
-                shifts={shifts}
-                selectedDate={selectedDate}
-              />
-            </div>
+            <ModernRoster
+              selectedDate={selectedDate}
+              department={department}
+              view={view}
+              scheduleMode={scheduleMode}
+            />
           </div>
         </div>
       </div>
