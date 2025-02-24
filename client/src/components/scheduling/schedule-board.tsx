@@ -108,16 +108,25 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Query for employees
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
-  const { data: shifts = [], refetch: refetchShifts } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", {
-      start: weekStart.toISOString(),
-      end: weekEnd.toISOString(),
-      department,
-    }],
+  // Query for shifts with explicit date range
+  const { data: shifts = [] } = useQuery<Shift[]>({
+    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/shifts", {
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString(),
+        department,
+      });
+      if (!res.ok) throw new Error("Failed to fetch shifts");
+      const data = await res.json();
+      console.log('Fetched shifts:', data); // Debug log
+      return data;
+    },
   });
 
   const createShiftMutation = useMutation({
@@ -160,17 +169,28 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         status: "scheduled"
       };
 
+      console.log('Creating shift with data:', shiftData); // Debug log
+
       const res = await apiRequest("POST", "/api/shifts", shiftData);
 
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Schicht konnte nicht erstellt werden");
       }
-      return res.json();
+
+      const newShift = await res.json();
+      console.log('Created shift:', newShift); // Debug log
+      return newShift;
     },
-    onSuccess: () => {
+    onSuccess: (newShift) => {
+      // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      refetchShifts(); // Explicitly refetch shifts
+
+      // Optimistically update the local data
+      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
+        return [...old, newShift];
+      });
+
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
@@ -203,12 +223,19 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     const shiftType = e.dataTransfer.getData('text/plain');
     if (!shiftType) return;
 
-    await createShiftMutation.mutateAsync({
-      employeeId,
-      type: shiftType,
-      date,
-    });
+    try {
+      await createShiftMutation.mutateAsync({
+        employeeId,
+        type: shiftType,
+        date,
+      });
+    } catch (error) {
+      console.error('Drop error:', error);
+    }
   };
+
+  // Debug log for current shifts
+  console.log('Current shifts:', shifts);
 
   return (
     <Card className="mt-6">
@@ -267,12 +294,16 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                   {/* Shift cells for each day */}
                   {weekDays.map((day) => {
-                    const dayShifts = shifts.filter(s => 
-                      s.employeeId === employee.id && 
-                      format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-                    );
+                    const dayShifts = shifts.filter(s => {
+                      const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
+                      const currentDate = format(day, 'yyyy-MM-dd');
+                      return s.employeeId === employee.id && shiftDate === currentDate;
+                    });
 
                     const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
+
+                    // Debug log for shifts in this cell
+                    console.log(`Shifts for ${cellId}:`, dayShifts);
 
                     return (
                       <div
