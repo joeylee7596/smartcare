@@ -3,8 +3,8 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { InsuranceBilling, Patient } from "@shared/schema";
-import { FileText, Plus, Search, Calendar, Filter, Clock, Euro, ChevronRight } from "lucide-react";
+import { InsuranceBilling, Patient, BillingStatus, BillingType } from "@shared/schema";
+import { FileText, Plus, Search, Calendar, Filter, Clock, Euro, ChevronRight, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
@@ -16,6 +16,8 @@ import { BillingEditor } from "@/components/billing/billing-editor";
 import { motion, AnimatePresence } from "framer-motion";
 import { BillingCard } from "@/components/billing/billing-card";
 import { DocumentationCheckDialog } from "@/components/billing/documentation-check-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Hilfsfunktion für sichere Datumsformatierung
 const formatSafeDate = (dateString: string | Date | null | undefined, defaultValue: string = "Nicht verfügbar"): string => {
@@ -37,6 +39,8 @@ export default function BillingPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(
     format(new Date(), "yyyy-MM")
   );
+  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<string>("all");
   const [missingDocs, setMissingDocs] = useState<Array<{
     id: number;
     date: string;
@@ -66,12 +70,18 @@ export default function BillingPage() {
     enabled: false,
   });
 
+  // KI-Vorschläge laden
+  const { data: aiSuggestions } = useQuery({
+    queryKey: ["/api/ai/billing-suggestions", selectedPatient?.id, selectedMonth],
+    enabled: !!selectedPatient?.id && !!selectedMonth,
+  });
+
   const filteredPatients = searchQuery && Array.isArray(patients)
     ? patients.filter(p =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.insuranceNumber.includes(searchQuery) ||
-        p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.insuranceNumber.includes(searchQuery) ||
+      p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : patients;
 
   // Sichere Gruppierung der Abrechnungen
@@ -95,7 +105,14 @@ export default function BillingPage() {
     }, {});
   })();
 
-  const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
+  // Filter Abrechnungen nach Status und Typ
+  const filteredBillings = (groupedBillings[selectedMonth] || [])
+    .filter(billing =>
+      (selectedStatus === "all" || billing.status === selectedStatus) &&
+      (selectedType === "all" || billing.type === selectedType)
+    );
+
+  const selectedMonthTotal = filteredBillings
     .reduce((sum, billing) => sum + Number(billing.totalAmount || 0), 0);
 
   const getLastBillingDate = (): string => {
@@ -203,13 +220,50 @@ export default function BillingPage() {
     },
   });
 
+  // KI-Optimierung für eine einzelne Abrechnung
+  const optimizeBilling = useMutation({
+    mutationFn: async (billingId: number) => {
+      const response = await fetch(`/api/ai/billing-assist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billingId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Optimierung fehlgeschlagen');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
+      toast({
+        title: 'Optimiert',
+        description: 'Die Abrechnung wurde erfolgreich optimiert.',
+      });
+    },
+    onError: (error) => {
+      console.error('Optimization Error:', error);
+      toast({
+        title: 'Fehler',
+        description: 'Die Optimierung konnte nicht durchgeführt werden.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Handler für die KI-Optimierung
+  const handleOptimize = (billingId: number) => {
+    optimizeBilling.mutate(billingId);
+  };
+
   const checkMissingDocumentation = async () => {
     if (!selectedPatient) return;
 
     try {
       const result = await refetchDocCheck();
       const missingDocs = result.data?.missingDocs || [];
-
       if (missingDocs.length > 0) {
         setMissingDocs(missingDocs);
         setShowDocCheck(true);
@@ -410,12 +464,43 @@ export default function BillingPage() {
                     </CardHeader>
                   </Card>
 
-                  {/* Monthly view with status updates */}
+                  {/* Filters and Stats */}
                   <Card className="border border-white/40 backdrop-blur-sm">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-xl text-gray-800">Abrechnungen</CardTitle>
                         <div className="flex items-center gap-4">
+                          <Select
+                            value={selectedStatus}
+                            onValueChange={setSelectedStatus}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle Status</SelectItem>
+                              <SelectItem value={BillingStatus.DRAFT}>Entwürfe</SelectItem>
+                              <SelectItem value={BillingStatus.PENDING}>In Bearbeitung</SelectItem>
+                              <SelectItem value={BillingStatus.SUBMITTED}>Eingereicht</SelectItem>
+                              <SelectItem value={BillingStatus.PAID}>Bezahlt</SelectItem>
+                              <SelectItem value={BillingStatus.REJECTED}>Abgelehnt</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Select
+                            value={selectedType}
+                            onValueChange={setSelectedType}
+                          >
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue placeholder="Typ" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle Typen</SelectItem>
+                              <SelectItem value={BillingType.INSURANCE}>Krankenkasse</SelectItem>
+                              <SelectItem value={BillingType.PRIVATE}>Privatrechnung</SelectItem>
+                            </SelectContent>
+                          </Select>
+
                           <Filter className="h-4 w-4 text-gray-500" />
                           <select
                             value={selectedMonth}
@@ -432,7 +517,25 @@ export default function BillingPage() {
                           </select>
                         </div>
                       </div>
+
+                      {/* AI Suggestions Badge */}
+                      {aiSuggestions?.suggestions?.length > 0 && (
+                        <div className="mt-4 bg-blue-50 p-3 rounded-lg flex items-center gap-2">
+                          <Wand2 className="h-5 w-5 text-blue-500" />
+                          <span className="text-sm text-blue-700">
+                            {aiSuggestions.suggestions.length} KI-Vorschläge verfügbar
+                          </span>
+                          <Button
+                            variant="link"
+                            className="text-blue-600 text-sm"
+                            onClick={() => {/* TODO: Show AI suggestions dialog */}}
+                          >
+                            Anzeigen
+                          </Button>
+                        </div>
+                      )}
                     </CardHeader>
+
                     <CardContent>
                       <ScrollArea className="h-[calc(100vh-500px)]">
                         <AnimatePresence>
@@ -442,7 +545,7 @@ export default function BillingPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                           >
-                            {(groupedBillings[selectedMonth] || [])
+                            {filteredBillings
                               .sort((a, b) => {
                                 if (!a.date || !b.date) return 0;
                                 const dateA = parseISO(a.date);
@@ -460,8 +563,15 @@ export default function BillingPage() {
                                     billingId: billing.id,
                                     newStatus: billing.status === "draft" ? "pending" : "submitted"
                                   })}
+                                  onOptimize={() => handleOptimize(billing.id)}
                                 />
                               ))}
+
+                            {filteredBillings.length === 0 && (
+                              <div className="text-center py-8 text-gray-500">
+                                Keine Abrechnungen für den ausgewählten Zeitraum und Filter
+                              </div>
+                            )}
                           </motion.div>
                         </AnimatePresence>
 

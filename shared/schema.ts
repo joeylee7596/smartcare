@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, json, boolean, decimal, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, json, boolean, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -222,17 +222,86 @@ export const insuranceBilling = pgTable("insurance_billing", {
   patientId: integer("patient_id").notNull(),
   employeeId: integer("employee_id").notNull(),
   date: timestamp("date").notNull(),
+  type: text("type").notNull().default("insurance"), // "insurance" oder "private"
   services: json("services").$type<{
     code: string;
     description: string;
     amount: number;
+    aiEnhanced?: boolean;
+    documentation?: {
+      docId: number;
+      excerpt: string;
+    };
   }[]>().notNull(),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().default("draft"), // draft, pending, submitted, paid, rejected
   totalAmount: decimal("total_amount").notNull(),
   submissionDate: timestamp("submission_date"),
   responseDate: timestamp("response_date"),
   insuranceResponse: text("insurance_response"),
   content: text("content"),
+  // Neue Felder
+  version: integer("version").notNull().default(1),
+  previousVersionId: integer("previous_version_id"),
+  aiAssistance: json("ai_assistance").$type<{
+    suggestions: Array<{
+      type: string;
+      content: string;
+      confidence: number;
+      appliedAt?: string;
+    }>;
+    optimizations: Array<{
+      field: string;
+      original: string;
+      suggestion: string;
+      appliedAt?: string;
+    }>;
+    validations: Array<{
+      check: string;
+      result: boolean;
+      message: string;
+      timestamp: string;
+    }>;
+  }>(),
+  metadata: json("metadata").$type<{
+    createdAt: string;
+    lastModified: string;
+    modifiedBy: number;
+    format: "digital" | "print";
+    printStatus?: "draft" | "final" | "printed";
+    attachments: Array<{
+      type: string;
+      url: string;
+      name: string;
+    }>;
+    reviewStatus?: {
+      reviewedBy?: number;
+      reviewedAt?: string;
+      comments?: string[];
+    };
+  }>().notNull(),
+  relatedDocuments: json("related_documents").$type<Array<{
+    id: number;
+    type: string;
+    date: string;
+    relevance: number;
+  }>>(),
+  customizations: json("customizations").$type<{
+    template?: string;
+    letterhead?: boolean;
+    signature?: {
+      type: "digital" | "scanned";
+      data?: string;
+    };
+    paymentInstructions?: {
+      type: "insurance" | "private";
+      bankDetails?: {
+        iban: string;
+        bic: string;
+        accountHolder: string;
+      };
+      dueDate?: string;
+    };
+  }>(),
 });
 
 export const expiryTracking = pgTable("expiry_tracking", {
@@ -445,7 +514,38 @@ export const insertDocSchema = createInsertSchema(documentation).extend({
   }).nullable()
 });
 export const insertWorkflowSchema = createInsertSchema(workflowTemplates);
-export const insertBillingSchema = createInsertSchema(insuranceBilling);
+export const insertBillingSchema = createInsertSchema(insuranceBilling, {
+  // Standardwerte und Validierungen
+  services: z.array(z.object({
+    code: z.string().min(1, "Leistungscode ist erforderlich"),
+    description: z.string().min(1, "Beschreibung ist erforderlich"),
+    amount: z.number().min(0, "Betrag muss positiv sein"),
+    aiEnhanced: z.boolean().optional(),
+    documentation: z.object({
+      docId: z.number(),
+      excerpt: z.string()
+    }).optional()
+  })),
+  metadata: z.object({
+    createdAt: z.string(),
+    lastModified: z.string(),
+    modifiedBy: z.number(),
+    format: z.enum(["digital", "print"]),
+    printStatus: z.enum(["draft", "final", "printed"]).optional(),
+    attachments: z.array(z.object({
+      type: z.string(),
+      url: z.string(),
+      name: z.string()
+    }))
+  }),
+  type: z.enum(["insurance", "private"]),
+  status: z.enum(["draft", "pending", "submitted", "paid", "rejected"])
+}).extend({
+  // Zusätzliche Validierung
+  date: z.string().or(z.date()).transform(val =>
+    typeof val === 'string' ? new Date(val) : val
+  ),
+});
 export const insertExpiryTrackingSchema = createInsertSchema(expiryTracking).extend({
   expiryDate: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
@@ -577,4 +677,17 @@ export const ChangeRequestStatus = {
   PENDING: "pending",
   APPROVED: "approved",
   REJECTED: "rejected",
+} as const;
+
+export const BillingStatus = {
+  DRAFT: "draft",
+  PENDING: "pending",
+  SUBMITTED: "submitted",
+  PAID: "paid",
+  REJECTED: "rejected",
+} as const;
+
+export const BillingType = {
+  INSURANCE: "insurance",
+  PRIVATE: "private",
 } as const;

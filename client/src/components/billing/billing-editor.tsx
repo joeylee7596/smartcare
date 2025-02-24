@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Save, Wand2, Plus, Trash2, Loader2 } from "lucide-react";
-import { InsuranceBilling, Patient } from "@shared/schema";
+import { InsuranceBilling, Patient, BillingType } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ServiceSuggestion {
   code: string;
@@ -60,9 +61,11 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
     code: string;
     description: string;
     amount: number;
+    aiEnhanced?: boolean; // Added aiEnhanced field
   }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [billingType, setBillingType] = useState<string>(BillingType.INSURANCE);
   const [aiSuggestions, setAiSuggestions] = useState<{
     services: ServiceSuggestion[];
   } | null>(null);
@@ -94,7 +97,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
     });
   };
 
-  // AI assistance for documentation completeness
+  // KI-Hilfe für Dokumentationsverbesserung
   const getAIAssistance = async () => {
     setIsGenerating(true);
     try {
@@ -106,16 +109,16 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
           services: serviceEntries,
           careLevel: patient.careLevel,
           date: selectedDate,
+          type: billingType,
         }),
       });
 
       if (!response.ok) throw new Error("Fehler bei der KI-Unterstützung");
 
       const data = await response.json();
-
       if (data.suggestions) {
         const enhancedServices = serviceEntries.map((service, index) => {
-          const suggestion = data.suggestions.find(s => s.code === service.code);
+          const suggestion = data.suggestions.find((s: any) => s.code === service.code);
           if (suggestion) {
             toast({
               title: "Beschreibung optimiert",
@@ -123,13 +126,14 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
             });
             return {
               ...service,
-              description: suggestion.enhancedDescription
+              description: suggestion.enhancedDescription,
+              aiEnhanced: true,
             };
           }
           return service;
         });
-        setServiceEntries(enhancedServices);
 
+        setServiceEntries(enhancedServices);
         toast({
           title: "KI-Optimierung abgeschlossen",
           description: "Die Leistungsbeschreibungen wurden optimiert.",
@@ -147,7 +151,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
     }
   };
 
-  // New function to get AI suggestions
+  // Neue Funktion für KI-Vorschläge
   const getAISuggestions = async () => {
     setIsGenerating(true);
     try {
@@ -157,6 +161,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
         body: JSON.stringify({
           patientId: patient.id,
           date: selectedDate,
+          type: billingType,
         }),
       });
 
@@ -180,7 +185,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
     }
   };
 
-  // Function to apply suggestions
+  // Vorschläge übernehmen
   const applySuggestions = (selectedSuggestions: ServiceSuggestion[] | undefined) => {
     if (!selectedSuggestions) return;
 
@@ -189,7 +194,8 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
       ...selectedSuggestions.map(suggestion => ({
         code: suggestion.code,
         description: suggestion.description,
-        amount: suggestion.amount
+        amount: suggestion.amount,
+        aiEnhanced: true,
       }))
     ]);
 
@@ -218,6 +224,7 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
         code: service.code || "",
         description: service.description || "",
         amount: Number(service.amount) || 0,
+        aiEnhanced: service.aiEnhanced || false,
       }));
 
       // Calculate total amount
@@ -233,6 +240,14 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
         services: validatedServices,
         totalAmount: totalAmount.toString(),
         status: "draft",
+        type: billingType, // Use selected billing type
+        metadata: {
+          createdAt: new Date().toISOString(),
+          lastModified: new Date().toISOString(),
+          modifiedBy: 1, // TODO: Get from auth context
+          format: "digital",
+          attachments: []
+        },
         date: new Date(selectedDate).toISOString(),
       });
     } catch (error) {
@@ -303,6 +318,23 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
                 <p><strong>Adresse:</strong> {patient.address}</p>
               </div>
             </div>
+          </div>
+
+          {/* Billing Type Selection */}
+          <div>
+            <Label>Abrechnungstyp</Label>
+            <Select
+              value={billingType}
+              onValueChange={setBillingType}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Typ wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={BillingType.INSURANCE}>Krankenkassenabrechnung</SelectItem>
+                <SelectItem value={BillingType.PRIVATE}>Privatrechnung</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Date Selection */}
@@ -396,6 +428,8 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
           </div>
         </div>
       </CardContent>
+
+      {/* AI Suggestions Dialog */}
       <AlertDialog open={showSuggestions} onOpenChange={setShowSuggestions}>
         <AlertDialogContent className="max-w-3xl">
           <AlertDialogHeader>
