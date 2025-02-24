@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import type { Employee, Shift } from "@shared/schema";
 
+// Shift type visuals
 const ShiftTypes = {
   early: { icon: Sun, color: "text-yellow-500", label: "Früh" },
   late: { icon: Coffee, color: "text-orange-500", label: "Spät" },
@@ -34,9 +35,11 @@ interface Props {
 }
 
 export function ScheduleBoard({ selectedDate }: Props) {
+  // Calculate week days
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1, locale: de });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Fetch data
   const { data: employees = [] } = useQuery({
     queryKey: ['/api/employees']
   });

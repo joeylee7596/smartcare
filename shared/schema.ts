@@ -2,7 +2,13 @@ import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Basic shifts table
+// Basic tables for shift management
+export const employees = pgTable("employees", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("caregiver")
+});
+
 export const shifts = pgTable("shifts", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id").notNull(),
@@ -11,7 +17,8 @@ export const shifts = pgTable("shifts", {
   type: text("type").notNull()
 });
 
-// Schema for inserting shifts
+// Create insert schemas
+export const insertEmployeeSchema = createInsertSchema(employees);
 export const insertShiftSchema = createInsertSchema(shifts, {
   type: z.enum(["early", "late", "night"]),
   startTime: z.string().or(z.date()).transform(val =>
@@ -19,19 +26,11 @@ export const insertShiftSchema = createInsertSchema(shifts, {
   ),
   endTime: z.string().or(z.date()).transform(val =>
     typeof val === 'string' ? new Date(val) : val
-  ),
+  )
 });
 
 // Export types
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type Shift = typeof shifts.$inferSelect;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
-
-// Basic employees table
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  role: text("role").notNull().default("caregiver"),
-});
-
-export type Employee = typeof employees.$inferSelect;
-export type InsertEmployee = z.infer<typeof createInsertSchema(employees)>;
