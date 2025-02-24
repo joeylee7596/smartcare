@@ -8,8 +8,8 @@ import {
   Sun,
   Moon,
   Coffee,
-  Plus,
   Sparkles,
+  Plus,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -50,29 +50,17 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
       draggable
       onDragStart={handleDragStart}
       className={`
-        flex items-center gap-3 p-4 rounded-xl
-        bg-gradient-to-br from-white/80 to-white/40
-        backdrop-blur-[2px]
-        border border-white/30
-        shadow-[0_8px_16px_-6px_rgba(0,0,0,0.02),0_16px_24px_-8px_rgba(0,0,0,0.01)]
-        hover:shadow-[0_12px_20px_-8px_rgba(0,0,0,0.03),0_20px_32px_-12px_rgba(0,0,0,0.02)]
-        hover:scale-[1.02]
+        flex items-center gap-2 p-3 rounded-lg
+        ${info.bgColor} border-2 border-dashed
         cursor-grab group
-        transition-all duration-500 ease-out
-        transform-gpu perspective-1000
-        hover:rotate-1
-        before:absolute before:inset-0 before:z-[-1] before:bg-gradient-to-t before:from-white/5 before:to-white/20 before:rounded-xl before:backdrop-blur-sm
+        hover:border-solid hover:shadow-sm
+        transition-all
       `}
-      style={{
-        background: `linear-gradient(135deg, rgba(255,255,255,0.9), ${info.bgColor.replace('bg-', '')})`,
-      }}
     >
-      <div className="p-2.5 rounded-lg bg-gradient-to-br from-white/60 to-white/20 backdrop-blur-[4px] shadow-inner">
-        <Icon className={`h-6 w-6 ${info.color} group-hover:scale-110 transition-transform duration-500`} />
-      </div>
+      <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
       <div>
-        <div className="font-semibold text-gray-800">{info.label}</div>
-        <div className="text-sm text-gray-600">{info.time}</div>
+        <div className="font-medium">{info.label}</div>
+        <div className="text-xs text-gray-500">{info.time}</div>
       </div>
     </div>
   );
@@ -85,36 +73,23 @@ function ShiftCard({ shift }: { shift: Shift }) {
   return (
     <motion.div
       className={`
-        p-3 mb-2 rounded-lg
-        ${shift.aiOptimized
-          ? 'bg-gradient-to-br from-white/80 via-green-50/50 to-emerald-50/30 border-l-2 border-green-400/50'
-          : 'bg-gradient-to-br from-white/80 via-white/60 to-transparent'}
-        backdrop-blur-[4px]
-        border border-white/30
-        shadow-[0_4px_12px_-4px_rgba(0,0,0,0.02)]
-        hover:shadow-[0_8px_16px_-6px_rgba(0,0,0,0.03)]
-        transform-gpu perspective-1000
-        hover:-translate-y-0.5
-        transition-all duration-500
-        before:absolute before:inset-0 before:z-[-1] before:bg-gradient-to-t before:from-white/5 before:to-white/20 before:rounded-lg before:backdrop-blur-sm
+        p-2 mb-1 rounded-md
+        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
+        hover:shadow-md transition-all
       `}
-      initial={{ opacity: 0, y: 5, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -5, scale: 0.95 }}
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md bg-gradient-to-br from-white/60 to-white/20 backdrop-blur-[4px] shadow-inner">
-            <Icon className={`h-4 w-4 ${info.color}`} />
-          </div>
-          <span className="font-medium text-gray-800">{info.label}</span>
+          <Icon className={`h-4 w-4 ${info.color}`} />
+          <span className="text-sm font-medium">{info.label}</span>
         </div>
         {shift.aiOptimized && (
           <Tooltip>
             <TooltipTrigger>
-              <div className="p-1.5 rounded-full bg-gradient-to-br from-green-100/60 to-green-50/20 backdrop-blur-[4px] shadow-inner">
-                <Sparkles className="h-3.5 w-3.5 text-green-500" />
-              </div>
+              <Sparkles className="h-4 w-4 text-green-500" />
             </TooltipTrigger>
             <TooltipContent>KI-optimierte Schicht</TooltipContent>
           </Tooltip>
@@ -133,14 +108,25 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  const shiftsQueryKey = ["/api/shifts", { start: weekStart.toISOString(), end: weekEnd.toISOString(), department }];
-
+  // Query for employees
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
+  // Query for shifts with explicit date range
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: shiftsQueryKey,
+    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/shifts", {
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString(),
+        department,
+      });
+      if (!res.ok) throw new Error("Failed to fetch shifts");
+      const data = await res.json();
+      console.log('Fetched shifts:', data); // Debug log
+      return data;
+    },
   });
 
   const createShiftMutation = useMutation({
@@ -183,6 +169,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         status: "scheduled"
       };
 
+      console.log('Creating shift with data:', shiftData); // Debug log
+
       const res = await apiRequest("POST", "/api/shifts", shiftData);
 
       if (!res.ok) {
@@ -191,56 +179,30 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       }
 
       const newShift = await res.json();
+      console.log('Created shift:', newShift); // Debug log
       return newShift;
     },
-    onMutate: async (newShiftData) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
-      await queryClient.cancelQueries({ queryKey: shiftsQueryKey });
+    onSuccess: (newShift) => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
 
-      // Snapshot the previous value
-      const previousShifts = queryClient.getQueryData<Shift[]>(shiftsQueryKey) || [];
+      // Optimistically update the local data
+      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
+        return [...old, newShift];
+      });
 
-      const optimisticShift = {
-        id: Date.now(), 
-        employeeId: newShiftData.employeeId,
-        type: newShiftData.type,
-        startTime: newShiftData.date.toISOString(),
-        endTime: addDays(newShiftData.date,1).toISOString(),
-        department: department,
-        status: "scheduled",
-        notes: "",
-        aiGenerated: false,
-        aiOptimized: false,
-        conflictInfo: {
-          type: "overlap",
-          description: "Checking for conflicts",
-          severity: "low",
-          status: "pending"
-        },
-      };
-
-      // Optimistically update to the new value
-      queryClient.setQueryData<Shift[]>(shiftsQueryKey, [...previousShifts, optimisticShift]);
-
-      // Return a context object with the snapshotted value
-      return { previousShifts };
+      toast({
+        title: "Schicht erstellt",
+        description: "Die neue Schicht wurde erfolgreich angelegt.",
+      });
     },
-    onError: (error, variables, context) => {
-      if (context?.previousShifts) {
-        queryClient.setQueryData(shiftsQueryKey, context.previousShifts);
-      }
+    onError: (error) => {
       toast({
         title: "Fehler",
         description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
         variant: "destructive",
       });
-    },
-    onSuccess: (newShift) => {
-      queryClient.invalidateQueries({ queryKey: shiftsQueryKey });
-      toast({
-        title: "Schicht erstellt",
-        description: "Die neue Schicht wurde erfolgreich angelegt.",
-      });
+      console.error("Error creating shift:", error);
     },
   });
 
@@ -272,16 +234,19 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }
   };
 
+  // Debug log for current shifts
+  console.log('Current shifts:', shifts);
+
   return (
-    <Card className="border-none shadow-none bg-white/70 backdrop-blur-sm">
-      <CardHeader className="pb-4">
+    <Card className="mt-6">
+      <CardHeader className="pb-4 border-b">
         <div className="flex items-center justify-between">
           <div className="grid grid-cols-3 gap-4">
             {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
               <ShiftTemplate key={type} type={type} />
             ))}
           </div>
-          <Button
+          <Button 
             onClick={onOptimize}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
           >
@@ -291,95 +256,88 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="relative">
-          {/* Sticky week header */}
-          <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100 mb-6">
-            <div className="grid grid-cols-7 gap-px">
-              {weekDays.map((day, index) => (
+        <ScrollArea className="h-[calc(100vh-280px)]">
+          <div className="min-w-[1200px]">
+            {/* Header row with dates */}
+            <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b">
+              <div className="p-4 font-medium">Mitarbeiter</div>
+              {weekDays.map((day) => (
                 <div
                   key={day.toISOString()}
-                  className={`
-                    text-center p-3
-                    ${format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                      ? 'bg-gradient-to-br from-blue-50 to-blue-50/50 border-b-2 border-blue-200'
-                      : 'bg-gradient-to-br from-gray-50/50 to-transparent'}
-                    ${index !== 6 ? 'border-r border-gray-100' : ''}
-                    backdrop-blur-[2px]
-                  `}
+                  className={`p-4 text-center ${
+                    format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+                      ? 'bg-blue-50'
+                      : ''
+                  }`}
                 >
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium">
                     {format(day, "EEEE", { locale: de })}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {format(day, "dd.MM.", { locale: de })}
+                    {format(day, "dd.MM.")}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
 
-          <ScrollArea className="h-[calc(100vh-380px)] pr-4">
-            <div className="space-y-6">
+            {/* Employee rows */}
+            <div>
               {employees.map((employee) => (
-                <Card key={employee.id} className="overflow-hidden border border-gray-100">
-                  <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="font-medium">{employee.name}</div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-7 gap-px">
-                      {weekDays.map((day, index) => {
-                        const dayShifts = shifts.filter(s => {
-                          const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
-                          const currentDate = format(day, 'yyyy-MM-dd');
-                          return s.employeeId === employee.id && shiftDate === currentDate;
-                        });
+                <div
+                  key={employee.id}
+                  className="grid grid-cols-[250px_repeat(7,1fr)] border-b hover:bg-gray-50/50"
+                >
+                  {/* Employee info */}
+                  <div className="p-4">
+                    <div className="font-medium">{employee.name}</div>
+                  </div>
 
-                        const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
+                  {/* Shift cells for each day */}
+                  {weekDays.map((day) => {
+                    const dayShifts = shifts.filter(s => {
+                      const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
+                      const currentDate = format(day, 'yyyy-MM-dd');
+                      return s.employeeId === employee.id && shiftDate === currentDate;
+                    });
 
-                        return (
-                          <div
-                            key={day.toISOString()}
-                            className={`
-                              p-2 min-h-[120px] relative
-                              ${index !== 6 ? 'border-r border-gray-100' : ''}
-                              ${dragOverCell === cellId
-                                ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]'
-                                : 'hover:bg-gradient-to-br hover:from-gray-50/40 hover:to-transparent'}
-                              transition-all duration-500
-                              rounded-lg
-                            `}
-                            onDragOver={(e) => handleDragOver(e, cellId)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, employee.id, day)}
-                          >
-                            <AnimatePresence>
-                              {dayShifts.map((shift) => (
-                                <ShiftCard key={shift.id} shift={shift} />
-                              ))}
-                            </AnimatePresence>
+                    const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
 
-                            {dayShifts.length === 0 && (
-                              <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
-                                <div className="p-2.5 rounded-full bg-gradient-to-br from-gray-50/60 to-white/20 backdrop-blur-[4px] shadow-inner">
-                                  <Plus className="h-5 w-5" />
-                                </div>
-                                <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
-                              </div>
-                            )}
+                    // Debug log for shifts in this cell
+                    console.log(`Shifts for ${cellId}:`, dayShifts);
+
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`
+                          p-2 min-h-[120px] border-l relative
+                          ${dragOverCell === cellId ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
+                          hover:bg-gray-50/50
+                          transition-all
+                        `}
+                        onDragOver={(e) => handleDragOver(e, cellId)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, employee.id, day)}
+                      >
+                        <AnimatePresence>
+                          {dayShifts.map((shift) => (
+                            <ShiftCard key={shift.id} shift={shift} />
+                          ))}
+                        </AnimatePresence>
+
+                        {dayShifts.length === 0 && (
+                          <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
+                            <Plus className="h-5 w-5" />
+                            <span className="text-xs mt-1">Schicht hinzufügen</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               ))}
             </div>
-          </ScrollArea>
-        </div>
+          </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );
