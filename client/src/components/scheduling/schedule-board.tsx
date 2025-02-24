@@ -130,7 +130,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           severity: "low"
         },
         required_skills: [],
-        rotation_pattern: data.type === "early" ? "early" : data.type === "late" ? "late" : data.type === "night" ? "night" : undefined
+        rotation_pattern: data.type
       };
 
       const res = await apiRequest("POST", "/api/shifts", shiftData);
@@ -227,7 +227,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                   const formattedDay = format(day, 'yyyy-MM-dd');
                   const dayShifts = shifts.filter(s => {
                     const shiftStart = new Date(s.startTime);
-                    return s.employeeId === employee.id && 
+                    return s.employeeId === employee.id &&
                            format(shiftStart, 'yyyy-MM-dd') === formattedDay;
                   });
 
