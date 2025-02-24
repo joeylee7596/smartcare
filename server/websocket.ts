@@ -1,5 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
+import { generateDocumentation } from './ai';
+import { parse } from 'cookie';
+import { storage } from './storage';
 
 export function setupWebSocket(server: Server) {
   const wss = new WebSocketServer({ 
@@ -20,16 +23,61 @@ export function setupWebSocket(server: Server) {
         const data = JSON.parse(message.toString());
 
         switch (data.type) {
-          case 'SHIFT_UPDATE':
-            // Broadcast shift updates to all connected clients
+          case 'VOICE_TRANSCRIPTION':
+            try {
+              const documentation = await generateDocumentation(data.audioContent);
+              console.log('Generated documentation successfully');
+
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_COMPLETE',
+                documentation,
+                originalText: data.audioContent
+              }));
+            } catch (error) {
+              console.error('Transcription error:', error);
+              ws.send(JSON.stringify({
+                type: 'TRANSCRIPTION_ERROR',
+                error: error instanceof Error ? error.message : 'Fehler bei der Transkription'
+              }));
+            }
+            break;
+
+          case 'DOC_STATUS_UPDATE':
+            console.log('Broadcasting status update:', data);
             wss.clients.forEach(client => {
               if (client !== ws && client.readyState === WebSocket.OPEN) {
                 client.send(JSON.stringify({
-                  type: 'SHIFT_UPDATED',
-                  shift: data.shift
+                  type: 'DOC_STATUS_UPDATED',
+                  docId: data.docId,
+                  status: data.status
                 }));
               }
             });
+            break;
+
+          case 'OPTIMIZE_TOUR':
+            console.log('Received tour optimization request:', data);
+            // Simulate AI processing time
+            setTimeout(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                  type: 'OPTIMIZED_TOUR',
+                  workflow: {
+                    waypoints: data.patients.map((patient: any, index: number) => ({
+                      patientId: patient.id,
+                      estimatedTime: new Date(Date.now() + index * 45 * 60000).toISOString(),
+                      visitDuration: 30,
+                      travelTimeToNext: index < data.patients.length - 1 ? 15 : 0,
+                      distanceToNext: index < data.patients.length - 1 ? 2.5 : 0,
+                      lat: 52.520008 + (Math.random() * 0.1 - 0.05),
+                      lng: 13.404954 + (Math.random() * 0.1 - 0.05)
+                    })),
+                    totalDistance: (data.patients.length - 1) * 2.5,
+                    estimatedDuration: data.patients.length * 45
+                  }
+                }));
+              }
+            }, 2000);
             break;
 
           default:
