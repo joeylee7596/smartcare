@@ -4,7 +4,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InsuranceBilling, Patient } from "@shared/schema";
-import { FileText, Plus, Download, Search, Calendar, Filter, Clock, Euro, ChevronRight } from "lucide-react";
+import { FileText, Plus, Search, Calendar, Filter, Clock, Euro, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { de } from "date-fns/locale";
@@ -46,17 +46,35 @@ export default function BillingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: patients = [], isError: isPatientsError } = useQuery({
+  // Patienten laden
+  const { data: patients = [], isError: isPatientsError } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
-    retry: false,
-    throwOnError: false,
+    retry: 2,
+    staleTime: 30000,
+    onError: (error) => {
+      console.error('Error loading patients:', error);
+      toast({
+        title: "Fehler",
+        description: "Patienten konnten nicht geladen werden",
+        variant: "destructive",
+      });
+    }
   });
 
-  const { data: billings = [], isError: isBillingsError } = useQuery({
+  // Abrechnungen laden
+  const { data: billings = [], isError: isBillingsError } = useQuery<InsuranceBilling[]>({
     queryKey: ["/api/billings", selectedPatient?.id],
     enabled: !!selectedPatient?.id,
-    retry: false,
-    throwOnError: false,
+    retry: 2,
+    staleTime: 30000,
+    onError: (error) => {
+      console.error('Error loading billings:', error);
+      toast({
+        title: "Fehler",
+        description: "Abrechnungen konnten nicht geladen werden",
+        variant: "destructive",
+      });
+    }
   });
 
   const { refetch: refetchDocCheck } = useQuery({
@@ -65,15 +83,15 @@ export default function BillingPage() {
   });
 
   const filteredPatients = patients && searchQuery
-    ? (patients as Patient[]).filter(p =>
+    ? patients.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.insuranceNumber.includes(searchQuery) ||
         p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : (patients as Patient[]);
+    : patients;
 
-  const groupedBillings = billings && Array.isArray(billings) 
-    ? (billings as InsuranceBilling[]).reduce((acc, billing) => {
+  const groupedBillings = Array.isArray(billings) 
+    ? billings.reduce((acc, billing) => {
         if (!billing.date) return acc;
         try {
           const date = parseISO(billing.date);
@@ -97,7 +115,7 @@ export default function BillingPage() {
     }
 
     try {
-      const validBillings = (billings as InsuranceBilling[])
+      const validBillings = billings
         .filter(b => b.date)
         .sort((a, b) => {
           const dateA = parseISO(a.date);
@@ -220,6 +238,7 @@ export default function BillingPage() {
     createBilling.mutate(billing);
   };
 
+  // Render error state
   if (isPatientsError || isBillingsError) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
