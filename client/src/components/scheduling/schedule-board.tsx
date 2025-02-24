@@ -2,7 +2,6 @@ import { useState } from "react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Brain,
   Sun,
@@ -35,7 +34,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Employee, Shift } from "@shared/schema";
 
@@ -46,15 +46,15 @@ interface ScheduleBoardProps {
 }
 
 const ShiftTypes = {
-  early: { icon: Sun, color: "text-yellow-500", bgColor: "bg-yellow-50", label: "Früh", time: "06:00 - 14:00" },
-  late: { icon: Coffee, color: "text-orange-500", bgColor: "bg-orange-50", label: "Spät", time: "14:00 - 22:00" },
-  night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
-  vacation: { icon: Calendar, color: "text-green-500", bgColor: "bg-green-50", label: "Urlaub", time: "Ganztägig" },
-  sick: { icon: HeartPulse, color: "text-red-500", bgColor: "bg-red-50", label: "Krank", time: "Ganztägig" },
-  overtime_reduction: { icon: Timer, color: "text-purple-500", bgColor: "bg-purple-50", label: "Überstundenabbau", time: "Ganztägig" },
-  training: { icon: GraduationCap, color: "text-indigo-500", bgColor: "bg-indigo-50", label: "Fortbildung", time: "Ganztägig" },
-  on_call: { icon: Phone, color: "text-cyan-500", bgColor: "bg-cyan-50", label: "Bereitschaft", time: "24 Stunden" },
-  holiday: { icon: CalendarOff, color: "text-gray-500", bgColor: "bg-gray-50", label: "Feiertag", time: "Ganztägig" },
+  early: { icon: Sun, color: "text-yellow-500", bgColor: "bg-yellow-50/80", label: "Früh", time: "06:00 - 14:00" },
+  late: { icon: Coffee, color: "text-orange-500", bgColor: "bg-orange-50/80", label: "Spät", time: "14:00 - 22:00" },
+  night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50/80", label: "Nacht", time: "22:00 - 06:00" },
+  vacation: { icon: Calendar, color: "text-green-500", bgColor: "bg-green-50/80", label: "Urlaub", time: "Ganztägig" },
+  sick: { icon: HeartPulse, color: "text-red-500", bgColor: "bg-red-50/80", label: "Krank", time: "Ganztägig" },
+  overtime_reduction: { icon: Timer, color: "text-purple-500", bgColor: "bg-purple-50/80", label: "Überstundenabbau", time: "Ganztägig" },
+  training: { icon: GraduationCap, color: "text-indigo-500", bgColor: "bg-indigo-50/80", label: "Fortbildung", time: "Ganztägig" },
+  on_call: { icon: Phone, color: "text-cyan-500", bgColor: "bg-cyan-50/80", label: "Bereitschaft", time: "24 Stunden" },
+  holiday: { icon: CalendarOff, color: "text-gray-500", bgColor: "bg-gray-50/80", label: "Feiertag", time: "Ganztägig" },
 } as const;
 
 function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
@@ -71,14 +71,18 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
       draggable
       onDragStart={handleDragStart}
       className={`
-        flex items-center gap-2 p-3 rounded-lg
-        ${info.bgColor} border-2 border-dashed
+        flex items-center gap-3 p-3 rounded-lg
+        ${info.bgColor} border border-transparent
         cursor-grab group
-        hover:border-solid hover:shadow-sm
-        transition-all
+        hover:border-${info.color.split('-')[1]}-200
+        hover:shadow-lg hover:shadow-${info.color.split('-')[1]}-100/20
+        transform hover:-translate-y-0.5
+        transition-all duration-200
       `}
     >
-      <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
+      <div className={`p-2 rounded-full ${info.bgColor} border border-${info.color.split('-')[1]}-200`}>
+        <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
+      </div>
       <div>
         <div className="font-medium">{info.label}</div>
         <div className="text-xs text-gray-500">{info.time}</div>
@@ -94,53 +98,57 @@ function ShiftCard({ shift, onEdit, onDelete }: { shift: Shift; onEdit: () => vo
   return (
     <motion.div
       className={`
-        p-2 mb-1 rounded-md
-        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
-        hover:shadow-md transition-all group
+        p-3 mb-2 rounded-lg
+        ${shift.aiOptimized ? 'bg-gradient-to-r from-green-50 to-green-50/50 border-l-2 border-green-500' : `${info.bgColor} border border-${info.color.split('-')[1]}-200/50`}
+        hover:shadow-lg hover:shadow-${info.color.split('-')[1]}-100/30
+        transform hover:-translate-y-0.5
+        transition-all duration-200 group
       `}
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -5 }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Icon className={`h-4 w-4 ${info.color}`} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-full ${info.bgColor} border border-${info.color.split('-')[1]}-200`}>
+            <Icon className={`h-4 w-4 ${info.color}`} />
+          </div>
           <div>
-            <span className="text-sm font-medium">{info.label}</span>
+            <div className="font-medium flex items-center gap-2">
+              {info.label}
+              {shift.aiOptimized && (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Sparkles className="h-4 w-4 text-green-500" />
+                  </TooltipTrigger>
+                  <TooltipContent>KI-optimierte Schicht</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             <div className="text-xs text-gray-500">{info.time}</div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          {shift.aiOptimized && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Sparkles className="h-4 w-4 text-green-500" />
-              </TooltipTrigger>
-              <TooltipContent>KI-optimierte Schicht</TooltipContent>
-            </Tooltip>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <span className="sr-only">Aktionen</span>
-                <Edit className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Bearbeiten</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Löschen</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="sr-only">Aktionen</span>
+              <Edit className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onEdit}>
+              <Edit className="mr-2 h-4 w-4" />
+              <span>Bearbeiten</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onDelete} className="text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Löschen</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {shift.notes && (
-        <div className="mt-1 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-gray-500 border-t border-gray-100 pt-2">
           {shift.notes}
         </div>
       )}
@@ -233,18 +241,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       }
       return res.json();
     },
-    onSuccess: (newShift) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
-        variant: "destructive",
       });
     },
   });
@@ -260,13 +261,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       toast({
         title: "Schicht gelöscht",
         description: "Die Schicht wurde erfolgreich gelöscht.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Die Schicht konnte nicht gelöscht werden",
-        variant: "destructive",
       });
     },
   });
@@ -301,7 +295,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
   return (
     <Card className="mt-6">
-      <CardHeader className="pb-4 border-b">
+      <CardHeader className="pb-6 border-b">
         <div className="flex items-center justify-between">
           <div className="grid grid-cols-3 gap-4">
             {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
@@ -310,7 +304,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </div>
           <Button 
             onClick={onOptimize}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
           >
             <Brain className="h-4 w-4 mr-2" />
             KI-Optimierung
@@ -321,7 +315,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         <ScrollArea className="h-[calc(100vh-280px)]">
           <div className="min-w-[1200px]">
             {/* Header row with dates */}
-            <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b">
+            <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b bg-gray-50/50">
               <div className="p-4 font-medium">Mitarbeiter</div>
               {weekDays.map((day) => (
                 <div
@@ -347,7 +341,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
               {employees.map((employee) => (
                 <div
                   key={employee.id}
-                  className="grid grid-cols-[250px_repeat(7,1fr)] border-b hover:bg-gray-50/50"
+                  className="grid grid-cols-[250px_repeat(7,1fr)] border-b hover:bg-gray-50/30"
                 >
                   {/* Employee info */}
                   <div className="p-4">
@@ -369,7 +363,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                         className={`
                           p-2 min-h-[120px] border-l relative
                           ${dragOverCell === cellId ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
-                          hover:bg-gray-50/50
+                          hover:bg-gray-50/30
                           transition-all
                         `}
                         onDragOver={(e) => handleDragOver(e, cellId)}
@@ -388,7 +382,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                         </AnimatePresence>
 
                         {dayShifts.length === 0 && (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
+                          <div className="h-full flex flex-col items-center justify-center text-gray-400 hover:text-gray-500 transition-colors">
                             <Plus className="h-5 w-5" />
                             <span className="text-xs mt-1">Schicht hinzufügen</span>
                           </div>
@@ -403,7 +397,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         </ScrollArea>
       </CardContent>
 
-      {/* Edit Dialog would go here */}
       <Dialog open={!!editingShift} onOpenChange={(open) => !open && setEditingShift(null)}>
         <DialogContent>
           <DialogHeader>
