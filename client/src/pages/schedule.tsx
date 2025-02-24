@@ -58,14 +58,14 @@ const calculateWorkload = (shifts: Shift[], employeeId: number): number => {
   return (employeeShifts.length / shifts.length) * 100;
 };
 
-type ScheduleView = "daily" | "weekly" | "monthly";
-type ScheduleMode = "manual" | "auto" | "balanced";
+type ScheduleView = "daily" | "weekly";
+type ScheduleMode = "manual" | "auto";
 type OptimizationFocus = "workload" | "preferences" | "efficiency";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<ScheduleView>("weekly");
-  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("auto");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("manual");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [department, setDepartment] = useState("all");
   const [optimizationFocus, setOptimizationFocus] = useState<OptimizationFocus>("workload");
@@ -108,7 +108,7 @@ export default function Schedule() {
         title: "Dienstplan optimiert",
         description: `Die KI hat ${data.changesCount} Änderungen vorgenommen für optimale ${
           optimizationFocus === "workload" ? "Arbeitsbelastung" :
-          optimizationFocus === "preferences" ? "Mitarbeiterzufriedenheit" : "Effizienz"
+            optimizationFocus === "preferences" ? "Mitarbeiterzufriedenheit" : "Effizienz"
         }.`,
       });
     },
@@ -246,10 +246,9 @@ export default function Schedule() {
                   <div>
                     <Label className="text-base font-semibold">Ansicht</Label>
                     <Tabs value={view} className="w-full mt-2">
-                      <TabsList className="grid grid-cols-3 w-full">
+                      <TabsList className="grid grid-cols-2 w-full">
                         <TabsTrigger value="daily" onClick={() => setView("daily")}>Tag</TabsTrigger>
                         <TabsTrigger value="weekly" onClick={() => setView("weekly")}>Woche</TabsTrigger>
-                        <TabsTrigger value="monthly" onClick={() => setView("monthly")}>Monat</TabsTrigger>
                       </TabsList>
                     </Tabs>
                   </div>
@@ -379,9 +378,9 @@ export default function Schedule() {
                           key={index}
                           className={`flex items-center gap-2 ${
                             insight.type === "warning" ? "text-yellow-600" :
-                            insight.type === "alert" ? "text-orange-600" :
-                            "text-red-600"
-                          }`}
+                              insight.type === "alert" ? "text-orange-600" :
+                                "text-red-600"
+                            }`}
                         >
                           <insight.icon className="h-4 w-4" />
                           <span className="text-sm">{insight.message}</span>
@@ -438,8 +437,8 @@ export default function Schedule() {
             <ModernRoster
               selectedDate={selectedDate}
               department={department}
-              view={view as "daily" | "weekly" | "monthly"}
-              scheduleMode={scheduleMode as "manual" | "auto" | "balanced"}
+              view={view}
+              scheduleMode={scheduleMode}
               optimizationFocus={optimizationFocus}
             />
           </div>

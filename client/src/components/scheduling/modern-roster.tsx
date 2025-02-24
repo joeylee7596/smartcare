@@ -65,6 +65,7 @@ interface ModernRosterProps {
   department: string;
   view: "daily" | "weekly";
   scheduleMode: "manual" | "auto";
+  optimizationFocus: "workload" | "preferences" | "efficiency";
 }
 
 const ShiftPatternIcons = {
@@ -73,7 +74,7 @@ const ShiftPatternIcons = {
   night: <Moon className="h-4 w-4 text-blue-500" />,
 };
 
-export function ModernRoster({ selectedDate, department, view, scheduleMode }: ModernRosterProps) {
+export function ModernRoster({ selectedDate, department, view, scheduleMode, optimizationFocus }: ModernRosterProps) {
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [aiOptimizationOpen, setAiOptimizationOpen] = useState(false);
@@ -112,7 +113,7 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
   });
 
   // Filter employees based on search
-  const filteredEmployees = employees.filter(emp => 
+  const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(employeeFilter.toLowerCase()) ||
     emp.qualifications?.nursingDegree && employeeFilter.toLowerCase().includes("pflege") ||
     emp.qualifications?.woundCare && employeeFilter.toLowerCase().includes("wund")
@@ -192,8 +193,8 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
     updateShiftMutation.mutate({
       id: shiftId,
       updates: {
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
+        startTime,
+        endTime,
         rotationPattern: pattern as "early" | "late" | "night",
       },
     });
@@ -241,7 +242,7 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
 
   // Render employee list item
   const renderEmployeeListItem = (employee: Employee) => (
-    <Card 
+    <Card
       key={employee.id}
       className={cn(
         "p-3 mb-2 cursor-move",
@@ -282,7 +283,7 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
             <h4 className="font-medium mb-2">Dienstplan-Analyse</h4>
             <Progress value={75} className="mb-2" />
             <p className="text-sm text-muted-foreground">
-              Der aktuelle Dienstplan ist zu 75% optimal. 
+              Der aktuelle Dienstplan ist zu 75% optimal.
               Hier sind einige Verbesserungsvorschläge:
             </p>
             <ul className="mt-2 space-y-2 text-sm">
@@ -299,7 +300,7 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
 
           <Card className="p-4">
             <h4 className="font-medium mb-2">Automatische Optimierung</h4>
-            <Button 
+            <Button
               className="w-full"
               onClick={() => optimizeScheduleMutation.mutate()}
               disabled={optimizeScheduleMutation.isPending}
@@ -348,241 +349,6 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
       </ScrollArea>
     </div>
   );
+};
 
-  return (
-    <DndContext
-      sensors={sensors}
-      modifiers={[restrictToVerticalAxis]}
-      onDragEnd={handleDragEnd}
-    >
-      <ResizablePanelGroup direction="horizontal" className="min-h-[800px] rounded-lg border">
-        {/* Left Panel - Employee List */}
-        <ResizablePanel defaultSize={20}>
-          <div className="flex flex-col h-full">
-            <div className="p-4 border-b">
-              <div className="flex items-center gap-2 mb-4">
-                <Users className="h-5 w-5" />
-                <h3 className="font-semibold">Mitarbeiter</h3>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Mitarbeiter suchen..."
-                  className="pl-8"
-                  value={employeeFilter}
-                  onChange={(e) => setEmployeeFilter(e.target.value)}
-                />
-              </div>
-            </div>
-            <ScrollArea className="flex-1 p-4">
-              {isLoadingEmployees ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((n) => (
-                    <div key={n} className="h-[68px] bg-muted rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                filteredEmployees.map(renderEmployeeListItem)
-              )}
-            </ScrollArea>
-          </div>
-        </ResizablePanel>
-
-        <ResizableHandle />
-
-        {/* Center Panel - Schedule Grid */}
-        <ResizablePanel defaultSize={60}>
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h1 className="text-2xl font-bold tracking-tight">
-                {format(selectedDate, "EEEE, d. MMMM yyyy", { locale: de })}
-              </h1>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => queryClient.invalidateQueries()}>
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex-1 grid grid-cols-[auto,1fr] gap-4 p-4">
-              {/* Time slots */}
-              <div className="w-24 pt-16">
-                <div className="space-y-2">
-                  {["Früh", "Spät", "Nacht"].map((shift) => (
-                    <div
-                      key={shift}
-                      className="h-24 flex items-center text-sm text-muted-foreground"
-                    >
-                      {shift}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Week grid */}
-              <div className="grid grid-cols-7 gap-px bg-muted rounded-lg overflow-hidden">
-                {weekDays.map((day) => (
-                  <div key={day.toISOString()} className="bg-card">
-                    <div className="p-2 text-center border-b">
-                      <div className="font-medium">
-                        {format(day, "EEEE", { locale: de })}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(day, "dd.MM.")}
-                      </div>
-                    </div>
-
-                    {/* Shift slots */}
-                    <div className="space-y-px">
-                      {["early", "late", "night"].map((pattern) => {
-                        const dayShifts = shiftsByDay[format(day, "yyyy-MM-dd")] || {};
-                        const patternShifts = Object.values(dayShifts)
-                          .flat()
-                          .filter((s) => s.rotationPattern === pattern);
-
-                        return (
-                          <div
-                            key={`${pattern}-${format(day, "yyyy-MM-dd")}`}
-                            className="h-24 p-2 bg-card hover:bg-accent/5 transition-colors"
-                            id={`${pattern}-${format(day, "yyyy-MM-dd")}`}
-                            data-droppable
-                          >
-                            <ScrollArea className="h-full">
-                              <div className="space-y-1">
-                                {patternShifts.map((shift) => {
-                                  const employee = employees.find(
-                                    (e) => e.id === shift.employeeId
-                                  );
-                                  if (!employee) return null;
-
-                                  return (
-                                    <motion.div
-                                      key={shift.id}
-                                      data-draggable
-                                      id={shift.id.toString()}
-                                      initial={{ opacity: 0, y: 5 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      className={cn(
-                                        "group relative p-2 rounded-md transition-colors cursor-move",
-                                        shift.aiOptimizationScore ? 'bg-primary/5 border-l-4 border-green-500' : 'bg-primary/5',
-                                        shift.conflictInfo && 'border-l-4 border-destructive'
-                                      )}
-                                      style={{
-                                        ...shift.dragDropMetadata?.position && {
-                                          transform: `translate(${shift.dragDropMetadata.position.x}px, ${shift.dragDropMetadata.position.y}px)`,
-                                        }
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          {ShiftPatternIcons[shift.rotationPattern as keyof typeof ShiftPatternIcons]}
-                                          <span className="text-sm font-medium truncate">
-                                            {employee.name}
-                                          </span>
-                                        </div>
-                                        {renderQualifications(employee)}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        {format(new Date(shift.startTime), "HH:mm")} -{" "}
-                                        {format(new Date(shift.endTime), "HH:mm")}
-                                      </div>
-
-                                      {typeof shift.aiOptimizationScore === 'number' && (
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Badge
-                                              variant="secondary"
-                                              className="absolute top-1 right-1"
-                                            >
-                                              <Sparkles className="h-3 w-3 text-green-500" />
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            KI-Optimierungsscore: {Math.round(shift.aiOptimizationScore * 100)}%
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      )}
-
-                                      {shift.conflictInfo && (
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Badge
-                                              variant="destructive"
-                                              className="absolute top-1 right-1"
-                                            >
-                                              <AlertTriangle className="h-3 w-3" />
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <div className="space-y-1">
-                                              <p className="font-medium">Konflikt: {shift.conflictInfo.type}</p>
-                                              <p>{shift.conflictInfo.description}</p>
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      )}
-                                    </motion.div>
-                                  );
-                                })}
-                              </div>
-                            </ScrollArea>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </ResizablePanel>
-
-        <ResizableHandle />
-
-        {/* Right Panel - AI Assistant */}
-        <ResizablePanel defaultSize={20}>
-          {renderAiPanel()}
-        </ResizablePanel>
-      </ResizablePanelGroup>
-
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Schicht bearbeiten</DialogTitle>
-            <DialogDescription>
-              Bearbeiten Sie die Details dieser Schicht
-            </DialogDescription>
-          </DialogHeader>
-          {selectedShift && (
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Notizen</Label>
-                <Input
-                  defaultValue={selectedShift.notes || ""}
-                  onChange={(e) =>
-                    updateShiftMutation.mutate({
-                      id: selectedShift.id,
-                      updates: { notes: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSelectedShift(selectedShift);
-                  setAiOptimizationOpen(true);
-                  setEditDialogOpen(false);
-                }}
-              >
-                <Brain className="h-4 w-4 mr-2" />
-                KI-Vorschläge
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </DndContext>
-  );
-}
+export default ModernRoster;
