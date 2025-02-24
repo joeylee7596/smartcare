@@ -229,10 +229,11 @@ export function BillingEditor({ patient, onSave }: BillingEditorProps) {
       // Call onSave with validated data
       onSave({
         patientId: patient.id,
-        date: selectedDate,
+        employeeId: 1, // TODO: Get from auth context
         services: validatedServices,
         totalAmount: totalAmount.toString(),
-        status: "pending",
+        status: "draft",
+        date: new Date(selectedDate).toISOString(),
       });
     } catch (error) {
       console.error('Validation Error:', error);

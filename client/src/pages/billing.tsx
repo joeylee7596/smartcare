@@ -25,63 +25,53 @@ export default function BillingPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(
     format(new Date(), "yyyy-MM")
   );
-  const [missingDocs, setMissingDocs] = useState<any[]>([]);
+  const [missingDocs, setMissingDocs] = useState<Array<{
+    id: number;
+    date: string;
+    type: string;
+  }>>([]);
   const [showDocCheck, setShowDocCheck] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch data with proper error handling
-  const { data: patients = [], isError: isPatientsError } = useQuery<Patient[]>({
+  const { data: patients = [], isError: isPatientsError } = useQuery({
     queryKey: ["/api/patients"],
-    onError: () => {
-      toast({
-        title: "Fehler",
-        description: "Patienten konnten nicht geladen werden",
-        variant: "destructive",
-      });
-    },
+    retry: false,
+    throwOnError: false,
   });
 
-  const { data: billings = [], isError: isBillingsError } = useQuery<InsuranceBilling[]>({
+  const { data: billings = [], isError: isBillingsError } = useQuery({
     queryKey: ["/api/billings", selectedPatient?.id],
     enabled: !!selectedPatient?.id,
-    onError: () => {
-      toast({
-        title: "Fehler",
-        description: "Abrechnungen konnten nicht geladen werden",
-        variant: "destructive",
-      });
-    },
+    retry: false,
+    throwOnError: false,
   });
 
-  // Add new query for documentation check
   const { refetch: refetchDocCheck } = useQuery({
     queryKey: ["/api/documentation/check", selectedPatient?.id],
-    enabled: false, // Only fetch when explicitly called
+    enabled: false,
   });
 
-  // Filter patients based on search
-  const filteredPatients = searchQuery
-    ? patients.filter(p =>
+  const filteredPatients = patients && searchQuery
+    ? (patients as Patient[]).filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.insuranceNumber.includes(searchQuery) ||
         p.insuranceProvider.toLowerCase().includes(searchQuery.toLowerCase())
       )
-    : patients;
+    : (patients as Patient[]);
 
-  // Group billings by month
-  const groupedBillings = billings.reduce((acc, billing) => {
-    const month = format(new Date(billing.date), "yyyy-MM");
-    if (!acc[month]) acc[month] = [];
-    acc[month].push(billing);
-    return acc;
-  }, {} as Record<string, InsuranceBilling[]>);
+  const groupedBillings = billings && Array.isArray(billings) 
+    ? (billings as InsuranceBilling[]).reduce((acc, billing) => {
+        const month = format(new Date(billing.date), "yyyy-MM");
+        if (!acc[month]) acc[month] = [];
+        acc[month].push(billing);
+        return acc;
+      }, {} as Record<string, InsuranceBilling[]>)
+    : {};
 
-  // Calculate total amount for selected month
   const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
     .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
-  // Create billing mutation
   const createBilling = useMutation({
     mutationFn: async (billing: Partial<InsuranceBilling>) => {
       if (!billing.date || !billing.services || !billing.totalAmount) {
@@ -93,7 +83,7 @@ export default function BillingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patientId: selectedPatient?.id,
-          employeeId: 1, // TODO: Get from auth context
+          employeeId: 1,
           date: new Date(billing.date).toISOString(),
           services: billing.services,
           totalAmount: billing.totalAmount.toString(),
@@ -109,7 +99,6 @@ export default function BillingPage() {
       return response.json();
     },
     onSuccess: () => {
-      // Invalidate and refetch relevant queries
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
@@ -131,7 +120,6 @@ export default function BillingPage() {
     },
   });
 
-  // Update billing status mutation
   const updateBillingStatus = useMutation({
     mutationFn: async ({ billingId, newStatus }: { billingId: number; newStatus: string }) => {
       const response = await fetch(`/api/billings/${billingId}`, {
@@ -145,6 +133,10 @@ export default function BillingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
+      toast({
+        title: 'Aktualisiert',
+        description: 'Der Status wurde erfolgreich aktualisiert.',
+      });
     },
     onError: () => {
       toast({
@@ -155,14 +147,14 @@ export default function BillingPage() {
     },
   });
 
-  // Function to check for missing documentation
   const checkMissingDocumentation = async () => {
     if (!selectedPatient) return;
 
     try {
       const result = await refetchDocCheck();
-      if (result.data?.missingDocs?.length > 0) {
-        setMissingDocs(result.data.missingDocs);
+      const missingDocs = result.data?.missingDocs || [];
+      if (missingDocs.length > 0) {
+        setMissingDocs(missingDocs);
         setShowDocCheck(true);
       } else {
         setIsNewBillingOpen(true);
@@ -176,12 +168,10 @@ export default function BillingPage() {
     }
   };
 
-  // Function to handle documentation creation
-  const handleCreateDocumentation = (item: any) => {
+  const handleCreateDocumentation = (item: { id: number; date: string; type: string }) => {
     window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
   };
 
-  // Handle save billing
   const handleSaveBilling = (billing: Partial<InsuranceBilling>) => {
     createBilling.mutate(billing);
   };
@@ -315,26 +305,24 @@ export default function BillingPage() {
                             <p className="text-sm text-gray-500 flex items-center gap-2">
                               <Clock className="h-4 w-4" />
                               Letzte Abrechnung: {
-                                billings.length > 0
+                                Array.isArray(billings) && billings.length > 0
                                   ? format(new Date(billings[0].date), "dd. MMMM yyyy", { locale: de })
                                   : "Keine Abrechnungen"
                               }
                             </p>
                           </div>
                         </div>
-                        <DialogTrigger asChild>
-                          <Button
-                            size="lg"
-                            className="h-11 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600
-                              hover:from-blue-600 hover:to-blue-700 text-white
-                              shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30
-                              transition-all duration-500 hover:scale-[1.02]"
-                            onClick={checkMissingDocumentation}
-                          >
-                            <Plus className="h-5 w-5 mr-2" />
-                            Neue Leistung
-                          </Button>
-                        </DialogTrigger>
+                        <Button
+                          size="lg"
+                          className="h-11 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600
+                            hover:from-blue-600 hover:to-blue-700 text-white
+                            shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30
+                            transition-all duration-500 hover:scale-[1.02]"
+                          onClick={checkMissingDocumentation}
+                        >
+                          <Plus className="h-5 w-5 mr-2" />
+                          Neue Leistung
+                        </Button>
                       </div>
                     </CardHeader>
                   </Card>
@@ -438,10 +426,12 @@ export default function BillingPage() {
               <DialogHeader>
                 <DialogTitle>Neue Leistung erfassen</DialogTitle>
               </DialogHeader>
-              <BillingEditor
-                patient={selectedPatient}
-                onSave={handleSaveBilling}
-              />
+              {selectedPatient && (
+                <BillingEditor
+                  patient={selectedPatient}
+                  onSave={handleSaveBilling}
+                />
+              )}
             </DialogContent>
           </Dialog>
         </main>

@@ -119,10 +119,12 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           </Button>
         )}
 
-        {billing.status === "paid" && (
+        {billing.status === "paid" && billing.responseDate && (
           <div className="flex items-center justify-center gap-2 text-green-600 bg-green-50 rounded-md p-2">
             <Euro className="h-4 w-4" />
-            <span className="text-sm font-medium">Bezahlt am {format(new Date(billing.paidAt || ''), "dd.MM.yyyy", { locale: de })}</span>
+            <span className="text-sm font-medium">
+              Bezahlt am {format(new Date(billing.responseDate), "dd.MM.yyyy", { locale: de })}
+            </span>
           </div>
         )}
       </CardContent>
