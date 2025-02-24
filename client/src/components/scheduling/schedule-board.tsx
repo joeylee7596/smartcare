@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format, addDays, startOfWeek, parseISO, isSameDay } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,22 +8,14 @@ import {
   Coffee,
   PalmtreeIcon,
   Stethoscope,
-  Plus,
-  Trash2,
   Brain,
+  Trash2,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import type { Employee, Shift } from "@shared/schema";
 
@@ -76,14 +68,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Debug logs for date range
-  useEffect(() => {
-    console.log("Date Range:", {
-      weekStart: weekStart.toISOString(),
-      weekEnd: weekEnd.toISOString(),
-    });
-  }, [weekStart, weekEnd]);
-
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
@@ -94,85 +78,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       end: weekEnd.toISOString(),
       department
     }],
-  });
-
-  // Debug logs for data
-  useEffect(() => {
-    if (shifts.length > 0) {
-      console.log("Loaded Shifts:", shifts.map(s => ({
-        id: s.id,
-        employeeId: s.employeeId,
-        type: s.type,
-        startTime: new Date(s.startTime).toISOString(),
-        endTime: new Date(s.endTime).toISOString()
-      })));
-    }
-  }, [shifts]);
-
-  const createShiftMutation = useMutation({
-    mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
-      let startTime = new Date(data.date);
-      let endTime = new Date(data.date);
-
-      switch (data.type) {
-        case "early":
-          startTime.setHours(6, 0);
-          endTime.setHours(14, 0);
-          break;
-        case "late":
-          startTime.setHours(14, 0);
-          endTime.setHours(22, 0);
-          break;
-        case "night":
-          startTime.setHours(22, 0);
-          endTime = addDays(endTime, 1);
-          endTime.setHours(6, 0);
-          break;
-        case "vacation":
-        case "sick":
-          startTime.setHours(0, 0);
-          endTime.setHours(23, 59);
-          break;
-      }
-
-      const shiftData = {
-        employeeId: data.employeeId,
-        type: data.type,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        department,
-        status: "scheduled",
-        breakDuration: 30,
-        conflictInfo: {
-          type: "overlap",
-          description: "Neue Schicht",
-          severity: "low"
-        },
-        required_skills: [],
-        rotation_pattern: data.type
-      };
-
-      const res = await apiRequest("POST", "/api/shifts", shiftData);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Schicht konnte nicht erstellt werden");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      toast({
-        title: "Schicht erstellt",
-        description: "Die neue Schicht wurde erfolgreich angelegt.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
-        variant: "destructive",
-      });
-    },
   });
 
   const deleteShiftMutation = useMutation({
@@ -244,64 +149,24 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                 {weekDays.map((day) => {
                   const dayShifts = shifts.filter(shift => {
-                    const matchesEmployee = shift.employeeId === employee.id;
-                    const matchesDay = isSameDay(new Date(shift.startTime), day);
-                    console.log("Checking shift:", {
-                      shiftId: shift.id,
-                      employeeId: shift.employeeId,
-                      employeeName: employee.name,
-                      shiftDate: new Date(shift.startTime),
-                      dayToMatch: day,
-                      matchesEmployee,
-                      matchesDay,
-                      matches: matchesEmployee && matchesDay
-                    });
-                    return matchesEmployee && matchesDay;
+                    return shift.employeeId === employee.id && 
+                           isSameDay(new Date(shift.startTime), day);
                   });
-
-                  console.log(`Found shifts for ${employee.name} on ${format(day, 'yyyy-MM-dd')}:`, dayShifts);
 
                   return (
                     <div
                       key={day.toISOString()}
                       className="p-2 min-h-[100px] border-l"
                     >
-                      {dayShifts.length > 0 && (
-                        <div className="space-y-2">
-                          {dayShifts.map((shift) => (
-                            <ShiftBadge
-                              key={shift.id}
-                              type={shift.type as keyof typeof ShiftTypes}
-                              onDelete={() => deleteShiftMutation.mutate(shift.id)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      {dayShifts.length === 0 && (
-                        <Select
-                          onValueChange={(value) => {
-                            createShiftMutation.mutate({
-                              employeeId: employee.id,
-                              type: value,
-                              date: day,
-                            });
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Schicht hinzufügen" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(ShiftTypes).map(([value, info]) => (
-                              <SelectItem key={value} value={value}>
-                                <div className="flex items-center gap-2">
-                                  <info.icon className={`h-4 w-4 ${info.color}`} />
-                                  <span>{info.label}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <div className="space-y-2">
+                        {dayShifts.map((shift) => (
+                          <ShiftBadge
+                            key={shift.id}
+                            type={shift.type as keyof typeof ShiftTypes}
+                            onDelete={() => deleteShiftMutation.mutate(shift.id)}
+                          />
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
