@@ -116,6 +116,110 @@ export default function BillingPage() {
     }
   };
 
+  const createBilling = useMutation({
+    mutationFn: async (billing: Partial<InsuranceBilling>) => {
+      if (!billing.date || !billing.services || !billing.totalAmount) {
+        throw new Error('Ungültige Abrechnungsdaten');
+      }
+
+      const response = await fetch('/api/billings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId: selectedPatient?.id,
+          employeeId: 1,
+          date: billing.date,
+          services: billing.services,
+          totalAmount: billing.totalAmount.toString(),
+          status: "draft"
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
+      ]).then(() => {
+        setIsNewBillingOpen(false);
+        toast({
+          title: 'Gespeichert',
+          description: 'Die Abrechnung wurde als Entwurf gespeichert.',
+        });
+      });
+    },
+    onError: (error) => {
+      console.error('Saving Error:', error);
+      toast({
+        title: 'Fehler',
+        description: error instanceof Error ? error.message : 'Die Abrechnung konnte nicht erstellt werden.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateBillingStatus = useMutation({
+    mutationFn: async ({ billingId, newStatus }: { billingId: number; newStatus: string }) => {
+      const response = await fetch(`/api/billings/${billingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) throw new Error('Status konnte nicht aktualisiert werden');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
+      toast({
+        title: 'Aktualisiert',
+        description: 'Der Status wurde erfolgreich aktualisiert.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Fehler',
+        description: 'Status konnte nicht aktualisiert werden.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const checkMissingDocumentation = async () => {
+    if (!selectedPatient) return;
+
+    try {
+      const result = await refetchDocCheck();
+      const missingDocs = result.data?.missingDocs || [];
+      if (missingDocs.length > 0) {
+        setMissingDocs(missingDocs);
+        setShowDocCheck(true);
+      } else {
+        setIsNewBillingOpen(true);
+      }
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Dokumentationen konnten nicht überprüft werden",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCreateDocumentation = (item: { id: number; date: string; type: string }) => {
+    window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
+  };
+
+  const handleSaveBilling = (billing: Partial<InsuranceBilling>) => {
+    createBilling.mutate(billing);
+  };
+
   if (isPatientsError || isBillingsError) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -296,7 +400,13 @@ export default function BillingPage() {
                             exit={{ opacity: 0 }}
                           >
                             {(groupedBillings[selectedMonth] || [])
-                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .sort((a, b) => {
+                                const dateA = parseISO(a.date);
+                                const dateB = parseISO(b.date);
+                                return isValid(dateB) && isValid(dateA)
+                                  ? dateB.getTime() - dateA.getTime()
+                                  : 0;
+                              })
                               .map((billing) => (
                                 <BillingCard
                                   key={billing.id}
