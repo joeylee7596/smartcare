@@ -178,12 +178,11 @@ export default function BillingPage() {
 
   // Function to handle documentation creation
   const handleCreateDocumentation = (item: any) => {
-    // Navigate to documentation page with pre-filled data
     window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
   };
 
   // Handle save billing
-  const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
+  const handleSaveBilling = (billing: Partial<InsuranceBilling>) => {
     createBilling.mutate(billing);
   };
 
