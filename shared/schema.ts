@@ -610,34 +610,6 @@ export const insertShiftSchema = createInsertSchema(shifts, {
   ),
 });
 
-export const shiftChangeSchema = z.object({
-  id: z.number().optional(),
-  shiftId: z.number(),
-  requestedBy: z.number(),
-  requestType: z.enum(["swap", "cancel", "modify"]),
-  requestStatus: z.enum(["pending", "approved", "rejected"]).default("pending"),
-  requestDetails: z.object({
-    reason: z.string(),
-    proposedChanges: z.object({
-      startTime: z.string().optional(),
-      endTime: z.string().optional(),
-      newEmployeeId: z.number().optional(),
-    }).optional(),
-    urgency: z.enum(["low", "medium", "high"]).default("low"),
-    alternativeEmployees: z.array(z.number()).optional(),
-  }),
-  responseNote: z.string().optional(),
-  createdAt: z.date().optional(),
-  respondedAt: z.date().optional(),
-  respondedBy: z.number().optional(),
-});
-
-export const insertChangeSchema = shiftChangeSchema.omit({ 
-  id: true, 
-  createdAt: true,
-  respondedAt: true 
-});
-
 export type ShiftChange = z.infer<typeof shiftChangeSchema>;
 export type InsertChange = z.infer<typeof insertChangeSchema>;
 
