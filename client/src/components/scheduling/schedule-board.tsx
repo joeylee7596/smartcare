@@ -6,8 +6,8 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
-  useDraggable,
   useDroppable,
+  useDraggable,
   DragOverlay,
 } from "@dnd-kit/core";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -24,9 +24,6 @@ import {
   Sparkles,
   Plus,
   Pencil,
-  X,
-  UserCheck,
-  AlertTriangle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,23 +31,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -70,9 +50,9 @@ const ShiftTypes = {
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
 };
 
-function DraggableShift({ type, isTemplate = false }: { type: keyof typeof ShiftTypes; isTemplate?: boolean }) {
+function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: isTemplate ? `template_${type}` : `shift_${type}`,
+    id: type,
   });
 
   const info = ShiftTypes[type];
@@ -100,9 +80,9 @@ function DraggableShift({ type, isTemplate = false }: { type: keyof typeof Shift
   );
 }
 
-function DroppableCell({ children, date, employeeId }: { children: React.ReactNode; date: Date; employeeId: number }) {
+function DroppableCell({ date, employeeId, children }: { date: Date; employeeId: number; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({
-    id: `${format(date, 'yyyy-MM-dd')}_${employeeId}`,
+    id: `${employeeId}_${format(date, 'yyyy-MM-dd')}`,
   });
 
   return (
@@ -110,7 +90,7 @@ function DroppableCell({ children, date, employeeId }: { children: React.ReactNo
       ref={setNodeRef}
       className={`
         p-2 min-h-[100px] border-l relative
-        ${isOver ? 'bg-blue-50/50 border-2 border-dashed border-blue-300' : ''}
+        ${isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
         hover:bg-gray-50/50
         transition-all
       `}
@@ -158,8 +138,6 @@ function ShiftCard({ shift }: { shift: Shift }) {
 
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [editingShift, setEditingShift] = useState<Shift | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -230,22 +208,20 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     },
   });
 
-  // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id.toString());
   };
 
-  // Handle drag end
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
     if (!over) return;
 
-    const [date, employeeId] = over.id.toString().split("_");
-    const [source, type] = active.id.toString().split("_");
+    const [employeeId, date] = over.id.toString().split("_");
+    const type = active.id.toString();
 
-    if (source === "template" && type && employeeId && date) {
+    if (type && employeeId && date) {
       createShiftMutation.mutate({
         employeeId: parseInt(employeeId),
         type,
@@ -265,7 +241,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           <div className="flex items-center justify-between">
             <div className="grid grid-cols-3 gap-4">
               {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
-                <DraggableShift key={type} type={type} isTemplate />
+                <DraggableShiftTemplate key={type} type={type} />
               ))}
             </div>
             <Button 
@@ -288,7 +264,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                     key={day.toISOString()}
                     className={`p-4 text-center ${
                       format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                        ? 'bg-blue-50/50'
+                        ? 'bg-blue-50'
                         : ''
                     }`}
                   >
@@ -365,118 +341,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       </Card>
 
       <DragOverlay>
-        {activeId && activeId.startsWith('template_') && (
-          <DraggableShift type={activeId.split('_')[1] as keyof typeof ShiftTypes} />
+        {activeId && (
+          <DraggableShiftTemplate type={activeId as keyof typeof ShiftTypes} />
         )}
       </DragOverlay>
-      {/* Edit Shift Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schicht bearbeiten</DialogTitle>
-            <DialogDescription>
-              Bearbeiten Sie die Details dieser Schicht oder löschen Sie sie.
-            </DialogDescription>
-          </DialogHeader>
-
-          {editingShift && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Schichttyp</Label>
-                <Select
-                  value={editingShift.type}
-                  onValueChange={(value) =>
-                    setEditingShift(prev => prev ? { ...prev, type: value } : null)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ShiftTypes).map(([type, info]) => (
-                      <SelectItem key={type} value={type}>
-                        <div className="flex items-center gap-2">
-                          <info.icon className={`h-4 w-4 ${info.color}`} />
-                          {info.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notizen</Label>
-                <Input
-                  value={editingShift.notes || ''}
-                  onChange={(e) =>
-                    setEditingShift(prev => prev ? { ...prev, notes: e.target.value } : null)
-                  }
-                  placeholder="Optionale Notizen zur Schicht"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={editingShift.status}
-                  onValueChange={(value) =>
-                    setEditingShift(prev => prev ? { ...prev, status: value } : null)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="scheduled">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4 text-green-500" />
-                        Geplant
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pending">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                        Ausstehend
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="flex justify-between">
-            <Button
-              variant="destructive"
-              onClick={() => editingShift && deleteShiftMutation.mutate(editingShift.id)}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Löschen
-            </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowEditDialog(false)}
-              >
-                Abbrechen
-              </Button>
-              <Button
-                onClick={() => editingShift && updateShiftMutation.mutate({
-                  id: editingShift.id,
-                  updates: {
-                    type: editingShift.type,
-                    notes: editingShift.notes,
-                    status: editingShift.status,
-                  },
-                })}
-              >
-                Speichern
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DndContext>
   );
 }
