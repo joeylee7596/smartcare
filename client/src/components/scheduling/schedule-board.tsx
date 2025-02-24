@@ -105,16 +105,17 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const { toast } = useToast();
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1, locale: de });
+  const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
-  const { data: shifts = [] } = useQuery<Shift[]>({
+  const { data: shifts = [], refetch: refetchShifts } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: weekStart.toISOString(),
-      end: addDays(weekStart, 6).toISOString(),
+      end: weekEnd.toISOString(),
       department,
     }],
   });
@@ -169,6 +170,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      refetchShifts(); // Explicitly refetch shifts
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
@@ -194,14 +196,14 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     setDragOverCell(null);
   };
 
-  const handleDrop = (e: React.DragEvent, employeeId: number, date: Date) => {
+  const handleDrop = async (e: React.DragEvent, employeeId: number, date: Date) => {
     e.preventDefault();
     setDragOverCell(null);
 
     const shiftType = e.dataTransfer.getData('text/plain');
     if (!shiftType) return;
 
-    createShiftMutation.mutate({
+    await createShiftMutation.mutateAsync({
       employeeId,
       type: shiftType,
       date,
