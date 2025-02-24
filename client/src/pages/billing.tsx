@@ -17,6 +17,60 @@ import { BillingEditor } from "@/components/billing/billing-editor";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 
+interface BillingCardProps {
+  key: string;
+  billing: InsuranceBilling;
+  patient: Patient | null;
+  onSubmit: () => void;
+}
+
+const BillingCard = ({ key, billing, patient, onSubmit }: BillingCardProps) => {
+  return (
+    <motion.div
+      key={key}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.2, delay: key * 0.05 }}
+    >
+      <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 rounded-xl border border-white/40 hover:border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-500">
+                  {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
+                </span>
+              </div>
+              <div className="mt-2 space-y-2">
+                {billing.services.map((service, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">{service.description}</span>
+                    <span className="font-medium">
+                      {Number(service.amount).toFixed(2)} €
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSubmit}
+              className="h-9 rounded-xl bg-white/80 hover:bg-blue-50 border border-white/40 hover:border-blue-200 transition-all duration-300"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {billing.status === "draft" ? "Pending" : "Submit"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
+
+
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -73,7 +127,7 @@ export default function BillingPage() {
           date: new Date(billing.date).toISOString(),
           services: billing.services,
           totalAmount: billing.totalAmount.toString(),
-          status: "pending"
+          status: "draft"
         }),
       });
 
@@ -92,7 +146,7 @@ export default function BillingPage() {
 
       toast({
         title: 'Gespeichert',
-        description: 'Die Abrechnung wurde erfolgreich erstellt.',
+        description: 'Die Abrechnung wurde als Entwurf gespeichert.',
       });
     } catch (error) {
       console.error('Saving Error:', error);
@@ -104,32 +158,27 @@ export default function BillingPage() {
     }
   };
 
-  const generatePDF = async (billing: InsuranceBilling) => {
+  const handleStatusUpdate = async (billing: InsuranceBilling, newStatus: string) => {
     try {
-      const response = await fetch(`/api/billings/${billing.id}/pdf`, {
-        method: "POST",
+      const response = await fetch(`/api/billings/${billing.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
       });
 
-      if (!response.ok) throw new Error("PDF konnte nicht erstellt werden");
+      if (!response.ok) throw new Error('Status konnte nicht aktualisiert werden');
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Abrechnung_${billing.id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
+      await refetchBillings();
 
       toast({
-        title: "PDF erstellt",
-        description: "Die Abrechnung wurde erfolgreich als PDF exportiert.",
+        title: 'Status aktualisiert',
+        description: `Die Abrechnung wurde als "${newStatus}" markiert.`,
       });
     } catch (error) {
       toast({
-        title: "Fehler",
-        description: "PDF konnte nicht erstellt werden.",
-        variant: "destructive",
+        title: 'Fehler',
+        description: 'Status konnte nicht aktualisiert werden.',
+        variant: 'destructive',
       });
     }
   };
@@ -175,7 +224,7 @@ export default function BillingPage() {
 
                   <ScrollArea className="h-[calc(100vh-320px)]">
                     <AnimatePresence>
-                      <motion.div 
+                      <motion.div
                         className="space-y-2 pr-4"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -307,58 +356,14 @@ export default function BillingPage() {
                     <CardContent>
                       <ScrollArea className="h-[calc(100vh-500px)]">
                         <AnimatePresence>
-                          <motion.div 
+                          <motion.div
                             className="space-y-4"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                           >
                             {(groupedBillings[selectedMonth] || []).map((billing, index) => (
-                              <motion.div
-                                key={billing.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.2, delay: index * 0.05 }}
-                              >
-                                <Card className="group hover:shadow-lg transition-all duration-300
-                                  hover:scale-[1.02] hover:-translate-y-1 rounded-xl
-                                  border border-white/40 hover:border-blue-200">
-                                  <CardContent className="p-4">
-                                    <div className="flex items-start justify-between">
-                                      <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                          <Calendar className="h-4 w-4 text-gray-500" />
-                                          <span className="text-sm text-gray-500">
-                                            {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
-                                          </span>
-                                        </div>
-                                        <div className="mt-2 space-y-2">
-                                          {billing.services.map((service, idx) => (
-                                            <div key={idx} className="flex items-center justify-between text-sm">
-                                              <span className="text-gray-600">{service.description}</span>
-                                              <span className="font-medium">
-                                                {Number(service.amount).toFixed(2)} €
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => generatePDF(billing)}
-                                        className="h-9 rounded-xl bg-white/80 hover:bg-blue-50
-                                          border border-white/40 hover:border-blue-200
-                                          transition-all duration-300"
-                                      >
-                                        <Download className="h-4 w-4 mr-2" />
-                                        PDF
-                                      </Button>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              </motion.div>
+                              <BillingCard key={billing.id} billing={billing} patient={selectedPatient} onSubmit={() => handleStatusUpdate(billing, billing.status === "draft" ? "pending" : "submitted")}/>
                             ))}
                           </motion.div>
                         </AnimatePresence>

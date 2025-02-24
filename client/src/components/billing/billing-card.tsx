@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { FileText, Send, CheckCircle, AlertCircle, LucideIcon } from "lucide-react";
+import { FileText, Send, CheckCircle, XCircle, Clock, FileEdit, Euro } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BillingCardProps {
@@ -13,21 +13,36 @@ interface BillingCardProps {
 }
 
 export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
-  const statusColors = {
-    pending: "text-yellow-600 bg-yellow-50",
-    submitted: "text-blue-600 bg-blue-50",
-    approved: "text-green-600 bg-green-50",
-    rejected: "text-red-600 bg-red-50",
+  const statusConfig = {
+    draft: {
+      label: "Entwurf",
+      color: "text-gray-600 bg-gray-50",
+      icon: FileEdit,
+    },
+    pending: {
+      label: "Offen",
+      color: "text-yellow-600 bg-yellow-50",
+      icon: Clock,
+    },
+    submitted: {
+      label: "Abgeschickt",
+      color: "text-blue-600 bg-blue-50",
+      icon: Send,
+    },
+    paid: {
+      label: "Bezahlt",
+      color: "text-green-600 bg-green-50",
+      icon: CheckCircle,
+    },
+    rejected: {
+      label: "Abgelehnt",
+      color: "text-red-600 bg-red-50",
+      icon: XCircle,
+    },
   } as const;
 
-  const statusIcons: Record<string, LucideIcon> = {
-    pending: AlertCircle,
-    submitted: Send,
-    approved: CheckCircle,
-    rejected: AlertCircle,
-  };
-
-  const StatusIcon = statusIcons[billing.status] || AlertCircle;
+  const currentStatus = statusConfig[billing.status as keyof typeof statusConfig] || statusConfig.pending;
+  const StatusIcon = currentStatus.icon;
 
   return (
     <Card>
@@ -39,10 +54,10 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           </div>
           <div className={cn(
             "px-2 py-1 rounded-full text-sm flex items-center gap-1",
-            statusColors[billing.status as keyof typeof statusColors]
+            currentStatus.color
           )}>
             <StatusIcon className="h-4 w-4" />
-            <span className="capitalize">{billing.status}</span>
+            <span>{currentStatus.label}</span>
           </div>
         </CardTitle>
       </CardHeader>
@@ -84,11 +99,31 @@ export function BillingCard({ billing, patient, onSubmit }: BillingCardProps) {
           </div>
         </div>
 
-        {billing.status === "pending" && (
-          <Button className="w-full" onClick={onSubmit}>
-            <Send className="mr-2 h-4 w-4" />
-            An Krankenkasse senden
+        {(billing.status === "draft" || billing.status === "pending") && (
+          <Button 
+            className="w-full" 
+            onClick={onSubmit}
+            variant={billing.status === "draft" ? "outline" : "default"}
+          >
+            {billing.status === "draft" ? (
+              <>
+                <FileEdit className="mr-2 h-4 w-4" />
+                Zur Prüfung freigeben
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" />
+                An Krankenkasse senden
+              </>
+            )}
           </Button>
+        )}
+
+        {billing.status === "paid" && (
+          <div className="flex items-center justify-center gap-2 text-green-600 bg-green-50 rounded-md p-2">
+            <Euro className="h-4 w-4" />
+            <span className="text-sm font-medium">Bezahlt am {format(new Date(billing.paidAt || ''), "dd.MM.yyyy", { locale: de })}</span>
+          </div>
         )}
       </CardContent>
     </Card>
