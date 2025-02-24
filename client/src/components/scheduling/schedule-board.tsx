@@ -247,31 +247,29 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                           ))}
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-2">
-                          <Select
-                            onValueChange={(value) => {
-                              createShiftMutation.mutate({
-                                employeeId: employee.id,
-                                type: value,
-                                date: day,
-                              });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Schicht hinzufügen" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(ShiftTypes).map(([value, info]) => (
-                                <SelectItem key={value} value={value}>
-                                  <div className="flex items-center gap-2">
-                                    <info.icon className={`h-4 w-4 ${info.color}`} />
-                                    <span>{info.label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <Select
+                          onValueChange={(value) => {
+                            createShiftMutation.mutate({
+                              employeeId: employee.id,
+                              type: value,
+                              date: day,
+                            });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Schicht hinzufügen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ShiftTypes).map(([value, info]) => (
+                              <SelectItem key={value} value={value}>
+                                <div className="flex items-center gap-2">
+                                  <info.icon className={`h-4 w-4 ${info.color}`} />
+                                  <span>{info.label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
                     </div>
                   );
