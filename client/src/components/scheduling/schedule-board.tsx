@@ -10,14 +10,6 @@ import {
   Coffee,
   Sparkles,
   Plus,
-  Trash2,
-  Edit,
-  Calendar,
-  HeartPulse,
-  Timer,
-  GraduationCap,
-  Phone,
-  CalendarOff,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -29,13 +21,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import type { Employee, Shift } from "@shared/schema";
 
@@ -49,12 +34,6 @@ const ShiftTypes = {
   early: { icon: Sun, color: "text-yellow-500", bgColor: "bg-yellow-50", label: "Früh", time: "06:00 - 14:00" },
   late: { icon: Coffee, color: "text-orange-500", bgColor: "bg-orange-50", label: "Spät", time: "14:00 - 22:00" },
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
-  vacation: { icon: Calendar, color: "text-green-500", bgColor: "bg-green-50", label: "Urlaub", time: "Ganztägig" },
-  sick: { icon: HeartPulse, color: "text-red-500", bgColor: "bg-red-50", label: "Krank", time: "Ganztägig" },
-  overtime_reduction: { icon: Timer, color: "text-purple-500", bgColor: "bg-purple-50", label: "Überstundenabbau", time: "Ganztägig" },
-  training: { icon: GraduationCap, color: "text-indigo-500", bgColor: "bg-indigo-50", label: "Fortbildung", time: "Ganztägig" },
-  on_call: { icon: Phone, color: "text-cyan-500", bgColor: "bg-cyan-50", label: "Bereitschaft", time: "24 Stunden" },
-  holiday: { icon: CalendarOff, color: "text-gray-500", bgColor: "bg-gray-50", label: "Feiertag", time: "Ganztägig" },
 } as const;
 
 function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
@@ -87,7 +66,7 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   );
 }
 
-function ShiftCard({ shift, onEdit, onDelete }: { shift: Shift; onEdit: () => void; onDelete: () => void }) {
+function ShiftCard({ shift }: { shift: Shift }) {
   const info = ShiftTypes[shift.type as keyof typeof ShiftTypes];
   const Icon = info.icon;
 
@@ -96,7 +75,7 @@ function ShiftCard({ shift, onEdit, onDelete }: { shift: Shift; onEdit: () => vo
       className={`
         p-2 mb-1 rounded-md
         ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
-        hover:shadow-md transition-all group
+        hover:shadow-md transition-all
       `}
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
@@ -105,52 +84,23 @@ function ShiftCard({ shift, onEdit, onDelete }: { shift: Shift; onEdit: () => vo
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${info.color}`} />
-          <div>
-            <span className="text-sm font-medium">{info.label}</span>
-            <div className="text-xs text-gray-500">{info.time}</div>
-          </div>
+          <span className="text-sm font-medium">{info.label}</span>
         </div>
-        <div className="flex items-center gap-1">
-          {shift.aiOptimized && (
-            <Tooltip>
-              <TooltipTrigger>
-                <Sparkles className="h-4 w-4 text-green-500" />
-              </TooltipTrigger>
-              <TooltipContent>KI-optimierte Schicht</TooltipContent>
-            </Tooltip>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <span className="sr-only">Aktionen</span>
-                <Edit className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                <span>Bearbeiten</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                <span>Löschen</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {shift.aiOptimized && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Sparkles className="h-4 w-4 text-green-500" />
+            </TooltipTrigger>
+            <TooltipContent>KI-optimierte Schicht</TooltipContent>
+          </Tooltip>
+        )}
       </div>
-      {shift.notes && (
-        <div className="mt-1 text-xs text-gray-500">
-          {shift.notes}
-        </div>
-      )}
     </motion.div>
   );
 }
 
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
-  const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -158,10 +108,12 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Query for employees
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
+  // Query for shifts with explicit date range
   const { data: shifts = [] } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
     queryFn: async () => {
@@ -171,7 +123,9 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         department,
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
-      return res.json();
+      const data = await res.json();
+      console.log('Fetched shifts:', data); // Debug log
+      return data;
     },
   });
 
@@ -180,32 +134,20 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       let startTime = new Date(data.date);
       let endTime = new Date(data.date);
 
-      const isFullDay = ["vacation", "sick", "overtime_reduction", "holiday"].includes(data.type);
-
-      if (isFullDay) {
-        startTime.setHours(0, 0, 0);
-        endTime.setHours(23, 59, 59);
-      } else {
-        switch (data.type) {
-          case "early":
-            startTime.setHours(6, 0);
-            endTime.setHours(14, 0);
-            break;
-          case "late":
-            startTime.setHours(14, 0);
-            endTime.setHours(22, 0);
-            break;
-          case "night":
-            startTime.setHours(22, 0);
-            endTime = addDays(endTime, 1);
-            endTime.setHours(6, 0);
-            break;
-          case "on_call":
-            startTime.setHours(0, 0);
-            endTime = addDays(endTime, 1);
-            endTime.setHours(0, 0);
-            break;
-        }
+      switch (data.type) {
+        case "early":
+          startTime.setHours(6, 0);
+          endTime.setHours(14, 0);
+          break;
+        case "late":
+          startTime.setHours(14, 0);
+          endTime.setHours(22, 0);
+          break;
+        case "night":
+          startTime.setHours(22, 0);
+          endTime = addDays(endTime, 1);
+          endTime.setHours(6, 0);
+          break;
       }
 
       const shiftData = {
@@ -214,11 +156,12 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
-        breakDuration: isFullDay ? 0 : 30,
+        breakDuration: 30,
         conflictInfo: {
           type: "overlap",
           description: "Checking for conflicts",
           severity: "low",
+          status: "pending"
         },
         notes: "",
         aiGenerated: false,
@@ -226,15 +169,28 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         status: "scheduled"
       };
 
+      console.log('Creating shift with data:', shiftData); // Debug log
+
       const res = await apiRequest("POST", "/api/shifts", shiftData);
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Schicht konnte nicht erstellt werden");
       }
-      return res.json();
+
+      const newShift = await res.json();
+      console.log('Created shift:', newShift); // Debug log
+      return newShift;
     },
     onSuccess: (newShift) => {
+      // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+
+      // Optimistically update the local data
+      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
+        return [...old, newShift];
+      });
+
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
@@ -246,28 +202,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
         variant: "destructive",
       });
-    },
-  });
-
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (shiftId: number) => {
-      const res = await apiRequest("DELETE", `/api/shifts/${shiftId}`);
-      if (!res.ok) throw new Error("Schicht konnte nicht gelöscht werden");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      toast({
-        title: "Schicht gelöscht",
-        description: "Die Schicht wurde erfolgreich gelöscht.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Die Schicht konnte nicht gelöscht werden",
-        variant: "destructive",
-      });
+      console.error("Error creating shift:", error);
     },
   });
 
@@ -298,6 +233,9 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       console.error('Drop error:', error);
     }
   };
+
+  // Debug log for current shifts
+  console.log('Current shifts:', shifts);
 
   return (
     <Card className="mt-6">
@@ -356,12 +294,16 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                   {/* Shift cells for each day */}
                   {weekDays.map((day) => {
-                    const dayShifts = shifts.filter(s => 
-                      s.employeeId === employee.id && 
-                      format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-                    );
+                    const dayShifts = shifts.filter(s => {
+                      const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
+                      const currentDate = format(day, 'yyyy-MM-dd');
+                      return s.employeeId === employee.id && shiftDate === currentDate;
+                    });
 
                     const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
+
+                    // Debug log for shifts in this cell
+                    console.log(`Shifts for ${cellId}:`, dayShifts);
 
                     return (
                       <div
@@ -378,12 +320,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       >
                         <AnimatePresence>
                           {dayShifts.map((shift) => (
-                            <ShiftCard
-                              key={shift.id}
-                              shift={shift}
-                              onEdit={() => setEditingShift(shift)}
-                              onDelete={() => deleteShiftMutation.mutate(shift.id)}
-                            />
+                            <ShiftCard key={shift.id} shift={shift} />
                           ))}
                         </AnimatePresence>
 
@@ -402,16 +339,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </div>
         </ScrollArea>
       </CardContent>
-
-      {/* Edit Dialog would go here */}
-      <Dialog open={!!editingShift} onOpenChange={(open) => !open && setEditingShift(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schicht bearbeiten</DialogTitle>
-          </DialogHeader>
-          {/* Edit form would go here */}
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
