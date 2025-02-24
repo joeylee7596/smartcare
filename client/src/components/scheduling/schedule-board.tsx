@@ -6,6 +6,7 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
+  useDraggable,
   useDroppable,
   DragOverlay,
 } from "@dnd-kit/core";
@@ -18,8 +19,6 @@ import {
   Sun,
   Moon,
   Coffee,
-  Shield,
-  Star,
   Sparkles,
   Plus,
 } from "lucide-react";
@@ -34,6 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
 import type { Employee, Shift } from "@shared/schema";
 
 interface ScheduleBoardProps {
@@ -48,19 +48,29 @@ const ShiftTypes = {
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
 } as const;
 
-// Draggable templates for shift types
-function ShiftTemplate({ type, overlay = false }: { type: keyof typeof ShiftTypes; overlay?: boolean }) {
+function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: type,
+  });
+
   const info = ShiftTypes[type];
   const Icon = info.icon;
 
   return (
     <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       className={`
         flex items-center gap-2 p-3 rounded-lg
         ${info.bgColor} border-2 border-dashed
-        ${!overlay && 'cursor-grab hover:border-solid hover:shadow-sm'}
-        transition-all group
+        cursor-grab group
+        ${isDragging ? 'opacity-50' : 'hover:border-solid hover:shadow-sm'}
+        transition-all
       `}
+      style={{
+        touchAction: 'none',
+      }}
     >
       <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
       <div>
@@ -71,9 +81,10 @@ function ShiftTemplate({ type, overlay = false }: { type: keyof typeof ShiftType
   );
 }
 
-// Droppable area for cells
-function DroppableCell({ id, children }: { id: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+function DroppableCell({ date, employeeId, children }: { date: Date; employeeId: number; children: React.ReactNode }) {
+  const { setNodeRef, isOver, isActive } = useDroppable({
+    id: `${employeeId}_${format(date, 'yyyy-MM-dd')}`,
+  });
 
   return (
     <div
@@ -81,7 +92,8 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
       className={`
         p-2 min-h-[120px] border-l relative
         ${isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
-        hover:bg-gray-50/50 transition-all duration-200
+        ${isActive ? 'bg-gray-50/50' : ''}
+        transition-all duration-200
       `}
     >
       {children}
@@ -89,7 +101,6 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
   );
 }
 
-// Shift card component
 function ShiftCard({ shift }: { shift: Shift }) {
   const info = ShiftTypes[shift.type as keyof typeof ShiftTypes];
   const Icon = info.icon;
@@ -108,7 +119,9 @@ function ShiftCard({ shift }: { shift: Shift }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${info.color}`} />
-          <span className="text-sm font-medium">{info.label}</span>
+          <span className="text-sm font-medium">
+            {info.label}
+          </span>
         </div>
         {shift.aiOptimized && (
           <Tooltip>
@@ -170,8 +183,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           endTime = addDays(endTime, 1);
           endTime.setHours(6, 0);
           break;
-        default:
-          throw new Error("Ungültiger Schichttyp");
       }
 
       const res = await apiRequest("POST", "/api/shifts", {
@@ -192,13 +203,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         description: "Die neue Schicht wurde erfolgreich angelegt.",
       });
     },
-    onError: (error) => {
-      toast({
-        title: "Fehler",
-        description: error instanceof Error ? error.message : "Schicht konnte nicht erstellt werden",
-        variant: "destructive",
-      });
-    },
   });
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -211,23 +215,14 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
     if (!over) return;
 
-    try {
-      const [employeeId, date] = over.id.toString().split("_");
-      const type = active.id.toString();
+    const [employeeId, date] = over.id.toString().split("_");
+    const type = active.id.toString();
 
-      if (type && employeeId && date) {
-        createShiftMutation.mutate({
-          employeeId: parseInt(employeeId),
-          type,
-          date: new Date(date),
-        });
-      }
-    } catch (error) {
-      console.error("Error in drag end:", error);
-      toast({
-        title: "Fehler",
-        description: "Die Schicht konnte nicht erstellt werden",
-        variant: "destructive",
+    if (type && employeeId && date) {
+      createShiftMutation.mutate({
+        employeeId: parseInt(employeeId),
+        type,
+        date: new Date(date),
       });
     }
   };
@@ -243,14 +238,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           <div className="flex items-center justify-between">
             <div className="grid grid-cols-3 gap-4">
               {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
-                <div
-                  key={type}
-                  className="cursor-grab"
-                  draggable="true"
-                  id={type}
-                >
-                  <ShiftTemplate type={type} />
-                </div>
+                <DraggableShiftTemplate key={type} type={type} />
               ))}
             </div>
             <Button 
@@ -315,16 +303,16 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                     {/* Shift cells for each day */}
                     {weekDays.map((day) => {
-                      const dateStr = format(day, 'yyyy-MM-dd');
                       const dayShifts = shifts.filter(s => 
                         s.employeeId === employee.id && 
-                        format(new Date(s.startTime), 'yyyy-MM-dd') === dateStr
+                        format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
                       );
 
                       return (
                         <DroppableCell
-                          key={dateStr}
-                          id={`${employee.id}_${dateStr}`}
+                          key={day.toISOString()}
+                          date={day}
+                          employeeId={employee.id}
                         >
                           <AnimatePresence>
                             {dayShifts.map((shift) => (
@@ -351,7 +339,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
       <DragOverlay>
         {activeId && Object.keys(ShiftTypes).includes(activeId) && (
-          <ShiftTemplate type={activeId as keyof typeof ShiftTypes} overlay />
+          <DraggableShiftTemplate type={activeId as keyof typeof ShiftTypes} />
         )}
       </DragOverlay>
     </DndContext>
