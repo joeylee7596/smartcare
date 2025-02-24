@@ -16,6 +16,7 @@ import { BillingEditor } from "@/components/billing/billing-editor";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { BillingCard } from "@/components/billing/billing-card";
+import { DocumentationCheckDialog } from "@/components/billing/documentation-check-dialog";
 
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,6 +25,8 @@ export default function BillingPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>(
     format(new Date(), "yyyy-MM")
   );
+  const [missingDocs, setMissingDocs] = useState<any[]>([]);
+  const [showDocCheck, setShowDocCheck] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -36,6 +39,13 @@ export default function BillingPage() {
     queryKey: ["/api/billings", selectedPatient?.id],
     enabled: !!selectedPatient?.id,
   });
+
+  // Add new query for documentation check
+  const { data: docCheckData, refetch: refetchDocCheck } = useQuery({
+    queryKey: ["/api/documentation/check", selectedPatient?.id],
+    enabled: !!selectedPatient?.id,
+  });
+
 
   // Filter patients based on search
   const filteredPatients = searchQuery
@@ -138,6 +148,25 @@ export default function BillingPage() {
       });
     },
   });
+
+  // Function to check for missing documentation
+  const checkMissingDocumentation = async () => {
+    if (!selectedPatient) return;
+
+    const result = await refetchDocCheck();
+    if (result?.data?.missingDocs?.length > 0) {
+      setMissingDocs(result.data.missingDocs);
+      setShowDocCheck(true);
+    } else {
+      setIsNewBillingOpen(true);
+    }
+  };
+
+  // Function to handle documentation creation
+  const handleCreateDocumentation = (item: any) => {
+    // Navigate to documentation page with pre-filled data
+    window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -266,6 +295,7 @@ export default function BillingPage() {
                               hover:from-blue-600 hover:to-blue-700 text-white
                               shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30
                               transition-all duration-500 hover:scale-[1.02]"
+                            onClick={checkMissingDocumentation}
                           >
                             <Plus className="h-5 w-5 mr-2" />
                             Neue Leistung
@@ -319,7 +349,7 @@ export default function BillingPage() {
                                     newStatus: billing.status === "draft" ? "pending" : "submitted"
                                   })}
                                 />
-                            ))}
+                              ))}
                           </motion.div>
                         </AnimatePresence>
 
@@ -354,6 +384,31 @@ export default function BillingPage() {
               )}
             </div>
           </div>
+          {/* Documentation Check Dialog */}
+          <DocumentationCheckDialog
+            open={showDocCheck}
+            onOpenChange={setShowDocCheck}
+            onProceed={() => {
+              setShowDocCheck(false);
+              setIsNewBillingOpen(true);
+            }}
+            onCreateDocumentation={handleCreateDocumentation}
+            missingDocs={missingDocs}
+            patientName={selectedPatient?.name || ""}
+          />
+
+          {/* Billing Dialog */}
+          <Dialog open={isNewBillingOpen} onOpenChange={setIsNewBillingOpen}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Neue Leistung erfassen</DialogTitle>
+              </DialogHeader>
+              <BillingEditor
+                patient={selectedPatient}
+                onSave={handleSaveBilling}
+              />
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>

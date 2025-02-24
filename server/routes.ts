@@ -8,14 +8,14 @@ import {
   insertDocSchema, 
   insertEmployeeSchema, 
   insertShiftSchema, 
-  ShiftStatus 
+  ShiftStatus,
+  insertBillingSchema 
 } from "@shared/schema";
 import { setupWebSocket } from "./websocket";
 import expiryRoutes from "./routes/expiry";
 import aiRoutes from "./routes/ai";
 import analyticsRoutes from "./routes/analytics";
-import { insertBillingSchema } from "@shared/schema";
-import { endOfDay } from "date-fns";
+import { endOfDay, subDays } from "date-fns";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -25,6 +25,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Use analytics routes
   app.use("/api/analytics", analyticsRoutes);
+
+  // Check missing documentation
+  app.get("/api/documentation/check/:patientId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const patientId = parseInt(req.params.patientId);
+    if (isNaN(patientId)) {
+      return res.status(400).json({ error: "Invalid patient ID" });
+    }
+
+    const thirtyDaysAgo = subDays(new Date(), 30);
+
+    // Get all tours and shifts for the patient in the last 30 days
+    const tours = await storage.getTours(patientId, thirtyDaysAgo);
+    const shifts = await storage.getShifts(thirtyDaysAgo, new Date());
+    const existingDocs = await storage.getDocs(patientId);
+
+    const missingDocs = [];
+
+    // Check tours
+    for (const tour of tours) {
+      const hasDoc = existingDocs.some(doc => 
+        doc.tourId === tour.id && doc.type === 'tour'
+      );
+      if (!hasDoc) {
+        missingDocs.push({
+          date: tour.date,
+          type: 'tour',
+          id: tour.id
+        });
+      }
+    }
+
+    // Check shifts
+    for (const shift of shifts) {
+      if (shift.patientIds.includes(patientId)) {
+        const hasDoc = existingDocs.some(doc =>
+          doc.shiftId === shift.id && doc.type === 'shift'
+        );
+        if (!hasDoc) {
+          missingDocs.push({
+            date: shift.startTime,
+            type: 'shift',
+            id: shift.id
+          });
+        }
+      }
+    }
+
+    res.json({
+      missingDocs: missingDocs.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
+    });
+  });
 
   // Documentation
   app.get("/api/docs", async (req, res) => {

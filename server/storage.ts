@@ -7,7 +7,7 @@ import {
   type InsertBilling, type InsertEmployee, type ExpiryTracking, type InsertExpiryTracking, type ShiftTemplate, type InsertTemplate
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, and, desc, not, lte, gte, between } from "drizzle-orm";
+import { eq, and, desc, not, lte, gte, between, sql } from "drizzle-orm";
 import { addDays, startOfWeek, endOfWeek } from "date-fns";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -28,7 +28,7 @@ export interface IStorage {
   deletePatient(id: number): Promise<void>;
 
   // Tours
-  getTours(): Promise<Tour[]>;
+  getTours(patientId?: number, startDate?: Date): Promise<Tour[]>;
   getTour(id: number): Promise<Tour | undefined>;
   createTour(tour: InsertTour): Promise<Tour>;
   updateTour(id: number, tour: Partial<InsertTour>): Promise<Tour>;
@@ -152,8 +152,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Tour methods
-  async getTours(): Promise<Tour[]> {
-    return db.select().from(tours).orderBy(desc(tours.date));
+  async getTours(patientId?: number, startDate?: Date): Promise<Tour[]> {
+    let query = db.select().from(tours);
+
+    if (patientId) {
+      query = query.where(sql`${tours.patientIds} @> ${[patientId]}`);
+    }
+
+    if (startDate) {
+      query = query.where(gte(tours.date, startDate));
+    }
+
+    return query.orderBy(desc(tours.date));
   }
 
   async getTour(id: number): Promise<Tour | undefined> {
