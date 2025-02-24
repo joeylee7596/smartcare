@@ -16,10 +16,13 @@ import {
   ChevronRight,
   Plus,
   Wand2,
-  HelpCircle
+  Euro,
+  TrendingUp,
+  HelpCircle,
+  Clock,
 } from "lucide-react";
-import { Patient, Tour, Documentation, Employee } from "@shared/schema";
-import { format } from "date-fns";
+import { Patient, Tour, Documentation, Employee, InsuranceBilling } from "@shared/schema";
+import { format, isToday, startOfWeek, endOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
@@ -32,10 +35,14 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Pie,
+  PieChart,
+  Cell,
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
-import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
@@ -60,7 +67,152 @@ const BackgroundPattern = () => (
   </div>
 );
 
-function DashboardCard({
+// Economic indicators chart
+function EconomicIndicators({ tours }: { tours: Tour[] }) {
+  const data = tours.map(tour => ({
+    date: format(new Date(tour.date), 'dd.MM.'),
+    profitMargin: tour.economicCalculation?.profitMargin || 0,
+    revenue: tour.economicCalculation?.expectedRevenue || 0,
+    costs: tour.economicCalculation?.totalCosts || 0,
+  }));
+
+  return (
+    <Card className="col-span-full lg:col-span-8">
+      <CardHeader>
+        <CardTitle className="text-xl text-gray-800">Wirtschaftliche Entwicklung</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="date" stroke="#6B7280" />
+              <YAxis stroke="#6B7280" />
+              <RechartsTooltip
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                }}
+              />
+              <Line type="monotone" dataKey="revenue" stroke="#10B981" name="Umsatz" />
+              <Line type="monotone" dataKey="costs" stroke="#EF4444" name="Kosten" />
+              <Line type="monotone" dataKey="profitMargin" stroke="#3B82F6" name="Marge" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Patient distribution chart
+function PatientDistribution({ patients }: { patients: Patient[] }) {
+  const data = [
+    { name: 'PG 1', value: patients.filter(p => p.careLevel === 1).length },
+    { name: 'PG 2', value: patients.filter(p => p.careLevel === 2).length },
+    { name: 'PG 3', value: patients.filter(p => p.careLevel === 3).length },
+    { name: 'PG 4', value: patients.filter(p => p.careLevel === 4).length },
+    { name: 'PG 5', value: patients.filter(p => p.careLevel === 5).length },
+  ];
+
+  const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#6366F1'];
+
+  return (
+    <Card className="col-span-full lg:col-span-4">
+      <CardHeader>
+        <CardTitle className="text-xl text-gray-800">Pflegegrade</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[300px] flex items-center justify-center">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <RechartsTooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const { name, value } = payload[0].payload;
+                    return (
+                      <div className="bg-white p-2 rounded-lg shadow border">
+                        <p className="font-medium">{name}</p>
+                        <p className="text-sm text-gray-500">{value} Patienten</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-center gap-4 mt-4">
+          {data.map((entry, index) => (
+            <div key={entry.name} className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }} />
+              <span className="text-sm text-gray-600">{entry.name}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActivityFeed({ activities }: { activities: any[] }) {
+  return (
+    <ScrollArea className="h-[400px]">
+      <div className="space-y-4 pr-4">
+        <AnimatePresence>
+          {activities.map((activity, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2, delay: i * 0.1 }}
+              className="flex items-start gap-4 p-4 rounded-xl border bg-white/50 backdrop-blur-sm
+                hover:bg-gradient-to-r hover:from-blue-50 hover:to-white
+                transition-all duration-300 group"
+            >
+              <motion.div
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                className={cn(
+                  "p-2 rounded-lg shrink-0",
+                  activity.type === "documentation" && "bg-blue-100 text-blue-700",
+                  activity.type === "tour" && "bg-green-100 text-green-700",
+                  activity.type === "patient" && "bg-amber-100 text-amber-700",
+                  activity.type === "alert" && "bg-red-100 text-red-700"
+                )}
+              >
+                {activity.icon}
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">{activity.title}</p>
+                <p className="text-sm text-gray-500">{activity.description}</p>
+              </div>
+              <time className="text-xs text-gray-400">{activity.time}</time>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </ScrollArea>
+  );
+}
+
+function StatsCard({
   title,
   value,
   description,
@@ -141,202 +293,26 @@ function DashboardCard({
               </div>
             </div>
           </div>
-          <div className="mt-4">
-            <h3 className="font-medium text-sm text-gray-600">{title}</h3>
-          </div>
         </CardContent>
       </Card>
     </motion.div>
   );
 }
 
-function ActivityFeed({ activities }: { activities: any[] }) {
-  return (
-    <ScrollArea className="h-[400px]">
-      <div className="space-y-4 pr-4">
-        <AnimatePresence>
-          {activities.map((activity, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.2, delay: i * 0.1 }}
-              className="flex items-start gap-4 p-4 rounded-xl border bg-white/50 backdrop-blur-sm
-                hover:bg-gradient-to-r hover:from-blue-50 hover:to-white
-                transition-all duration-300 group"
-            >
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                className={cn(
-                  "p-2 rounded-lg shrink-0",
-                  activity.type === "documentation" && "bg-blue-100 text-blue-700",
-                  activity.type === "tour" && "bg-green-100 text-green-700",
-                  activity.type === "patient" && "bg-amber-100 text-amber-700",
-                  activity.type === "alert" && "bg-red-100 text-red-700"
-                )}
-              >
-                {activity.icon}
-              </motion.div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{activity.title}</p>
-                <p className="text-sm text-gray-500">{activity.description}</p>
-              </div>
-              <time className="text-xs text-gray-400">{activity.time}</time>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-    </ScrollArea>
-  );
-}
-
-// Quick Action component
-function QuickAction({ 
-  icon: Icon, 
-  label, 
-  description, 
-  onClick,
-  shortcut 
-}: { 
-  icon: React.ComponentType<any>;
-  label: string;
-  description: string;
-  onClick: () => void;
-  shortcut?: string;
-}) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <motion.div
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            className="cursor-pointer"
-          >
-            <Button
-              variant="outline"
-              className="w-full justify-between p-4 h-auto rounded-xl
-                bg-gradient-to-r from-white to-blue-50/50
-                hover:from-blue-50 hover:to-blue-100/50
-                border border-white/40 hover:border-blue-200
-                hover:shadow-lg
-                transition-all duration-500 group"
-              onClick={onClick}
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <Icon className="h-5 w-5 text-blue-600
-                    transition-all duration-500 group-hover:scale-110 group-hover:rotate-6" />
-                </div>
-                <div className="text-left">
-                  <div className="font-medium text-gray-700">{label}</div>
-                  <div className="text-sm text-gray-500 mt-1">{description}</div>
-                </div>
-              </div>
-              {shortcut && (
-                <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 text-xs text-gray-500 bg-gray-100 rounded">
-                  {shortcut}
-                </kbd>
-              )}
-            </Button>
-          </motion.div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{description}</p>
-          {shortcut && <p className="text-xs text-gray-500">Shortcut: {shortcut}</p>}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
-
-// AI Assistant Dialog component
-function AIAssistantDialog() {
-  const { toast } = useToast();
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          className="fixed right-6 bottom-6 h-14 w-14 rounded-full shadow-xl
-            bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400
-            transition-all duration-300 hover:scale-110"
-        >
-          <Wand2 className="h-6 w-6 text-white" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>KI-Assistent</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-auto p-4"
-            onClick={() => {
-              toast({
-                title: "Tour-Optimierung gestartet",
-                description: "Der KI-Assistent analysiert Ihre Touren...",
-              });
-            }}
-          >
-            <Route className="h-5 w-5 text-blue-600" />
-            <div className="text-left">
-              <div className="font-medium">Tour optimieren</div>
-              <div className="text-sm text-gray-500">Lassen Sie die KI Ihre Touren automatisch optimieren</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-auto p-4"
-            onClick={() => {
-              toast({
-                title: "Dokumentation wird erstellt",
-                description: "Die KI erstellt einen Dokumentationsvorschlag...",
-              });
-            }}
-          >
-            <FileText className="h-5 w-5 text-blue-600" />
-            <div className="text-left">
-              <div className="font-medium">Dokumentation erstellen</div>
-              <div className="text-sm text-gray-500">Automatische Erstellung einer Pflegedokumentation</div>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-auto p-4"
-            onClick={() => {
-              toast({
-                title: "Dienstplan-Analyse gestartet",
-                description: "Die KI analysiert Ihren Dienstplan...",
-              });
-            }}
-          >
-            <Calendar className="h-5 w-5 text-blue-600" />
-            <div className="text-left">
-              <div className="font-medium">Dienstplan analysieren</div>
-              <div className="text-sm text-gray-500">KI-gestützte Analyse und Optimierung des Dienstplans</div>
-            </div>
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
 
+  // Query all necessary data
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
   });
 
   const { data: tours = [] } = useQuery<Tour[]>({
-    queryKey: ["/api/tours"],
+    queryKey: ["/api/tours", { start: weekStart, end: weekEnd }],
   });
 
   const { data: docs = [] } = useQuery<Documentation[]>({
@@ -347,105 +323,50 @@ export default function Dashboard() {
     queryKey: ["/api/employees"],
   });
 
-  const todaysTours = tours.filter(
-    (tour) => format(new Date(tour.date), "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd")
-  );
+  const { data: billings = [] } = useQuery<InsuranceBilling[]>({
+    queryKey: ["/api/billings"],
+  });
 
+  // Calculate KPIs
+  const todaysTours = tours.filter(tour => isToday(new Date(tour.date)));
   const criticalPatients = patients.filter(patient => patient.careLevel >= 4);
   const pendingDocs = docs.filter(doc => doc.status === "pending");
   const activeEmployees = employees.filter(emp => emp.status === "active");
 
-  // Mock activities for demonstration
+  const totalRevenue = billings
+    .filter(b => b.status === "paid")
+    .reduce((sum, b) => sum + Number(b.totalAmount), 0);
+
+  const averageProfitMargin = tours
+    .filter(t => t.economicCalculation?.profitMargin)
+    .reduce((sum, t) => sum + (t.economicCalculation?.profitMargin || 0), 0) / tours.length;
+
+  // Generate activity feed from real data
   const recentActivities = [
-    {
-      type: "documentation",
+    ...docs.slice(0, 3).map(doc => ({
+      type: "documentation" as const,
       icon: <FileText className="h-5 w-5" />,
-      title: "Neue Dokumentation erstellt",
-      description: "Pflege-Dokumentation für Elisabeth Weber wurde mit KI-Unterstützung erstellt",
-      time: "Vor 5 Min."
-    },
-    {
-      type: "tour",
+      title: `Dokumentation erstellt`,
+      description: `Pflege-Dokumentation für Patient #${doc.patientId}`,
+      time: format(new Date(doc.date), 'HH:mm'),
+    })),
+    ...tours.slice(0, 3).map(tour => ({
+      type: "tour" as const,
       icon: <Route className="h-5 w-5" />,
-      title: "Tour #23 abgeschlossen",
-      description: "Alle Patienten wurden erfolgreich besucht",
-      time: "Vor 15 Min."
-    },
-    {
-      type: "patient",
-      icon: <Activity className="h-5 w-5" />,
-      title: "Neuer Patient aufgenommen",
-      description: "Hans Müller wurde erfolgreich registriert",
-      time: "Vor 1 Std."
-    },
-    {
-      type: "alert",
-      icon: <AlertTriangle className="h-5 w-5" />,
-      title: "Dringende Anfrage",
-      description: "Notfallkontakt für Patient #45 aktualisiert",
-      time: "Vor 2 Std."
-    }
-  ];
-
-  // Mock data for care level distribution
-  const careLevelData = [
-    { name: 'PG 1', count: patients.filter(p => p.careLevel === 1).length },
-    { name: 'PG 2', count: patients.filter(p => p.careLevel === 2).length },
-    { name: 'PG 3', count: patients.filter(p => p.careLevel === 3).length },
-    { name: 'PG 4', count: patients.filter(p => p.careLevel === 4).length },
-    { name: 'PG 5', count: patients.filter(p => p.careLevel === 5).length },
-  ];
-
-  const quickActions = [
-    {
-      icon: Users,
-      label: "Patient aufnehmen",
-      description: "Schnelle Patientenaufnahme mit KI-Unterstützung",
-      shortcut: "⌘ + N",
-      onClick: () => {
-        toast({
-          title: "Patientenaufnahme gestartet",
-          description: "Die KI-gestützte Aufnahme wird vorbereitet...",
-        });
-      }
-    },
-    {
-      icon: Route,
-      label: "Schnell-Tour",
-      description: "KI erstellt optimierte Tour basierend auf aktuellen Patienten",
-      shortcut: "⌘ + T",
-      onClick: () => {
-        toast({
-          title: "Tour wird erstellt",
-          description: "Die KI optimiert die Route...",
-        });
-      }
-    },
-    {
-      icon: Brain,
-      label: "Smart-Dokumentation",
-      description: "Automatische Dokumentation mit Spracheingabe",
-      shortcut: "⌘ + D",
-      onClick: () => {
-        toast({
-          title: "Dokumentation wird vorbereitet",
-          description: "Spracherkennung wird initialisiert...",
-        });
-      }
-    },
-    {
-      icon: Calendar,
-      label: "Dienstplan-Assistent",
-      description: "KI-gestützte Dienstplanerstellung",
-      shortcut: "⌘ + S",
-      onClick: () => {
-        toast({
-          title: "Dienstplan-Assistent",
-          description: "Die KI analysiert verfügbare Mitarbeiter...",
-        });
-      }
-    }
-  ];
+      title: `Tour ${tour.id} ${tour.status}`,
+      description: `${tour.patientIds.length} Patienten, ${
+        tour.optimizationScore ? `Optimierungsscore: ${tour.optimizationScore}` : 'Keine Optimierung'
+      }`,
+      time: format(new Date(tour.date), 'HH:mm'),
+    })),
+    ...billings.slice(0, 3).map(billing => ({
+      type: "alert" as const,
+      icon: <Euro className="h-5 w-5" />,
+      title: `Abrechnung ${billing.status}`,
+      description: `${billing.totalAmount}€ für Patient #${billing.patientId}`,
+      time: format(new Date(billing.date), 'HH:mm'),
+    })),
+  ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white relative">
@@ -468,39 +389,27 @@ export default function Dashboard() {
             </p>
           </motion.div>
 
-          {/* Quick Actions Grid */}
-          <div className="grid gap-4 md:grid-cols-2 mb-8">
-            {quickActions.map((action, index) => (
-              <QuickAction key={index} {...action} />
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8"
-          >
-            <DashboardCard
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <StatsCard
               title="Aktive Patienten"
               value={patients.length}
               description={`${criticalPatients.length} kritische Fälle`}
               icon={Users}
-              trend="up"
-              trendValue="+2 diese Woche"
+              trend={criticalPatients.length > 5 ? "down" : "up"}
+              trendValue={criticalPatients.length > 5 ? "Hohe Belastung" : "Normal"}
               gradient
             />
-            <DashboardCard
+            <StatsCard
               title="Heutige Touren"
               value={todaysTours.length}
-              description={`Nächste: ${todaysTours[0] ? format(new Date(todaysTours[0].date), "HH:mm") : '--:--'}`}
+              description={`${todaysTours.filter(t => t.status === 'completed').length} abgeschlossen`}
               icon={Route}
-              trend="neutral"
-              trendValue="Planmäßig"
+              trend={todaysTours.length > 0 ? "neutral" : "down"}
+              trendValue={todaysTours.length > 0 ? "Planmäßig" : "Keine Touren"}
               gradient
             />
-            <DashboardCard
-              title="Dokumentation"
+            <StatsCard
+              title="Offene Dokumentation"
               value={pendingDocs.length}
               description="Ausstehende Berichte"
               icon={Brain}
@@ -508,75 +417,76 @@ export default function Dashboard() {
               trendValue={pendingDocs.length > 5 ? "Überfällig" : "Aktuell"}
               gradient
             />
-            <DashboardCard
-              title="Personal im Dienst"
-              value={activeEmployees.length}
-              description="von insgesamt"
-              icon={Users}
-              trend={activeEmployees.length < 5 ? "down" : "up"}
-              trendValue={`${activeEmployees.length}/${employees.length}`}
+            <StatsCard
+              title="Umsatz (MTD)"
+              value={`${totalRevenue.toLocaleString('de-DE')}€`}
+              description={`${averageProfitMargin.toFixed(1)}% Marge`}
+              icon={TrendingUp}
+              trend={averageProfitMargin > 15 ? "up" : "down"}
+              trendValue={`${averageProfitMargin > 15 ? "Profitabel" : "Kritisch"}`}
               className="bg-gradient-to-br from-emerald-500/[0.08] via-emerald-400/[0.05] to-transparent"
             />
-          </motion.div>
-
-          <div className="grid gap-6 lg:grid-cols-7">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="lg:col-span-3"
-            >
-              <Card className="rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-                <CardHeader>
-                  <CardTitle className="text-xl text-gray-800">Pflegegrad-Verteilung</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={careLevelData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                        <XAxis dataKey="name" stroke="#6B7280" />
-                        <YAxis stroke="#6B7280" />
-                        <RechartsTooltip
-                          contentStyle={{
-                            backgroundColor: 'white',
-                            border: '1px solid #E5E7EB',
-                            borderRadius: '0.5rem',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                          }}
-                        />
-                        <Bar
-                          dataKey="count"
-                          fill="#3B82F6"
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-              className="lg:col-span-4"
-            >
-              <Card className="rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-xl text-gray-800">Aktivitäten</CardTitle>
-                  <Bell className="h-5 w-5 text-gray-400" />
-                </CardHeader>
-                <CardContent>
-                  <ActivityFeed activities={recentActivities} />
-                </CardContent>
-              </Card>
-            </motion.div>
           </div>
 
-          {/* Floating AI Assistant Button */}
-          <AIAssistantDialog />
+          <div className="grid gap-6 lg:grid-cols-12 mb-8">
+            <EconomicIndicators tours={tours} />
+            <PatientDistribution patients={patients} />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-12">
+            <Card className="lg:col-span-8 rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-xl text-gray-800">Aktivitäten</CardTitle>
+                <Bell className="h-5 w-5 text-gray-400" />
+              </CardHeader>
+              <CardContent>
+                <ActivityFeed activities={recentActivities} />
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-4 rounded-2xl border border-white/20 backdrop-blur-sm shadow-[0_20px_50px_-12px_rgba(0,0,0,0.08)]">
+              <CardHeader>
+                <CardTitle className="text-xl text-gray-800">Personal heute</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-4">
+                    {activeEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="p-4 rounded-xl border bg-white/50 hover:bg-blue-50/50 transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{employee.name}</p>
+                            <p className="text-sm text-gray-500">{employee.role}</p>
+                          </div>
+                          <Badge
+                            variant={employee.status === 'active' ? 'default' : 'secondary'}
+                            className="capitalize"
+                          >
+                            {employee.status}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          {employee.qualifications?.nursingDegree && (
+                            <Badge variant="outline" className="bg-blue-50">
+                              Examiniert
+                            </Badge>
+                          )}
+                          {employee.languages?.map((lang) => (
+                            <Badge key={lang} variant="outline" className="bg-green-50">
+                              {lang}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
         </main>
       </div>
     </div>
