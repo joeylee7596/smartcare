@@ -53,6 +53,7 @@ import type {
   ShiftPreference,
   Documentation
 } from "@shared/schema";
+import { DocumentationEditor } from "@/components/documentation/documentation-editor";
 
 interface ModernRosterProps {
   selectedDate: Date;
@@ -362,7 +363,7 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
 
       {/* Documentation Dialog */}
       <Dialog open={documentationDialogOpen} onOpenChange={setDocumentationDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle>Dokumentation erstellen</DialogTitle>
             <DialogDescription>
@@ -370,45 +371,11 @@ export function ModernRoster({ selectedDate, department, view, scheduleMode }: M
             </DialogDescription>
           </DialogHeader>
           {selectedShift && (
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label>Inhalt</Label>
-                <textarea
-                  className="w-full h-32 p-2 border rounded-md"
-                  placeholder="Dokumentation eingeben..."
-                  onChange={(e) =>
-                    createDocumentationMutation.mutate({
-                      shiftId: selectedShift.id,
-                      content: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setDocumentationDialogOpen(false)}
-                >
-                  Abbrechen
-                </Button>
-                <Button
-                  onClick={() =>
-                    createDocumentationMutation.mutate({
-                      shiftId: selectedShift.id,
-                      content: "Test content", // Replace with actual content
-                    })
-                  }
-                  disabled={createDocumentationMutation.isPending}
-                >
-                  {createDocumentationMutation.isPending ? (
-                    <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <FileText className="h-4 w-4 mr-2" />
-                  )}
-                  Speichern
-                </Button>
-              </DialogFooter>
-            </div>
+            <DocumentationEditor
+              patientId={selectedShift.patientId}
+              shiftId={selectedShift.id}
+              onSave={() => setDocumentationDialogOpen(false)}
+            />
           )}
         </DialogContent>
       </Dialog>
