@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, parseISO, isSameDay } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -224,11 +224,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 </div>
 
                 {weekDays.map((day) => {
-                  const formattedDay = format(day, 'yyyy-MM-dd');
-                  const dayShifts = shifts.filter(s => {
-                    const shiftStart = new Date(s.startTime);
-                    return s.employeeId === employee.id &&
-                           format(shiftStart, 'yyyy-MM-dd') === formattedDay;
+                  const dayShifts = shifts.filter(shift => {
+                    const shiftDate = new Date(shift.startTime);
+                    return shift.employeeId === employee.id && 
+                           isSameDay(shiftDate, day);
                   });
 
                   return (
