@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor, closestCenter } from "@dnd-kit/core";
+import { SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { format, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Brain,
@@ -13,6 +15,10 @@ import {
   Star,
   Sparkles,
   Plus,
+  Pencil,
+  X,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +26,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
@@ -39,8 +62,94 @@ const ShiftTypes = {
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
 };
 
+function SortableShift({ shift, info }: { shift: Shift; info: typeof ShiftTypes[keyof typeof ShiftTypes] }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: shift.id.toString(),
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 999 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const Icon = info.icon;
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`
+        p-2 mb-1 rounded-md cursor-grab group
+        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
+        hover:shadow-md transition-all
+        hover:scale-105 relative
+      `}
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${info.color}`} />
+          <span className="text-sm font-medium">
+            {info.label}
+          </span>
+        </div>
+        {shift.aiOptimized && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Sparkles className="h-4 w-4 text-green-500" />
+            </TooltipTrigger>
+            <TooltipContent>
+              KI-optimierte Schicht
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function DroppableCell({ children, id, onDrop }: { children: React.ReactNode; id: string; onDrop: (id: string) => void }) {
+  const {
+    setNodeRef,
+    isOver,
+  } = useSortable({
+    id,
+    data: {
+      type: 'cell',
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`
+        p-2 min-h-[100px] border-l relative
+        ${isOver ? 'bg-blue-50/50 border-2 border-dashed border-blue-300' : ''}
+        transition-all
+      `}
+      onDrop={() => onDrop(id)}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
   const [draggedShift, setDraggedShift] = useState<Shift | null>(null);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -48,7 +157,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5,
       },
     })
   );
@@ -107,7 +216,44 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({
         title: "Schicht erstellt",
-        description: "Die neue Schicht wurde angelegt.",
+        description: "Die neue Schicht wurde erfolgreich angelegt.",
+      });
+      setDraggedShift(null);
+    },
+  });
+
+  // Update shift
+  const updateShiftMutation = useMutation({
+    mutationFn: async (data: { id: number; updates: Partial<Shift> }) => {
+      const res = await apiRequest("PATCH", `/api/shifts/${data.id}`, data.updates);
+      if (!res.ok) throw new Error("Schicht konnte nicht aktualisiert werden");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      setShowEditDialog(false);
+      setEditingShift(null);
+      toast({
+        title: "Schicht aktualisiert",
+        description: "Die Änderungen wurden gespeichert.",
+      });
+    },
+  });
+
+  // Delete shift
+  const deleteShiftMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/shifts/${id}`);
+      if (!res.ok) throw new Error("Schicht konnte nicht gelöscht werden");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      setShowEditDialog(false);
+      setEditingShift(null);
+      toast({
+        title: "Schicht gelöscht",
+        description: "Die Schicht wurde erfolgreich gelöscht.",
       });
     },
   });
@@ -117,14 +263,24 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     const { active, over } = event;
     if (!over) return;
 
-    const [employeeId, date] = over.id.toString().split("_");
-    const shiftType = active.id.toString().split("_")[0];
+    const [targetDate, targetEmployeeId] = over.id.toString().split("_");
+    const draggedId = active.id.toString();
 
-    if (employeeId && date && shiftType) {
+    // Check if we're dragging a new shift or an existing one
+    if (draggedId.startsWith("new_")) {
+      const shiftType = draggedId.split("_")[1];
       createShiftMutation.mutate({
-        employeeId: parseInt(employeeId),
+        employeeId: parseInt(targetEmployeeId),
         type: shiftType,
-        date: new Date(date),
+        date: new Date(targetDate),
+      });
+    } else if (draggedShift) {
+      updateShiftMutation.mutate({
+        id: draggedShift.id,
+        updates: {
+          employeeId: parseInt(targetEmployeeId),
+          startTime: new Date(targetDate),
+        },
       });
     }
   };
@@ -132,6 +288,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
     >
       <Card className="mt-6">
@@ -144,12 +301,12 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                   <div
                     key={type}
                     data-draggable
-                    id={`${type}_new`}
+                    id={`new_${type}`}
                     className={`
                       flex items-center gap-2 p-3 rounded-lg
                       ${info.bgColor} border-2 border-dashed cursor-grab
                       hover:border-solid hover:shadow-sm transition-all
-                      group
+                      group relative
                     `}
                   >
                     <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
@@ -223,59 +380,32 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                     {/* Shift cells for each day */}
                     {weekDays.map((day) => {
+                      const dateStr = format(day, "yyyy-MM-dd");
                       const dayShifts = shifts.filter(s => 
                         s.employeeId === employee.id && 
-                        format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
+                        format(new Date(s.startTime), 'yyyy-MM-dd') === dateStr
                       );
 
                       return (
-                        <div
-                          key={day.toISOString()}
-                          id={`${employee.id}_${format(day, 'yyyy-MM-dd')}`}
-                          className={`
-                            p-2 min-h-[100px] border-l
-                            ${dayShifts.length === 0 ? 'hover:bg-gray-50 hover:border-dashed hover:border-2 hover:border-gray-300' : ''}
-                            transition-all
-                          `}
-                          data-droppable
+                        <DroppableCell
+                          key={dateStr}
+                          id={`${dateStr}_${employee.id}`}
+                          onDrop={() => {}}
                         >
-                          {dayShifts.map((shift) => {
-                            const shiftInfo = ShiftTypes[shift.type as keyof typeof ShiftTypes];
-                            const Icon = shiftInfo.icon;
-
-                            return (
-                              <motion.div
-                                key={shift.id}
-                                className={`
-                                  p-2 mb-1 rounded-md cursor-grab
-                                  ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${shiftInfo.bgColor} border`}
-                                  hover:shadow-md transition-all
-                                  hover:scale-105
-                                `}
-                                initial={{ opacity: 0, y: 5 }}
-                                animate={{ opacity: 1, y: 0 }}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <Icon className={`h-4 w-4 ${shiftInfo.color}`} />
-                                    <span className="text-sm font-medium">
-                                      {shiftInfo.label}
-                                    </span>
-                                  </div>
-                                  {shift.aiOptimized && (
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Sparkles className="h-4 w-4 text-green-500" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        KI-optimierte Schicht
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </motion.div>
-                            );
-                          })}
+                          <SortableContext items={dayShifts.map(s => s.id)}>
+                            <AnimatePresence>
+                              {dayShifts.map((shift) => {
+                                const shiftInfo = ShiftTypes[shift.type as keyof typeof ShiftTypes];
+                                return (
+                                  <SortableShift
+                                    key={shift.id}
+                                    shift={shift}
+                                    info={shiftInfo}
+                                  />
+                                );
+                              })}
+                            </AnimatePresence>
+                          </SortableContext>
 
                           {dayShifts.length === 0 && (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
@@ -283,7 +413,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                               <span className="text-xs mt-1">Schicht hinzufügen</span>
                             </div>
                           )}
-                        </div>
+                        </DroppableCell>
                       );
                     })}
                   </div>
@@ -293,6 +423,117 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Edit Shift Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schicht bearbeiten</DialogTitle>
+            <DialogDescription>
+              Bearbeiten Sie die Details dieser Schicht oder löschen Sie sie.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingShift && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Schichttyp</Label>
+                <Select
+                  value={editingShift.type}
+                  onValueChange={(value) =>
+                    setEditingShift(prev => prev ? { ...prev, type: value } : null)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ShiftTypes).map(([type, info]) => (
+                      <SelectItem key={type} value={type}>
+                        <div className="flex items-center gap-2">
+                          <info.icon className={`h-4 w-4 ${info.color}`} />
+                          {info.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notizen</Label>
+                <Input
+                  value={editingShift.notes || ''}
+                  onChange={(e) =>
+                    setEditingShift(prev => prev ? { ...prev, notes: e.target.value } : null)
+                  }
+                  placeholder="Optionale Notizen zur Schicht"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editingShift.status}
+                  onValueChange={(value) =>
+                    setEditingShift(prev => prev ? { ...prev, status: value } : null)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4 text-green-500" />
+                        Geplant
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pending">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                        Ausstehend
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex justify-between">
+            <Button
+              variant="destructive"
+              onClick={() => editingShift && deleteShiftMutation.mutate(editingShift.id)}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Löschen
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditDialog(false)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                onClick={() => editingShift && updateShiftMutation.mutate({
+                  id: editingShift.id,
+                  updates: {
+                    type: editingShift.type,
+                    notes: editingShift.notes,
+                    status: editingShift.status,
+                  },
+                })}
+              >
+                Speichern
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DndContext>
   );
 }
+
+export default ScheduleBoard;
