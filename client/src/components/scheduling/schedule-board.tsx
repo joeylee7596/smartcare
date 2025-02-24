@@ -125,48 +125,47 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Mitarbeiter und Schichten laden
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/shifts", {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
-        department,
-      });
-      if (!res.ok) throw new Error("Failed to fetch shifts");
-      return res.json();
-    },
+    queryKey: ["/api/shifts", {
+      start: weekStart.toISOString(),
+      end: weekEnd.toISOString(),
+      department
+    }],
   });
 
+  // Schicht erstellen Mutation
   const createShiftMutation = useMutation({
     mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
       let startTime = new Date(data.date);
       let endTime = new Date(data.date);
 
-      // Handle special shift types
-      if (data.type === 'vacation' || data.type === 'sick') {
-        startTime.setHours(0, 0);
-        endTime.setHours(23, 59);
-      } else {
-        switch (data.type) {
-          case "early":
-            startTime.setHours(6, 0);
-            endTime.setHours(14, 0);
-            break;
-          case "late":
-            startTime.setHours(14, 0);
-            endTime.setHours(22, 0);
-            break;
-          case "night":
-            startTime.setHours(22, 0);
-            endTime = addDays(endTime, 1);
-            endTime.setHours(6, 0);
-            break;
-        }
+      switch (data.type) {
+        case "early":
+          startTime.setHours(6, 0);
+          endTime.setHours(14, 0);
+          break;
+        case "late":
+          startTime.setHours(14, 0);
+          endTime.setHours(22, 0);
+          break;
+        case "night":
+          startTime.setHours(22, 0);
+          endTime = addDays(endTime, 1);
+          endTime.setHours(6, 0);
+          break;
+        case "vacation":
+          startTime.setHours(0,0);
+          endTime.setHours(23,59);
+          break;
+        case "sick":
+          startTime.setHours(0,0);
+          endTime.setHours(23,59);
+          break;
       }
 
       const shiftData = {
@@ -175,34 +174,18 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
-        breakDuration: 30,
-        conflictInfo: {
-          type: "overlap",
-          description: "Checking for conflicts",
-          severity: "low",
-          status: "pending"
-        },
-        notes: "",
-        aiGenerated: false,
-        aiOptimized: false,
         status: "scheduled"
       };
 
       const res = await apiRequest("POST", "/api/shifts", shiftData);
-
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Schicht konnte nicht erstellt werden");
       }
-
       return res.json();
     },
-    onSuccess: (newShift) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
-        return [...old, newShift];
-      });
-
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
@@ -249,11 +232,15 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     const shiftType = e.dataTransfer.getData('text/plain');
     if (!shiftType) return;
 
-    await createShiftMutation.mutateAsync({
-      employeeId,
-      type: shiftType,
-      date,
-    });
+    try {
+      await createShiftMutation.mutateAsync({
+        employeeId,
+        type: shiftType,
+        date,
+      });
+    } catch (error) {
+      console.error("Error creating shift:", error);
+    }
   };
 
   const handlePrint = () => {
@@ -285,8 +272,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
               <tr>
                 <td>${employee.name}</td>
                 ${weekDays.map(day => {
-                  const dayShifts = shifts.filter(s => 
-                    s.employeeId === employee.id && 
+                  const dayShifts = shifts.filter(s =>
+                    s.employeeId === employee.id &&
                     format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
                   );
                   return `<td>${dayShifts.map(shift => `
@@ -317,7 +304,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <Button 
+            <Button
               onClick={onOptimize}
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
             >
@@ -376,8 +363,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                   {/* Shift cells for each day */}
                   {weekDays.map((day) => {
-                    const dayShifts = shifts.filter(s => 
-                      s.employeeId === employee.id && 
+                    const dayShifts = shifts.filter(s =>
+                      s.employeeId === employee.id &&
                       format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
                     );
 
@@ -398,8 +385,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       >
                         <AnimatePresence>
                           {dayShifts.map((shift) => (
-                            <ShiftCard 
-                              key={shift.id} 
+                            <ShiftCard
+                              key={shift.id}
                               shift={shift}
                               onDelete={() => deleteShiftMutation.mutate(shift.id)}
                             />
