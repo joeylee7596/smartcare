@@ -1,5 +1,5 @@
 import {
-  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, shifts, shiftPreferences, shiftChanges,
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, shifts, shiftPreferences,
   type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, type Employee,
   type Shift, type ShiftPreference, type ShiftChange,
   type InsertShift, type InsertPreference, type InsertChange,

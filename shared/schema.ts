@@ -346,6 +346,36 @@ export const shifts = pgTable("shifts", {
   locationId: integer("location_id"),
   lastModified: timestamp("last_modified").defaultNow(),
   lastModifiedBy: integer("last_modified_by"),
+  // New AI optimization fields
+  aiOptimizationScore: decimal("ai_optimization_score"),
+  aiSuggestions: json("ai_suggestions").$type<{
+    suggestedChanges: Array<{
+      type: "time" | "employee" | "department";
+      currentValue: string;
+      suggestedValue: string;
+      reason: string;
+      impact: number; // 0-1 score
+    }>;
+    workloadBalance: {
+      score: number;
+      issues: string[];
+    };
+    employeePreferenceMatch: {
+      score: number;
+      conflicts: string[];
+    };
+    patientCareQuality: {
+      score: number;
+      recommendations: string[];
+    };
+  }>(),
+  dragDropMetadata: json("drag_drop_metadata").$type<{
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    zIndex: number;
+    isDragged: boolean;
+    lastDragPosition?: { x: number; y: number };
+  }>(),
 });
 
 export const shiftTemplates = pgTable("shift_templates", {
@@ -361,6 +391,24 @@ export const shiftTemplates = pgTable("shift_templates", {
   breakDuration: integer("break_duration").notNull().default(30),
   priority: integer("priority").notNull().default(1),
   isActive: boolean("is_active").default(true),
+  // New AI optimization fields
+  aiRules: json("ai_rules").$type<{
+    staffingRules: {
+      minQualificationLevel: number;
+      preferredSkills: string[];
+      experienceLevel: "junior" | "intermediate" | "senior";
+    };
+    timingRules: {
+      preferredDayShifts: boolean;
+      allowWeekends: boolean;
+      maxConsecutiveDays: number;
+    };
+    workloadRules: {
+      maxPatientsPerShift: number;
+      requiredBreakFrequency: number;
+      taskComplexityLevel: number;
+    };
+  }>(),
 });
 
 export const shiftPreferences = pgTable("shift_preferences", {
@@ -380,28 +428,18 @@ export const shiftPreferences = pgTable("shift_preferences", {
     };
   }>(),
   lastUpdated: timestamp("last_updated").defaultNow(),
-});
-
-export const shiftChanges = pgTable("shift_changes", {
-  id: serial("id").primaryKey(),
-  shiftId: integer("shift_id").notNull(),
-  requestedBy: integer("requested_by").notNull(),
-  requestType: text("request_type").notNull(), // swap, cancel, modify
-  requestStatus: text("request_status").notNull().default("pending"),
-  requestDetails: json("request_details").$type<{
-    reason: string;
-    proposedChanges?: {
-      startTime?: string;
-      endTime?: string;
-      newEmployeeId?: number;
-    };
-    urgency: "low" | "medium" | "high";
-    alternativeEmployees?: number[];
-  }>().notNull(),
-  responseNote: text("response_note"),
-  createdAt: timestamp("created_at").defaultNow(),
-  respondedAt: timestamp("responded_at"),
-  respondedBy: integer("responded_by"),
+  // New AI preference fields
+  workLifeBalancePreferences: json("work_life_balance_preferences").$type<{
+    preferredShiftLength: number;
+    preferredBreakPattern: "short-frequent" | "long-infrequent";
+    maximumOvertimeHours: number;
+    flexibilityScore: number; // 0-1, how flexible the employee is with changes
+  }>(),
+  skillDevelopmentGoals: json("skill_development_goals").$type<{
+    targetSkills: string[];
+    currentLevel: "beginner" | "intermediate" | "advanced";
+    desiredMentors: number[];
+  }>(),
 });
 
 export const insertUserSchema = createInsertSchema(users);
@@ -591,19 +629,9 @@ export const insertPreferenceSchema = createInsertSchema(shiftPreferences).exten
   maxNightShifts: z.number().int().min(0).max(7),
 });
 
-export const insertChangeSchema = createInsertSchema(shiftChanges).extend({
-  requestType: z.enum(["swap", "cancel", "modify"]),
-  requestDetails: z.object({
-    reason: z.string().min(1),
-    proposedChanges: z.object({
-      startTime: z.string().optional(),
-      endTime: z.string().optional(),
-      newEmployeeId: z.number().optional(),
-    }).optional(),
-    urgency: z.enum(["low", "medium", "high"]).default("low"),
-    alternativeEmployees: z.array(z.number()).optional(),
-  }),
-});
+export const insertChangeSchema = undefined;
+export type ShiftChange = undefined;
+export type InsertChange = undefined;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -626,8 +654,6 @@ export type Shift = typeof shifts.$inferSelect;
 export type InsertShift = z.infer<typeof insertShiftSchema>;
 export type ShiftPreference = typeof shiftPreferences.$inferSelect;
 export type InsertPreference = z.infer<typeof insertPreferenceSchema>;
-export type ShiftChange = typeof shiftChanges.$inferSelect;
-export type InsertChange = z.infer<typeof insertChangeSchema>;
 export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
 export type InsertTemplate = z.infer<typeof insertTemplateSchema>;
 
