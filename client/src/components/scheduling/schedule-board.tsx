@@ -9,8 +9,6 @@ import {
   Coffee,
   Sparkles,
   Plus,
-  Trash2,
-  Edit,
   Calendar,
   HeartPulse,
   Timer,
@@ -28,13 +26,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { Employee, Shift } from "@shared/schema";
@@ -46,15 +37,15 @@ interface ScheduleBoardProps {
 }
 
 const ShiftTypes = {
-  early: { icon: Sun, color: "text-yellow-500", bgColor: "bg-yellow-50/80", label: "Früh", time: "06:00 - 14:00" },
-  late: { icon: Coffee, color: "text-orange-500", bgColor: "bg-orange-50/80", label: "Spät", time: "14:00 - 22:00" },
-  night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50/80", label: "Nacht", time: "22:00 - 06:00" },
-  vacation: { icon: Calendar, color: "text-green-500", bgColor: "bg-green-50/80", label: "Urlaub", time: "Ganztägig" },
-  sick: { icon: HeartPulse, color: "text-red-500", bgColor: "bg-red-50/80", label: "Krank", time: "Ganztägig" },
-  overtime_reduction: { icon: Timer, color: "text-purple-500", bgColor: "bg-purple-50/80", label: "Überstundenabbau", time: "Ganztägig" },
-  training: { icon: GraduationCap, color: "text-indigo-500", bgColor: "bg-indigo-50/80", label: "Fortbildung", time: "Ganztägig" },
-  on_call: { icon: Phone, color: "text-cyan-500", bgColor: "bg-cyan-50/80", label: "Bereitschaft", time: "24 Stunden" },
-  holiday: { icon: CalendarOff, color: "text-gray-500", bgColor: "bg-gray-50/80", label: "Feiertag", time: "Ganztägig" },
+  early: { icon: Sun, color: "text-yellow-500", bgColor: "bg-yellow-50", label: "Früh", time: "06:00 - 14:00" },
+  late: { icon: Coffee, color: "text-orange-500", bgColor: "bg-orange-50", label: "Spät", time: "14:00 - 22:00" },
+  night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
+  vacation: { icon: Calendar, color: "text-green-500", bgColor: "bg-green-50", label: "Urlaub", time: "Ganztägig" },
+  sick: { icon: HeartPulse, color: "text-red-500", bgColor: "bg-red-50", label: "Krank", time: "Ganztägig" },
+  overtime_reduction: { icon: Timer, color: "text-purple-500", bgColor: "bg-purple-50", label: "Überstundenabbau", time: "Ganztägig" },
+  training: { icon: GraduationCap, color: "text-indigo-500", bgColor: "bg-indigo-50", label: "Fortbildung", time: "Ganztägig" },
+  on_call: { icon: Phone, color: "text-cyan-500", bgColor: "bg-cyan-50", label: "Bereitschaft", time: "24 Stunden" },
+  holiday: { icon: CalendarOff, color: "text-gray-500", bgColor: "bg-gray-50", label: "Feiertag", time: "Ganztägig" },
 } as const;
 
 function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
@@ -75,12 +66,11 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
         ${info.bgColor} border border-transparent
         cursor-grab group
         hover:border-${info.color.split('-')[1]}-200
-        hover:shadow-lg hover:shadow-${info.color.split('-')[1]}-100/20
-        transform hover:-translate-y-0.5
+        hover:shadow-lg
         transition-all duration-200
       `}
     >
-      <div className={`p-2 rounded-full ${info.bgColor} border border-${info.color.split('-')[1]}-200`}>
+      <div className={`p-2 rounded-full ${info.bgColor}`}>
         <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
       </div>
       <div>
@@ -91,74 +81,44 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   );
 }
 
-function ShiftCard({ shift, onEdit, onDelete }: { shift: Shift; onEdit: () => void; onDelete: () => void }) {
+function ShiftCard({ shift }: { shift: Shift }) {
   const info = ShiftTypes[shift.type as keyof typeof ShiftTypes];
   const Icon = info.icon;
 
   return (
     <motion.div
       className={`
-        p-3 mb-2 rounded-lg
-        ${shift.aiOptimized ? 'bg-gradient-to-r from-green-50 to-green-50/50 border-l-2 border-green-500' : `${info.bgColor} border border-${info.color.split('-')[1]}-200/50`}
-        hover:shadow-lg hover:shadow-${info.color.split('-')[1]}-100/30
-        transform hover:-translate-y-0.5
-        transition-all duration-200 group
+        p-2 mb-2 rounded-lg
+        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
+        hover:shadow-md transition-all
       `}
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -5 }}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-full ${info.bgColor} border border-${info.color.split('-')[1]}-200`}>
-            <Icon className={`h-4 w-4 ${info.color}`} />
-          </div>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className={`h-4 w-4 ${info.color}`} />
           <div>
-            <div className="font-medium flex items-center gap-2">
-              {info.label}
-              {shift.aiOptimized && (
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Sparkles className="h-4 w-4 text-green-500" />
-                  </TooltipTrigger>
-                  <TooltipContent>KI-optimierte Schicht</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
+            <span className="text-sm font-medium">{info.label}</span>
             <div className="text-xs text-gray-500">{info.time}</div>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <span className="sr-only">Aktionen</span>
-              <Edit className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="mr-2 h-4 w-4" />
-              <span>Bearbeiten</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Löschen</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {shift.aiOptimized && (
+          <Tooltip>
+            <TooltipTrigger>
+              <Sparkles className="h-4 w-4 text-green-500" />
+            </TooltipTrigger>
+            <TooltipContent>KI-optimierte Schicht</TooltipContent>
+          </Tooltip>
+        )}
       </div>
-      {shift.notes && (
-        <div className="mt-2 text-xs text-gray-500 border-t border-gray-100 pt-2">
-          {shift.notes}
-        </div>
-      )}
     </motion.div>
   );
 }
 
 export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
-  const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -172,15 +132,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
   const { data: shifts = [] } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/shifts", {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
-        department,
-      });
-      if (!res.ok) throw new Error("Failed to fetch shifts");
-      return res.json();
-    },
   });
 
   const createShiftMutation = useMutation({
@@ -188,7 +139,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       let startTime = new Date(data.date);
       let endTime = new Date(data.date);
 
-      const isFullDay = ["vacation", "sick", "overtime_reduction", "holiday"].includes(data.type);
+      const isFullDay = ["vacation", "sick", "overtime_reduction", "holiday", "training"].includes(data.type);
 
       if (isFullDay) {
         startTime.setHours(0, 0, 0);
@@ -216,29 +167,17 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         }
       }
 
-      const shiftData = {
+      const res = await apiRequest("POST", "/api/shifts", {
         employeeId: data.employeeId,
         type: data.type,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
         breakDuration: isFullDay ? 0 : 30,
-        conflictInfo: {
-          type: "overlap",
-          description: "Checking for conflicts",
-          severity: "low",
-        },
-        notes: "",
-        aiGenerated: false,
-        aiOptimized: false,
         status: "scheduled"
-      };
+      });
 
-      const res = await apiRequest("POST", "/api/shifts", shiftData);
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Schicht konnte nicht erstellt werden");
-      }
+      if (!res.ok) throw new Error("Failed to create shift");
       return res.json();
     },
     onSuccess: () => {
@@ -246,21 +185,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       toast({
         title: "Schicht erstellt",
         description: "Die neue Schicht wurde erfolgreich angelegt.",
-      });
-    },
-  });
-
-  const deleteShiftMutation = useMutation({
-    mutationFn: async (shiftId: number) => {
-      const res = await apiRequest("DELETE", `/api/shifts/${shiftId}`);
-      if (!res.ok) throw new Error("Schicht konnte nicht gelöscht werden");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      toast({
-        title: "Schicht gelöscht",
-        description: "Die Schicht wurde erfolgreich gelöscht.",
       });
     },
   });
@@ -275,22 +199,18 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     setDragOverCell(null);
   };
 
-  const handleDrop = async (e: React.DragEvent, employeeId: number, date: Date) => {
+  const handleDrop = (e: React.DragEvent, employeeId: number, date: Date) => {
     e.preventDefault();
     setDragOverCell(null);
 
     const shiftType = e.dataTransfer.getData('text/plain');
     if (!shiftType) return;
 
-    try {
-      await createShiftMutation.mutateAsync({
-        employeeId,
-        type: shiftType,
-        date,
-      });
-    } catch (error) {
-      console.error('Drop error:', error);
-    }
+    createShiftMutation.mutate({
+      employeeId,
+      type: shiftType,
+      date,
+    });
   };
 
   return (
@@ -304,7 +224,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </div>
           <Button 
             onClick={onOptimize}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/20"
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
           >
             <Brain className="h-4 w-4 mr-2" />
             KI-Optimierung
@@ -372,12 +292,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       >
                         <AnimatePresence>
                           {dayShifts.map((shift) => (
-                            <ShiftCard
-                              key={shift.id}
-                              shift={shift}
-                              onEdit={() => setEditingShift(shift)}
-                              onDelete={() => deleteShiftMutation.mutate(shift.id)}
-                            />
+                            <ShiftCard key={shift.id} shift={shift} />
                           ))}
                         </AnimatePresence>
 
@@ -396,15 +311,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           </div>
         </ScrollArea>
       </CardContent>
-
-      <Dialog open={!!editingShift} onOpenChange={(open) => !open && setEditingShift(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Schicht bearbeiten</DialogTitle>
-          </DialogHeader>
-          {/* Edit form would go here */}
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 }
