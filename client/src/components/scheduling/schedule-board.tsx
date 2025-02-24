@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, addDays, startOfWeek, parseISO, isSameDay } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -76,7 +76,14 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Mitarbeiter und Schichten laden
+  // Debug logs for date range
+  useEffect(() => {
+    console.log("Date Range:", {
+      weekStart: weekStart.toISOString(),
+      weekEnd: weekEnd.toISOString(),
+    });
+  }, [weekStart, weekEnd]);
+
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
@@ -89,7 +96,19 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }],
   });
 
-  // Schicht erstellen Mutation
+  // Debug logs for data
+  useEffect(() => {
+    if (shifts.length > 0) {
+      console.log("Loaded Shifts:", shifts.map(s => ({
+        id: s.id,
+        employeeId: s.employeeId,
+        type: s.type,
+        startTime: new Date(s.startTime).toISOString(),
+        endTime: new Date(s.endTime).toISOString()
+      })));
+    }
+  }, [shifts]);
+
   const createShiftMutation = useMutation({
     mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
       let startTime = new Date(data.date);
@@ -225,17 +244,29 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                 {weekDays.map((day) => {
                   const dayShifts = shifts.filter(shift => {
-                    const shiftDate = new Date(shift.startTime);
-                    return shift.employeeId === employee.id && 
-                           isSameDay(shiftDate, day);
+                    const matchesEmployee = shift.employeeId === employee.id;
+                    const matchesDay = isSameDay(new Date(shift.startTime), day);
+                    console.log("Checking shift:", {
+                      shiftId: shift.id,
+                      employeeId: shift.employeeId,
+                      employeeName: employee.name,
+                      shiftDate: new Date(shift.startTime),
+                      dayToMatch: day,
+                      matchesEmployee,
+                      matchesDay,
+                      matches: matchesEmployee && matchesDay
+                    });
+                    return matchesEmployee && matchesDay;
                   });
+
+                  console.log(`Found shifts for ${employee.name} on ${format(day, 'yyyy-MM-dd')}:`, dayShifts);
 
                   return (
                     <div
                       key={day.toISOString()}
                       className="p-2 min-h-[100px] border-l"
                     >
-                      {dayShifts.length > 0 ? (
+                      {dayShifts.length > 0 && (
                         <div className="space-y-2">
                           {dayShifts.map((shift) => (
                             <ShiftBadge
@@ -245,7 +276,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                             />
                           ))}
                         </div>
-                      ) : (
+                      )}
+                      {dayShifts.length === 0 && (
                         <Select
                           onValueChange={(value) => {
                             createShiftMutation.mutate({
