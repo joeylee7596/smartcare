@@ -1,37 +1,10 @@
 import {
-  users,
-  patients,
-  tours,
-  documentation,
-  workflowTemplates,
-  insuranceBilling,
-  employees,
-  shifts,
-  shiftPreferences,
-  type User,
-  type Patient,
-  type Tour,
-  type Documentation,
-  type WorkflowTemplate,
-  type InsuranceBilling,
-  type Employee,
-  type Shift,
-  type ShiftPreference,
-  type ShiftChange,
-  type InsertShift,
-  type InsertPreference,
-  type InsertChange,
-  type InsertUser,
-  type InsertPatient,
-  type InsertTour,
-  type InsertDoc,
-  type InsertWorkflow,
-  type InsertBilling,
-  type InsertEmployee,
-  type ExpiryTracking,
-  type InsertExpiryTracking,
-  type ShiftTemplate,
-  type InsertTemplate,
+  users, patients, tours, documentation, workflowTemplates, insuranceBilling, employees, shifts, shiftPreferences,
+  type User, type Patient, type Tour, type Documentation, type WorkflowTemplate, type InsuranceBilling, type Employee,
+  type Shift, type ShiftPreference, type ShiftChange,
+  type InsertShift, type InsertPreference, type InsertChange,
+  type InsertUser, type InsertPatient, type InsertTour, type InsertDoc, type InsertWorkflow,
+  type InsertBilling, type InsertEmployee, type ExpiryTracking, type InsertExpiryTracking, type ShiftTemplate, type InsertTemplate
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, and, desc, not, lte, gte, between, sql } from "drizzle-orm";
@@ -92,7 +65,7 @@ export interface IStorage {
   deleteExpiryItem(id: number): Promise<void>;
 
   // Shift methods
-  getShifts(startDate: Date, endDate: Date, department?: string): Promise<Shift[]>;
+  getShifts(startDate: Date, endDate: Date): Promise<Shift[]>;
   getEmployeeShifts(employeeId: number, startDate: Date, endDate: Date): Promise<Shift[]>;
   createShift(shift: InsertShift): Promise<Shift>;
   updateShift(id: number, shift: Partial<InsertShift>): Promise<Shift>;
@@ -446,22 +419,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Implement new shift-related methods
-  async getShifts(startDate: Date, endDate: Date, department?: string): Promise<Shift[]> {
-    let query = db
+  async getShifts(startDate: Date, endDate: Date): Promise<Shift[]> {
+    return db
       .select()
       .from(shifts)
       .where(
         and(
-          between(shifts.startTime, startDate, endDate),
-          between(shifts.endTime, startDate, endDate)
+          gte(shifts.startTime, startDate),
+          lte(shifts.endTime, endDate)
         )
-      );
-
-    if (department) {
-      query = query.where(eq(shifts.department, department));
-    }
-
-    return query.orderBy(shifts.startTime);
+      )
+      .orderBy(shifts.startTime);
   }
 
   async getEmployeeShifts(employeeId: number, startDate: Date, endDate: Date): Promise<Shift[]> {
@@ -471,8 +439,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(shifts.employeeId, employeeId),
-          between(shifts.startTime, startDate, endDate),
-          between(shifts.endTime, startDate, endDate)
+          gte(shifts.startTime, startDate),
+          lte(shifts.endTime, endDate)
         )
       )
       .orderBy(shifts.startTime);
