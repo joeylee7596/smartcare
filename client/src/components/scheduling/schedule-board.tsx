@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, subWeeks, addWeeks } from "date-fns";
 import { de } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,8 @@ import {
   PalmtreeIcon,
   Stethoscope,
   Printer,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +32,7 @@ import type { Employee, Shift } from "@shared/schema";
 
 interface ScheduleBoardProps {
   selectedDate: Date;
+  onDateChange: (date: Date) => void;
   department: string;
   onOptimize: () => void;
 }
@@ -116,7 +119,7 @@ function ShiftCard({ shift, onDelete }: { shift: Shift; onDelete: () => void }) 
   );
 }
 
-export function ScheduleBoard({ selectedDate, department, onOptimize }: ScheduleBoardProps) {
+export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimize }: ScheduleBoardProps) {
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -124,6 +127,15 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1, locale: de });
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Navigation functions
+  const handlePreviousWeek = () => {
+    onDateChange(subWeeks(selectedDate, 1));
+  };
+
+  const handleNextWeek = () => {
+    onDateChange(addWeeks(selectedDate, 1));
+  };
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
@@ -310,28 +322,54 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   return (
     <Card className="mt-6">
       <CardHeader className="pb-4 border-b">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4">
+          {/* Week Navigation */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePreviousWeek}
+                className="h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-medium">
+                {format(weekStart, "dd.MM.yyyy", { locale: de })} - {format(weekEnd, "dd.MM.yyyy", { locale: de })}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextWeek}
+                className="h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={onOptimize}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              >
+                <Brain className="h-4 w-4 mr-2" />
+                KI-Optimierung
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handlePrint}
+                className="ml-2"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Drucken
+              </Button>
+            </div>
+          </div>
+
+          {/* Shift Templates */}
           <div className="grid grid-cols-5 gap-4">
             {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
               <ShiftTemplate key={type} type={type} />
             ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={onOptimize}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-            >
-              <Brain className="h-4 w-4 mr-2" />
-              KI-Optimierung
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handlePrint}
-              className="ml-2"
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Drucken
-            </Button>
           </div>
         </div>
       </CardHeader>

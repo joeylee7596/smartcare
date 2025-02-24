@@ -118,6 +118,13 @@ export default function Schedule() {
     },
   });
 
+  // Handler für Datumsänderungen
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      setSelectedDate(date);
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
       <Sidebar />
@@ -142,7 +149,7 @@ export default function Schedule() {
                     <Calendar
                       mode="single"
                       selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
+                      onSelect={handleDateChange}
                       initialFocus
                     />
                   </PopoverContent>
@@ -173,6 +180,7 @@ export default function Schedule() {
           {/* Schedule Board */}
           <ScheduleBoard
             selectedDate={selectedDate}
+            onDateChange={handleDateChange}
             department={department}
             onOptimize={() => optimizeScheduleMutation.mutate()}
           />
