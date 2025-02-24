@@ -1,17 +1,16 @@
-import { Employee, Tour, Shift } from "@shared/schema";
+import { Employee, Shift } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isSameDay, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
-import { 
-  Brain, 
-  Clock, 
-  Shield, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Sun, 
-  Moon, 
+import {
+  Brain,
+  Clock,
+  Shield,
+  AlertTriangle,
+  Sun,
+  Moon,
   Coffee,
   UserCheck,
   Calendar,
@@ -47,7 +46,7 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
     <Card className="border-none shadow-none bg-white/70 backdrop-blur-sm">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+          <CardTitle className="text-xl font-bold">
             Wochendienstplan
           </CardTitle>
           <Button variant="outline" size="sm">
@@ -66,13 +65,13 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold">{employee.name}</h3>
-                        {employee.qualifications.nursingDegree && (
+                        {employee.role === 'nurse' && (
                           <Badge variant="secondary" className="h-5">
                             <Shield className="h-3 w-3 mr-1" />
                             Examiniert
                           </Badge>
                         )}
-                        {employee.qualifications.woundCare && (
+                        {employee.qualifications?.woundCare && (
                           <Badge variant="outline" className="h-5 border-purple-200 bg-purple-50 text-purple-700">
                             <Star className="h-3 w-3 mr-1" />
                             Wundexperte
@@ -82,10 +81,10 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                       <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
                         <span className="flex items-center">
                           <UserCheck className="h-4 w-4 mr-1" />
-                          {employee.maxPatientsPerDay} max. Patienten
+                          {employee.maxPatientsPerDay || 8} max. Patienten
                         </span>
                         <Badge variant="outline" className="h-5">
-                          {employee.workingHours.monday.isWorkingDay ? "Vollzeit" : "Teilzeit"}
+                          {employee.workingHours?.monday?.isWorkingDay ? "Vollzeit" : "Teilzeit"}
                         </Badge>
                       </div>
                     </div>
@@ -98,17 +97,17 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                         shift => shift.employeeId === employee.id && isSameDay(parseISO(shift.startTime.toString()), day)
                       ).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-                      const workingHours = employee.workingHours[format(day, 'EEEE', { locale: de }).toLowerCase()];
-                      const isWorkingDay = workingHours?.isWorkingDay;
+                      const workingHours = employee.workingHours?.[format(day, 'EEEE', { locale: de }).toLowerCase()];
+                      const isWorkingDay = workingHours?.isWorkingDay ?? false;
 
                       return (
-                        <div 
-                          key={index} 
+                        <div
+                          key={index}
                           className={clsx(
                             "p-2 rounded-lg min-h-[120px]",
                             "border transition-colors",
-                            isSameDay(day, selectedDate) 
-                              ? "border-blue-200 bg-blue-50/50" 
+                            isSameDay(day, selectedDate)
+                              ? "border-blue-200 bg-blue-50/50"
                               : "border-gray-100 hover:bg-gray-50/50",
                             !isWorkingDay && "bg-gray-50/30 opacity-50"
                           )}
@@ -121,7 +120,7 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                               {dayShifts.map((shift) => (
                                 <HoverCard key={shift.id}>
                                   <HoverCardTrigger asChild>
-                                    <div 
+                                    <div
                                       className={clsx(
                                         "p-2 rounded bg-white",
                                         "border border-gray-100",
@@ -132,15 +131,9 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                                       <div className="flex items-center gap-2">
                                         {getShiftIcon(new Date(shift.startTime).getHours())}
                                         <span className="text-sm">
-                                          {format(parseISO(shift.startTime.toString()), "HH:mm")}
+                                          {format(new Date(shift.startTime), "HH:mm")}
                                         </span>
                                       </div>
-                                      {shift.optimizationScore && (
-                                        <div className="flex items-center text-xs">
-                                          <Brain className="h-3 w-3 text-purple-500 mr-1" />
-                                          {shift.optimizationScore}%
-                                        </div>
-                                      )}
                                     </div>
                                   </HoverCardTrigger>
                                   <HoverCardContent className="w-80 p-0">
@@ -155,8 +148,8 @@ export function DailyRoster({ employees, shifts, selectedDate }: DailyRosterProp
                                         <div className="flex items-center gap-2">
                                           <Clock className="h-4 w-4" />
                                           <span>
-                                            {format(parseISO(shift.startTime.toString()), "HH:mm")} - 
-                                            {format(parseISO(shift.endTime.toString()), "HH:mm")}
+                                            {format(new Date(shift.startTime), "HH:mm")} -
+                                            {format(new Date(shift.endTime), "HH:mm")}
                                           </span>
                                         </div>
                                         {shift.notes && (

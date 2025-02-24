@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,88 +23,41 @@ import {
   Settings2,
   Wand2,
   Plus,
-  AlertTriangle,
 } from "lucide-react";
 import type { Employee, Shift, ShiftTemplate } from "@shared/schema";
 import { DailyRoster } from "@/components/tours/daily-roster";
 import { ShiftTemplatesDialog } from "@/components/scheduling/shift-templates-dialog";
-import { useToast } from "@/hooks/use-toast";
 
-export default function SchedulePage() {
+export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [view, setView] = useState<"daily" | "weekly">("daily");
   const [scheduleMode, setScheduleMode] = useState<"manual" | "auto">("manual");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const { toast } = useToast();
 
-  // Fetch data
-  const { data: employees = [], isLoading: isLoadingEmployees } = useQuery<Employee[]>({
+  // Fetch data with proper typing
+  const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
   });
 
-  const { data: shifts = [], isLoading: isLoadingShifts } = useQuery<Shift[]>({
+  const { data: shifts = [] } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: startOfWeek(selectedDate, { locale: de }).toISOString(),
       end: endOfWeek(selectedDate, { locale: de }).toISOString(),
     }],
   });
 
-  const { data: templates = [], isLoading: isLoadingTemplates } = useQuery<ShiftTemplate[]>({
+  const { data: templates = [] } = useQuery<ShiftTemplate[]>({
     queryKey: ["/api/shift-templates"],
   });
 
-  // Apply template mutation
-  const applyTemplate = useMutation({
-    mutationFn: async (template: ShiftTemplate) => {
-      const response = await fetch("/api/shifts/from-template", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          templateId: template.id,
-          date: selectedDate.toISOString(),
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to apply template");
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Erfolg",
-        description: "Schicht wurde erstellt",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Fehler",
-        description: "Schicht konnte nicht erstellt werden",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Loading state
-  if (isLoadingEmployees || isLoadingShifts || isLoadingTemplates) {
-    return (
-      <div className="flex h-screen">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <Header />
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex">
           {/* Left Panel - Calendar & Controls */}
-          <div className="w-80 border-r border-gray-200 bg-white/80 backdrop-blur-sm dark:bg-gray-900/80">
+          <div className="w-80 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
             <ScrollArea className="h-[calc(100vh-4rem)] p-4">
               <div className="space-y-6">
                 {/* Calendar */}
@@ -177,20 +130,9 @@ export default function SchedulePage() {
                       <Clock className="mr-2 h-4 w-4" />
                       Schichtvorlage erstellen
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        if (scheduleMode === "auto") {
-                          toast({
-                            title: "KI-Analyse wird gestartet",
-                            description: "Die optimale Schichtplanung wird berechnet...",
-                          });
-                        }
-                      }}
-                    >
+                    <Button variant="outline" className="w-full justify-start">
                       <Brain className="mr-2 h-4 w-4" />
-                      KI-Analyse
+                      KI-Analyse starten
                     </Button>
                   </div>
                 </div>
@@ -215,7 +157,6 @@ export default function SchedulePage() {
                           variant="outline"
                           className="w-full justify-start text-left"
                           size="sm"
-                          onClick={() => applyTemplate.mutate(template)}
                         >
                           <div>
                             <div className="font-medium">{template.name}</div>
@@ -233,7 +174,7 @@ export default function SchedulePage() {
           </div>
 
           {/* Main Content - Roster */}
-          <div className="flex-1 overflow-hidden bg-white dark:bg-gray-900">
+          <div className="flex-1 overflow-hidden bg-white">
             <div className="h-full p-6">
               <div className="mb-6">
                 <h1 className="text-2xl font-bold tracking-tight">
