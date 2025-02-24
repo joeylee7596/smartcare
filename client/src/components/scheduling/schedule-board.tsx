@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, addDays, startOfWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -76,18 +76,30 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Debug-Ausgaben
+  useEffect(() => {
+    console.log("Wochenstart:", weekStart.toISOString());
+    console.log("Wochenende:", weekEnd.toISOString());
+  }, [weekStart, weekEnd]);
+
   // Mitarbeiter und Schichten laden
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
-  const { data: shifts = [] } = useQuery<Shift[]>({
+  const { data: shifts = [], isLoading } = useQuery<Shift[]>({
     queryKey: ["/api/shifts", {
       start: weekStart.toISOString(),
       end: weekEnd.toISOString(),
       department
     }],
   });
+
+  // Debug-Ausgaben
+  useEffect(() => {
+    console.log("Geladene Schichten:", shifts);
+    console.log("Mitarbeiter:", employees);
+  }, [shifts, employees]);
 
   // Schicht erstellen Mutation
   const createShiftMutation = useMutation({
@@ -115,6 +127,13 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           endTime.setHours(23, 59);
           break;
       }
+
+      console.log("Erstelle neue Schicht:", {
+        employeeId: data.employeeId,
+        type: data.type,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
 
       const shiftData = {
         employeeId: data.employeeId,
@@ -171,6 +190,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     },
   });
 
+  if (isLoading) {
+    return <div>Lade Schichtplan...</div>;
+  }
+
   return (
     <Card className="mt-6">
       <CardHeader className="pb-4 border-b">
@@ -220,10 +243,24 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 </div>
 
                 {weekDays.map((day) => {
-                  const dayShifts = shifts.filter(s =>
-                    s.employeeId === employee.id &&
-                    format(new Date(s.startTime), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-                  );
+                  // Debug-Ausgabe für jeden Tag
+                  const formattedDay = format(day, 'yyyy-MM-dd');
+                  console.log(`Suche Schichten für ${employee.name} am ${formattedDay}`);
+
+                  const dayShifts = shifts.filter(s => {
+                    const shiftStart = format(new Date(s.startTime), 'yyyy-MM-dd');
+                    const match = s.employeeId === employee.id && shiftStart === formattedDay;
+                    console.log('Shift:', {
+                      shiftId: s.id,
+                      employeeId: s.employeeId,
+                      shiftStart,
+                      formattedDay,
+                      matches: match
+                    });
+                    return match;
+                  });
+
+                  console.log(`Gefundene Schichten:`, dayShifts);
 
                   return (
                     <div
