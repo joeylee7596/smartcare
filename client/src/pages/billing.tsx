@@ -51,14 +51,6 @@ export default function BillingPage() {
     queryKey: ["/api/patients"],
     retry: 2,
     staleTime: 30000,
-    onError: (error) => {
-      console.error('Error loading patients:', error);
-      toast({
-        title: "Fehler",
-        description: "Patienten konnten nicht geladen werden",
-        variant: "destructive",
-      });
-    }
   });
 
   // Abrechnungen laden
@@ -67,14 +59,6 @@ export default function BillingPage() {
     enabled: !!selectedPatient?.id,
     retry: 2,
     staleTime: 30000,
-    onError: (error) => {
-      console.error('Error loading billings:', error);
-      toast({
-        title: "Fehler",
-        description: "Abrechnungen konnten nicht geladen werden",
-        variant: "destructive",
-      });
-    }
   });
 
   const { refetch: refetchDocCheck } = useQuery({
@@ -82,7 +66,7 @@ export default function BillingPage() {
     enabled: false,
   });
 
-  const filteredPatients = patients && searchQuery
+  const filteredPatients = searchQuery && Array.isArray(patients)
     ? patients.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.insuranceNumber.includes(searchQuery) ||
@@ -90,24 +74,29 @@ export default function BillingPage() {
       )
     : patients;
 
-  const groupedBillings = Array.isArray(billings) 
-    ? billings.reduce((acc, billing) => {
-        if (!billing.date) return acc;
-        try {
-          const date = parseISO(billing.date);
-          if (!isValid(date)) return acc;
-          const month = format(date, "yyyy-MM");
-          if (!acc[month]) acc[month] = [];
-          acc[month].push(billing);
-        } catch (error) {
-          console.error('Error processing billing date:', error);
-        }
-        return acc;
-      }, {} as Record<string, InsuranceBilling[]>)
-    : {};
+  // Sichere Gruppierung der Abrechnungen
+  const groupedBillings = (() => {
+    if (!Array.isArray(billings)) return {};
+
+    return billings.reduce<Record<string, InsuranceBilling[]>>((acc, billing) => {
+      if (!billing?.date) return acc;
+
+      try {
+        const date = parseISO(billing.date);
+        if (!isValid(date)) return acc;
+
+        const month = format(date, "yyyy-MM");
+        if (!acc[month]) acc[month] = [];
+        acc[month].push(billing);
+      } catch (error) {
+        console.error('Error processing billing date:', error);
+      }
+      return acc;
+    }, {});
+  })();
 
   const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
-    .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
+    .reduce((sum, billing) => sum + Number(billing.totalAmount || 0), 0);
 
   const getLastBillingDate = (): string => {
     if (!Array.isArray(billings) || billings.length === 0) {
@@ -116,8 +105,9 @@ export default function BillingPage() {
 
     try {
       const validBillings = billings
-        .filter(b => b.date)
+        .filter(b => b?.date)
         .sort((a, b) => {
+          if (!a.date || !b.date) return 0;
           const dateA = parseISO(a.date);
           const dateB = parseISO(b.date);
           return isValid(dateB) && isValid(dateA) 
@@ -125,7 +115,7 @@ export default function BillingPage() {
             : 0;
         });
 
-      return validBillings.length > 0 
+      return validBillings.length > 0 && validBillings[0].date
         ? formatSafeDate(validBillings[0].date, "Datum nicht verfügbar")
         : "Keine Abrechnungen";
     } catch (error) {
@@ -302,7 +292,7 @@ export default function BillingPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                       >
-                        {filteredPatients.map((patient) => (
+                        {Array.isArray(filteredPatients) && filteredPatients.map((patient) => (
                           <motion.div
                             key={patient.id}
                             initial={{ opacity: 0, y: 20 }}
@@ -402,7 +392,7 @@ export default function BillingPage() {
                               .sort((a, b) => b.localeCompare(a))
                               .map((month) => (
                                 <option key={month} value={month}>
-                                  {format(new Date(month), "MMMM yyyy", { locale: de })}
+                                  {format(parseISO(`${month}-01`), "MMMM yyyy", { locale: de })}
                                 </option>
                               ))}
                           </select>
@@ -420,6 +410,7 @@ export default function BillingPage() {
                           >
                             {(groupedBillings[selectedMonth] || [])
                               .sort((a, b) => {
+                                if (!a.date || !b.date) return 0;
                                 const dateA = parseISO(a.date);
                                 const dateB = parseISO(b.date);
                                 return isValid(dateB) && isValid(dateA)
@@ -444,7 +435,7 @@ export default function BillingPage() {
                         <div className="sticky bottom-0 bg-white/80 backdrop-blur-sm border-t mt-6 p-4 rounded-b-xl">
                           <div className="flex items-center justify-between">
                             <span className="text-lg font-medium text-gray-700">
-                              Gesamtbetrag {format(new Date(selectedMonth), "MMMM yyyy", { locale: de })}
+                              Gesamtbetrag {format(parseISO(`${selectedMonth}-01`), "MMMM yyyy", { locale: de })}
                             </span>
                             <div className="flex items-center gap-2">
                               <Euro className="h-5 w-5 text-blue-500" />
