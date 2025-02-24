@@ -130,28 +130,18 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const { toast } = useToast();
 
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1, locale: de });
-  const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Query for employees
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", { department }],
   });
 
-  // Query for shifts with explicit date range
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/shifts", {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
-        department,
-      });
-      if (!res.ok) throw new Error("Failed to fetch shifts");
-      const data = await res.json();
-      console.log('Fetched shifts:', data);
-      return data;
-    },
+    queryKey: ["/api/shifts", {
+      start: weekStart.toISOString(),
+      end: addDays(weekStart, 6).toISOString(),
+      department,
+    }],
   });
 
   const createShiftMutation = useMutation({
@@ -194,8 +184,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         status: "scheduled"
       };
 
-      console.log('Creating shift with data:', shiftData);
-
       const res = await apiRequest("POST", "/api/shifts", shiftData);
 
       if (!res.ok) {
@@ -204,17 +192,11 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       }
 
       const newShift = await res.json();
-      console.log('Created shift:', newShift);
       return newShift;
     },
     onSuccess: (newShift) => {
-      // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-
-      // Optimistically update the local data
-      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
-        return [...old, newShift];
-      });
+      queryClient.setQueryData<Shift[]>(["/api/shifts"], (old = []) => [...old, newShift]);
 
       toast({
         title: "Schicht erstellt",
@@ -227,7 +209,6 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
         variant: "destructive",
       });
-      console.error("Error creating shift:", error);
     },
   });
 
@@ -278,18 +259,19 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[calc(100vh-280px)] pr-4">
-          <div className="space-y-6">
-            {/* Week header with dates */}
-            <div className="grid grid-cols-7 gap-2 mb-6 px-2">
-              {weekDays.map((day) => (
+        <div className="relative">
+          {/* Sticky week header */}
+          <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-gray-100 mb-6">
+            <div className="grid grid-cols-7 gap-px">
+              {weekDays.map((day, index) => (
                 <div
                   key={day.toISOString()}
                   className={`
-                    text-center p-3 rounded-lg
+                    text-center p-3
                     ${format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                      ? 'bg-gradient-to-br from-blue-50 to-blue-50/50 border border-blue-100'
+                      ? 'bg-gradient-to-br from-blue-50 to-blue-50/50 border-b-2 border-blue-200'
                       : 'bg-gradient-to-br from-gray-50/50 to-transparent'}
+                    ${index !== 6 ? 'border-r border-gray-100' : ''}
                     backdrop-blur-[2px]
                   `}
                 >
@@ -302,66 +284,70 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                 </div>
               ))}
             </div>
-
-            {employees.map((employee) => (
-              <Card key={employee.id} className="overflow-hidden border border-gray-100">
-                <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium">{employee.name}</div>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="grid grid-cols-7 gap-2">
-                    {weekDays.map((day) => {
-                      const dayShifts = shifts.filter(s => {
-                        const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
-                        const currentDate = format(day, 'yyyy-MM-dd');
-                        return s.employeeId === employee.id && shiftDate === currentDate;
-                      });
-
-                      const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
-
-                      return (
-                        <div
-                          key={day.toISOString()}
-                          className={`
-                            p-2 min-h-[120px] relative
-                            border-l 
-                            ${dragOverCell === cellId
-                              ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]'
-                              : 'hover:bg-gradient-to-br hover:from-gray-50/40 hover:to-transparent'}
-                            transition-all duration-500
-                            rounded-lg
-                          `}
-                          onDragOver={(e) => handleDragOver(e, cellId)}
-                          onDragLeave={handleDragLeave}
-                          onDrop={(e) => handleDrop(e, employee.id, day)}
-                        >
-                          <AnimatePresence>
-                            {dayShifts.map((shift) => (
-                              <ShiftCard key={shift.id} shift={shift} />
-                            ))}
-                          </AnimatePresence>
-
-                          {dayShifts.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
-                              <div className="p-2.5 rounded-full bg-gradient-to-br from-gray-50/60 to-white/20 backdrop-blur-[4px] shadow-inner">
-                                <Plus className="h-5 w-5" />
-                              </div>
-                              <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
           </div>
-        </ScrollArea>
+
+          <ScrollArea className="h-[calc(100vh-380px)] pr-4">
+            <div className="space-y-6">
+              {employees.map((employee) => (
+                <Card key={employee.id} className="overflow-hidden border border-gray-100">
+                  <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium">{employee.name}</div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-7 gap-px">
+                      {weekDays.map((day, index) => {
+                        const dayShifts = shifts.filter(s => {
+                          const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
+                          const currentDate = format(day, 'yyyy-MM-dd');
+                          return s.employeeId === employee.id && shiftDate === currentDate;
+                        });
+
+                        const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
+
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={`
+                              p-2 min-h-[120px] relative
+                              ${index !== 6 ? 'border-r border-gray-100' : ''}
+                              ${dragOverCell === cellId
+                                ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]'
+                                : 'hover:bg-gradient-to-br hover:from-gray-50/40 hover:to-transparent'}
+                              transition-all duration-500
+                              rounded-lg
+                            `}
+                            onDragOver={(e) => handleDragOver(e, cellId)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, employee.id, day)}
+                          >
+                            <AnimatePresence>
+                              {dayShifts.map((shift) => (
+                                <ShiftCard key={shift.id} shift={shift} />
+                              ))}
+                            </AnimatePresence>
+
+                            {dayShifts.length === 0 && (
+                              <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
+                                <div className="p-2.5 rounded-full bg-gradient-to-br from-gray-50/60 to-white/20 backdrop-blur-[4px] shadow-inner">
+                                  <Plus className="h-5 w-5" />
+                                </div>
+                                <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
