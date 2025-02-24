@@ -40,7 +40,6 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   const info = ShiftTypes[type];
   const Icon = info.icon;
 
-  // Handle drag start
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('text/plain', type);
     e.dataTransfer.effectAllowed = 'copy';
@@ -147,9 +146,23 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         department,
+        breakDuration: 30, // 30 Minuten Pause
+        conflictInfo: {
+          type: null,
+          description: null,
+          severity: "low",
+          status: "none"
+        },
+        notes: null,
+        aiGenerated: false,
+        aiOptimized: false,
+        status: "scheduled"
       });
 
-      if (!res.ok) throw new Error("Failed to create shift");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to create shift");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -162,9 +175,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     onError: (error) => {
       toast({
         title: "Fehler",
-        description: "Die Schicht konnte nicht erstellt werden.",
+        description: error instanceof Error ? error.message : "Die Schicht konnte nicht erstellt werden",
         variant: "destructive",
       });
+      console.error("Error creating shift:", error);
     },
   });
 
