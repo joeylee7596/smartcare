@@ -12,9 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, addDays, eachDayOfInterval } from "date-fns";
 import { de } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Brain,
   Calendar as CalendarIcon,
@@ -27,23 +27,51 @@ import {
   RefreshCw,
   Sparkles,
   AlertTriangle,
+  ChevronRight,
+  ChevronLeft,
+  BarChart3,
+  Sliders,
+  UserCheck,
+  Scale,
+  Heart
 } from "lucide-react";
 import type { Employee, Shift, ShiftTemplate } from "@shared/schema";
 import { ModernRoster } from "@/components/scheduling/modern-roster";
 import { ShiftTemplatesDialog } from "@/components/scheduling/shift-templates-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useWebSocket } from "@/hooks/use-websocket";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Helper function to calculate employee workload
+const calculateWorkload = (shifts: Shift[], employeeId: number): number => {
+  const employeeShifts = shifts.filter(s => s.employeeId === employeeId);
+  return (employeeShifts.length / shifts.length) * 100;
+};
+
+type ScheduleView = "daily" | "weekly" | "monthly";
+type ScheduleMode = "manual" | "auto" | "balanced";
+type OptimizationFocus = "workload" | "preferences" | "efficiency";
 
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [view, setView] = useState<"daily" | "weekly">("daily");
-  const [scheduleMode, setScheduleMode] = useState<"manual" | "auto">("manual");
+  const [view, setView] = useState<ScheduleView>("weekly");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("auto");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [department, setDepartment] = useState("all");
+  const [optimizationFocus, setOptimizationFocus] = useState<OptimizationFocus>("workload");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { sendMessage, subscribe } = useWebSocket();
 
   // Enhanced data fetching with proper typing
   const { data: employees = [], isLoading: loadingEmployees } = useQuery<Employee[]>({
@@ -61,52 +89,108 @@ export default function Schedule() {
     queryKey: ["/api/shift-templates"],
   });
 
-  // AI Optimization Mutation
+  // AI Optimization Mutation with Gemini Integration
   const optimizeScheduleMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/schedule/optimize", {
         startDate: startOfWeek(selectedDate).toISOString(),
         endDate: endOfWeek(selectedDate).toISOString(),
         department,
+        optimizationFocus,
+        scheduleMode,
       });
       if (!res.ok) throw new Error("Optimierung fehlgeschlagen");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({
         title: "Dienstplan optimiert",
-        description: "Die KI hat den Dienstplan erfolgreich optimiert.",
+        description: `Die KI hat ${data.changesCount} Änderungen vorgenommen für optimale ${
+          optimizationFocus === "workload" ? "Arbeitsbelastung" :
+          optimizationFocus === "preferences" ? "Mitarbeiterzufriedenheit" : "Effizienz"
+        }.`,
       });
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Fehler",
-        description: "Die Optimierung konnte nicht durchgeführt werden.",
+        description: error instanceof Error ? error.message : "Die Optimierung konnte nicht durchgeführt werden.",
         variant: "destructive",
       });
     },
   });
 
-  // Quick Stats
+  // WebSocket subscription for real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe((message) => {
+      if (message.type === 'SHIFT_UPDATED' || message.type === 'OPTIMIZATION_COMPLETE') {
+        queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+        toast({
+          title: message.type === 'SHIFT_UPDATED' ? "Schicht aktualisiert" : "Optimierung abgeschlossen",
+          description: message.description,
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [subscribe, queryClient, toast]);
+
+  // Calculate statistics and insights
   const stats = {
     totalShifts: shifts.length,
     coveredShifts: shifts.filter(s => s.employeeId).length,
     openShifts: shifts.filter(s => !s.employeeId).length,
     activeEmployees: new Set(shifts.map(s => s.employeeId)).size,
+    averageWorkload: employees.length > 0
+      ? employees.reduce((acc, emp) => acc + calculateWorkload(shifts, emp.id), 0) / employees.length
+      : 0
   };
 
-  const handleOptimize = () => {
-    optimizeScheduleMutation.mutate();
+  // AI Insights based on current schedule
+  const getAiInsights = () => {
+    const insights = [];
+
+    if (stats.openShifts > 0) {
+      insights.push({
+        type: "warning",
+        icon: AlertTriangle,
+        message: `${stats.openShifts} offene Schichten zu besetzen`
+      });
+    }
+
+    if (stats.averageWorkload > 80) {
+      insights.push({
+        type: "alert",
+        icon: Scale,
+        message: "Hohe durchschnittliche Arbeitsbelastung"
+      });
+    }
+
+    const overworkedEmployees = employees.filter(emp =>
+      calculateWorkload(shifts, emp.id) > 90
+    );
+
+    if (overworkedEmployees.length > 0) {
+      insights.push({
+        type: "critical",
+        icon: Heart,
+        message: `${overworkedEmployees.length} Mitarbeiter mit sehr hoher Belastung`
+      });
+    }
+
+    return insights;
   };
+
+  const aiInsights = getAiInsights();
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex">
-          {/* Left Panel - Calendar & Controls */}
+          {/* Left Panel - Enhanced Controls & Insights */}
           <div className="w-80 border-r border-gray-200 bg-white/80 backdrop-blur-sm">
             <ScrollArea className="h-[calc(100vh-4rem)] p-4">
               <div className="space-y-6">
@@ -122,12 +206,15 @@ export default function Schedule() {
                   />
                 </div>
 
-                {/* Stats Card */}
-                <Card>
+                {/* Enhanced Stats Card */}
+                <Card className="bg-gradient-to-br from-blue-50 to-white border-2">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Übersicht</CardTitle>
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-blue-500" />
+                      Übersicht
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-2 text-sm">
+                  <CardContent className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <div className="text-muted-foreground">Gesamt</div>
                       <div className="font-medium">{stats.totalShifts} Schichten</div>
@@ -144,132 +231,178 @@ export default function Schedule() {
                       <div className="text-muted-foreground">Aktiv</div>
                       <div className="font-medium">{stats.activeEmployees} Mitarbeiter</div>
                     </div>
+                    <div className="col-span-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-muted-foreground">Durchschnittliche Auslastung</span>
+                        <span className="font-medium">{Math.round(stats.averageWorkload)}%</span>
+                      </div>
+                      <Progress value={stats.averageWorkload} className="h-2" />
+                    </div>
                   </CardContent>
                 </Card>
 
-                {/* View Controls */}
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Ansicht</Label>
-                  <Select
-                    value={view}
-                    onValueChange={(value: "daily" | "weekly") => setView(value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Tagesansicht</SelectItem>
-                      <SelectItem value="weekly">Wochenansicht</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Enhanced View Controls */}
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-base font-semibold">Ansicht</Label>
+                    <Tabs value={view} className="w-full mt-2">
+                      <TabsList className="grid grid-cols-3 w-full">
+                        <TabsTrigger value="daily" onClick={() => setView("daily")}>Tag</TabsTrigger>
+                        <TabsTrigger value="weekly" onClick={() => setView("weekly")}>Woche</TabsTrigger>
+                        <TabsTrigger value="monthly" onClick={() => setView("monthly")}>Monat</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
 
-                {/* Department Filter */}
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Abteilung</Label>
-                  <Select value={department} onValueChange={setDepartment}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle Abteilungen</SelectItem>
-                      <SelectItem value="general">Allgemeinpflege</SelectItem>
-                      <SelectItem value="intensive">Intensivpflege</SelectItem>
-                      <SelectItem value="palliative">Palliativpflege</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Scheduling Mode */}
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Planungsmodus</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant={scheduleMode === "manual" ? "default" : "outline"}
-                      onClick={() => setScheduleMode("manual")}
-                      className="w-full"
-                      size="sm"
-                    >
-                      <Settings2 className="mr-2 h-4 w-4" />
-                      Manuell
-                    </Button>
-                    <Button
-                      variant={scheduleMode === "auto" ? "default" : "outline"}
-                      onClick={() => setScheduleMode("auto")}
-                      className="w-full"
-                      size="sm"
-                    >
-                      <Wand2 className="mr-2 h-4 w-4" />
-                      KI-Optimiert
-                    </Button>
+                  <div>
+                    <Label className="text-base font-semibold">Abteilung</Label>
+                    <Select value={department} onValueChange={setDepartment}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle Abteilungen</SelectItem>
+                        <SelectItem value="general">Allgemeinpflege</SelectItem>
+                        <SelectItem value="intensive">Intensivpflege</SelectItem>
+                        <SelectItem value="palliative">Palliativpflege</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Schnellzugriff</Label>
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => handleOptimize()}
-                      disabled={optimizeScheduleMutation.isPending}
-                    >
-                      <Brain className="mr-2 h-4 w-4 text-blue-500" />
-                      KI-Optimierung starten
-                      {optimizeScheduleMutation.isPending && (
-                        <RefreshCw className="ml-2 h-4 w-4 animate-spin" />
-                      )}
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Users className="mr-2 h-4 w-4 text-purple-500" />
-                      Mitarbeiter verwalten
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      onClick={() => setTemplateDialogOpen(true)}
-                    >
-                      <Clock className="mr-2 h-4 w-4 text-green-500" />
-                      Schichtvorlagen
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <FileText className="mr-2 h-4 w-4 text-orange-500" />
-                      Dokumentation erstellen
-                    </Button>
-                  </div>
-                </div>
-
-                {/* AI Insights */}
-                <Card className="bg-blue-50/50">
+                {/* Enhanced AI Controls */}
+                <Card className="border-2 bg-gradient-to-br from-blue-500/5 to-transparent">
                   <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-500" />
-                      <CardTitle className="text-sm font-medium">KI-Erkenntnisse</CardTitle>
-                    </div>
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-blue-500" />
+                      KI-Planung
+                    </CardTitle>
+                    <CardDescription>
+                      Optimieren Sie den Dienstplan mit KI-Unterstützung
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="text-sm">
-                    <div className="space-y-2">
-                      {stats.openShifts > 0 && (
-                        <div className="flex items-center gap-2 text-yellow-600">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span>{stats.openShifts} offene Schichten zu besetzen</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-blue-600">
-                        <Brain className="h-4 w-4" />
-                        <span>Optimierungsvorschläge verfügbar</span>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label>Planungsmodus</Label>
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        <Button
+                          variant={scheduleMode === "manual" ? "default" : "outline"}
+                          onClick={() => setScheduleMode("manual")}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <Settings2 className="h-4 w-4 mr-1" />
+                          Manuell
+                        </Button>
+                        <Button
+                          variant={scheduleMode === "auto" ? "default" : "outline"}
+                          onClick={() => setScheduleMode("auto")}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <Wand2 className="h-4 w-4 mr-1" />
+                          KI
+                        </Button>
+                        <Button
+                          variant={scheduleMode === "balanced" ? "default" : "outline"}
+                          onClick={() => setScheduleMode("balanced")}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <Scale className="h-4 w-4 mr-1" />
+                          Hybrid
+                        </Button>
                       </div>
                     </div>
+
+                    <div>
+                      <Label>Optimierungsfokus</Label>
+                      <Select value={optimizationFocus} onValueChange={(value: OptimizationFocus) => setOptimizationFocus(value)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="workload">
+                            <div className="flex items-center gap-2">
+                              <Scale className="h-4 w-4" />
+                              Arbeitsbelastung
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="preferences">
+                            <div className="flex items-center gap-2">
+                              <Heart className="h-4 w-4" />
+                              Mitarbeiterwünsche
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="efficiency">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-4 w-4" />
+                              Effizienz
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600"
+                      onClick={() => optimizeScheduleMutation.mutate()}
+                      disabled={optimizeScheduleMutation.isPending}
+                    >
+                      {optimizeScheduleMutation.isPending ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          Optimiere...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="mr-2 h-4 w-4" />
+                          KI-Optimierung starten
+                        </>
+                      )}
+                    </Button>
                   </CardContent>
                 </Card>
 
-                {/* Templates Section */}
+                {/* AI Insights */}
+                <Card className="border-2 bg-gradient-to-br from-blue-50 to-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-500" />
+                      KI-Erkenntnisse
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {aiInsights.map((insight, index) => (
+                        <div
+                          key={index}
+                          className={`flex items-center gap-2 ${
+                            insight.type === "warning" ? "text-yellow-600" :
+                            insight.type === "alert" ? "text-orange-600" :
+                            "text-red-600"
+                          }`}
+                        >
+                          <insight.icon className="h-4 w-4" />
+                          <span className="text-sm">{insight.message}</span>
+                        </div>
+                      ))}
+                      {aiInsights.length === 0 && (
+                        <div className="flex items-center gap-2 text-green-600">
+                          <UserCheck className="h-4 w-4" />
+                          <span className="text-sm">Optimale Verteilung erreicht</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Templates Section - Remains largely unchanged */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">Schichtvorlagen</Label>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={() => setTemplateDialogOpen(true)}
                     >
@@ -300,19 +433,20 @@ export default function Schedule() {
             </ScrollArea>
           </div>
 
-          {/* Main Content - Roster */}
+          {/* Main Content - Enhanced Roster */}
           <div className="flex-1 overflow-hidden bg-white">
             <ModernRoster
               selectedDate={selectedDate}
               department={department}
-              view={view}
-              scheduleMode={scheduleMode}
+              view={view as "daily" | "weekly" | "monthly"}
+              scheduleMode={scheduleMode as "manual" | "auto" | "balanced"}
+              optimizationFocus={optimizationFocus}
             />
           </div>
         </div>
       </div>
 
-      <ShiftTemplatesDialog 
+      <ShiftTemplatesDialog
         open={templateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
       />
