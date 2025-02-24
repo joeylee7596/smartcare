@@ -50,17 +50,27 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
       draggable
       onDragStart={handleDragStart}
       className={`
-        flex items-center gap-2 p-3 rounded-lg
-        ${info.bgColor} border-2 border-dashed
+        flex items-center gap-3 p-4 rounded-xl
+        ${info.bgColor} bg-opacity-90
+        backdrop-blur-sm
+        border border-white/20
+        shadow-lg shadow-${info.color}/10
+        hover:shadow-xl hover:scale-[1.02]
         cursor-grab group
-        hover:border-solid hover:shadow-sm
-        transition-all
+        transition-all duration-300 ease-out
+        transform perspective-1000
+        hover:rotate-1
       `}
+      style={{
+        background: `linear-gradient(135deg, ${info.bgColor}, rgba(255,255,255,0.9))`,
+      }}
     >
-      <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
+      <div className="p-2 rounded-lg bg-white/30 backdrop-blur-sm">
+        <Icon className={`h-6 w-6 ${info.color} group-hover:scale-110 transition-transform`} />
+      </div>
       <div>
-        <div className="font-medium">{info.label}</div>
-        <div className="text-xs text-gray-500">{info.time}</div>
+        <div className="font-semibold text-gray-800">{info.label}</div>
+        <div className="text-sm text-gray-600">{info.time}</div>
       </div>
     </div>
   );
@@ -73,23 +83,34 @@ function ShiftCard({ shift }: { shift: Shift }) {
   return (
     <motion.div
       className={`
-        p-2 mb-1 rounded-md
-        ${shift.aiOptimized ? 'bg-green-50 border-l-2 border-green-500' : `${info.bgColor} border`}
-        hover:shadow-md transition-all
+        p-3 mb-2 rounded-lg
+        ${shift.aiOptimized
+          ? 'bg-gradient-to-br from-green-50 to-emerald-50/90 border-l-2 border-green-500'
+          : `bg-gradient-to-br from-${info.bgColor} to-white/90 border border-white/20`
+        }
+        backdrop-blur-sm
+        shadow-sm hover:shadow-md
+        transform perspective-1000
+        hover:-translate-y-0.5
+        transition-all duration-300
       `}
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -5 }}
+      initial={{ opacity: 0, y: 5, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -5, scale: 0.95 }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Icon className={`h-4 w-4 ${info.color}`} />
-          <span className="text-sm font-medium">{info.label}</span>
+          <div className="p-1.5 rounded-md bg-white/50 backdrop-blur-sm">
+            <Icon className={`h-4 w-4 ${info.color}`} />
+          </div>
+          <span className="font-medium text-gray-800">{info.label}</span>
         </div>
         {shift.aiOptimized && (
           <Tooltip>
             <TooltipTrigger>
-              <Sparkles className="h-4 w-4 text-green-500" />
+              <div className="p-1 rounded-full bg-green-100/50 backdrop-blur-sm">
+                <Sparkles className="h-4 w-4 text-green-600" />
+              </div>
             </TooltipTrigger>
             <TooltipContent>KI-optimierte Schicht</TooltipContent>
           </Tooltip>
@@ -246,7 +267,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
               <ShiftTemplate key={type} type={type} />
             ))}
           </div>
-          <Button 
+          <Button
             onClick={onOptimize}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
           >
@@ -309,10 +330,14 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
                       <div
                         key={day.toISOString()}
                         className={`
-                          p-2 min-h-[120px] border-l relative
-                          ${dragOverCell === cellId ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
-                          hover:bg-gray-50/50
-                          transition-all
+                          p-2 min-h-[120px] relative
+                          border-l 
+                          ${dragOverCell === cellId 
+                            ? 'bg-blue-50/80 border-2 border-dashed border-blue-300 backdrop-blur-sm' 
+                            : 'hover:bg-gray-50/50'
+                          }
+                          transition-all duration-300
+                          rounded-lg
                         `}
                         onDragOver={(e) => handleDragOver(e, cellId)}
                         onDragLeave={handleDragLeave}
@@ -326,8 +351,10 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
                         {dayShifts.length === 0 && (
                           <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
-                            <Plus className="h-5 w-5" />
-                            <span className="text-xs mt-1">Schicht hinzufügen</span>
+                            <div className="p-2 rounded-full bg-gray-50/80 backdrop-blur-sm">
+                              <Plus className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
                           </div>
                         )}
                       </div>
