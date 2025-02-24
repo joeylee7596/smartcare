@@ -142,7 +142,7 @@ export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimi
   });
 
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", { start: weekStart.toISOString(), end: weekEnd.toISOString(), department }],
+    queryKey: ["/api/shifts", weekStart.toISOString(), weekEnd.toISOString(), department],
     queryFn: async () => {
       const searchParams = new URLSearchParams({
         start: weekStart.toISOString(),
@@ -195,16 +195,14 @@ export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimi
         endTime: endTime.toISOString(),
         department,
         breakDuration: 30,
-        conflictInfo: {
-          type: "overlap",
-          description: "Checking for conflicts",
-          severity: "low",
-          status: "pending"
-        },
+        status: "confirmed",
         notes: "",
         aiGenerated: false,
         aiOptimized: false,
-        status: "scheduled"
+        conflictInfo: null,
+        requiredSkills: [],
+        aiSuggestions: null,
+        dragDropMetadata: null
       };
 
       const res = await apiRequest("POST", "/api/shifts", shiftData);
@@ -216,10 +214,10 @@ export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimi
 
       return res.json();
     },
-    onSuccess: (newShift) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
-        return [...old, newShift];
+    onSuccess: () => {
+      // Invalidate and refetch shifts query after creating a new shift
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/shifts", weekStart.toISOString(), weekEnd.toISOString(), department] 
       });
 
       toast({
@@ -243,7 +241,11 @@ export function ScheduleBoard({ selectedDate, onDateChange, department, onOptimi
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      // Invalidate and refetch shifts query after deleting a shift
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/shifts", weekStart.toISOString(), weekEnd.toISOString(), department] 
+      });
+
       toast({
         title: "Schicht gelöscht",
         description: "Die Schicht wurde erfolgreich entfernt.",

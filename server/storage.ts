@@ -420,8 +420,12 @@ export class DatabaseStorage implements IStorage {
 
   // Implement new shift-related methods
   async getShifts(startDate: Date, endDate: Date): Promise<Shift[]> {
-    console.log('Fetching shifts for:', { startDate, endDate }); // Debug logging
-    return db
+    console.log('Storage: Fetching shifts for:', { 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
+
+    const shifts = await db
       .select()
       .from(shifts)
       .where(
@@ -431,6 +435,9 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(shifts.startTime);
+
+    console.log('Storage: Found shifts:', shifts.length);
+    return shifts;
   }
 
   async getEmployeeShifts(employeeId: number, startDate: Date, endDate: Date): Promise<Shift[]> {
