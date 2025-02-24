@@ -125,16 +125,23 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const weekEnd = addDays(weekStart, 6);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
+  // Query for employees
   const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ["/api/employees", { department }],
+    queryKey: ["/api/employees"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/employees");
+      if (!res.ok) throw new Error("Failed to fetch employees");
+      return res.json();
+    }
   });
 
+  // Query for shifts with proper parameters
   const { data: shifts = [] } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts", { start: weekStart, end: weekEnd, department }],
+    queryKey: ["/api/shifts", { startDate: weekStart, endDate: weekEnd, department }],
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/shifts", {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
+        startDate: weekStart.toISOString(),
+        endDate: weekEnd.toISOString(),
         department,
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
@@ -199,7 +206,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     },
     onSuccess: (newShift) => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      queryClient.setQueryData<Shift[]>(["/api/shifts", { start: weekStart, end: weekEnd, department }], (old = []) => {
+      queryClient.setQueryData<Shift[]>(["/api/shifts", { startDate: weekStart, endDate: weekEnd, department }], (old = []) => {
         return [...old, newShift];
       });
 
