@@ -610,28 +610,36 @@ export const insertShiftSchema = createInsertSchema(shifts, {
   ),
 });
 
-export const insertTemplateSchema = createInsertSchema(shiftTemplates).extend({
-  requiredSkills: z.array(z.string()).default([]),
-  minStaffing: z.number().int().min(1),
-  optimalStaffing: z.number().int().min(1),
-  priority: z.number().int().min(1).max(5),
+export const shiftChangeSchema = z.object({
+  id: z.number().optional(),
+  shiftId: z.number(),
+  requestedBy: z.number(),
+  requestType: z.enum(["swap", "cancel", "modify"]),
+  requestStatus: z.enum(["pending", "approved", "rejected"]).default("pending"),
+  requestDetails: z.object({
+    reason: z.string(),
+    proposedChanges: z.object({
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      newEmployeeId: z.number().optional(),
+    }).optional(),
+    urgency: z.enum(["low", "medium", "high"]).default("low"),
+    alternativeEmployees: z.array(z.number()).optional(),
+  }),
+  responseNote: z.string().optional(),
+  createdAt: z.date().optional(),
+  respondedAt: z.date().optional(),
+  respondedBy: z.number().optional(),
 });
 
-export const insertPreferenceSchema = createInsertSchema(shiftPreferences).extend({
-  preferredShiftTypes: z.array(z.string()).default([]),
-  preferredDays: z.array(z.enum([
-    "Monday", "Tuesday", "Wednesday", "Thursday",
-    "Friday", "Saturday", "Sunday"
-  ])).default([]),
-  maxShiftsPerWeek: z.number().int().min(1).max(7),
-  minRestHours: z.number().int().min(8).max(48),
-  preferredDepartments: z.array(z.string()).default([]),
-  maxNightShifts: z.number().int().min(0).max(7),
+export const insertChangeSchema = shiftChangeSchema.omit({ 
+  id: true, 
+  createdAt: true,
+  respondedAt: true 
 });
 
-export const insertChangeSchema = undefined;
-export type ShiftChange = undefined;
-export type InsertChange = undefined;
+export type ShiftChange = z.infer<typeof shiftChangeSchema>;
+export type InsertChange = z.infer<typeof insertChangeSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
