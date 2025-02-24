@@ -1,75 +1,21 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from "@tanstack/react-query";
 import { InsuranceBilling, Patient } from "@shared/schema";
 import { FileText, Plus, Download, Search, Calendar, Filter, Clock, Euro, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { BillingEditor } from "@/components/billing/billing-editor";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface BillingCardProps {
-  key: string;
-  billing: InsuranceBilling;
-  patient: Patient | null;
-  onSubmit: () => void;
-}
-
-const BillingCard = ({ key, billing, patient, onSubmit }: BillingCardProps) => {
-  return (
-    <motion.div
-      key={key}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.2, delay: key * 0.05 }}
-    >
-      <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 rounded-xl border border-white/40 hover:border-blue-200">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-500">
-                  {format(new Date(billing.date), "dd. MMMM yyyy", { locale: de })}
-                </span>
-              </div>
-              <div className="mt-2 space-y-2">
-                {billing.services.map((service, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">{service.description}</span>
-                    <span className="font-medium">
-                      {Number(service.amount).toFixed(2)} €
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSubmit}
-              className="h-9 rounded-xl bg-white/80 hover:bg-blue-50 border border-white/40 hover:border-blue-200 transition-all duration-300"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {billing.status === "draft" ? "Pending" : "Submit"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-};
-
+import { BillingCard } from "@/components/billing/billing-card";
 
 export default function BillingPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -79,6 +25,7 @@ export default function BillingPage() {
     format(new Date(), "yyyy-MM")
   );
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch data
   const { data: patients = [] } = useQuery<Patient[]>({
@@ -111,9 +58,9 @@ export default function BillingPage() {
   const selectedMonthTotal = (groupedBillings[selectedMonth] || [])
     .reduce((sum, billing) => sum + Number(billing.totalAmount), 0);
 
-  // Handle save billing
-  const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
-    try {
+  // Create billing mutation
+  const createBilling = useMutation({
+    mutationFn: async (billing: Partial<InsuranceBilling>) => {
       if (!billing.date || !billing.services || !billing.totalAmount) {
         throw new Error('Ungültige Abrechnungsdaten');
       }
@@ -136,52 +83,61 @@ export default function BillingPage() {
         throw new Error(errorData.error || 'Fehler beim Speichern der Abrechnung');
       }
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/billings"] }),
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch relevant queries
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
-      ]);
-
-      await refetchBillings();
-      setIsNewBillingOpen(false);
-
-      toast({
-        title: 'Gespeichert',
-        description: 'Die Abrechnung wurde als Entwurf gespeichert.',
+      ]).then(() => {
+        refetchBillings();
+        setIsNewBillingOpen(false);
+        toast({
+          title: 'Gespeichert',
+          description: 'Die Abrechnung wurde als Entwurf gespeichert.',
+        });
       });
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Saving Error:', error);
       toast({
         title: 'Fehler',
         description: error instanceof Error ? error.message : 'Die Abrechnung konnte nicht erstellt werden.',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  // Handle save billing
+  const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
+    createBilling.mutate(billing);
   };
 
-  const handleStatusUpdate = async (billing: InsuranceBilling, newStatus: string) => {
-    try {
-      const response = await fetch(`/api/billings/${billing.id}/status`, {
+  // Update billing status mutation
+  const updateBillingStatus = useMutation({
+    mutationFn: async ({ billingId, newStatus }: { billingId: number; newStatus: string }) => {
+      const response = await fetch(`/api/billings/${billingId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
 
       if (!response.ok) throw new Error('Status konnte nicht aktualisiert werden');
-
-      await refetchBillings();
-
-      toast({
-        title: 'Status aktualisiert',
-        description: `Die Abrechnung wurde als "${newStatus}" markiert.`,
-      });
-    } catch (error) {
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
+      refetchBillings();
+    },
+    onError: () => {
       toast({
         title: 'Fehler',
         description: 'Status konnte nicht aktualisiert werden.',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -303,34 +259,23 @@ export default function BillingPage() {
                             </p>
                           </div>
                         </div>
-                        <Dialog open={isNewBillingOpen} onOpenChange={setIsNewBillingOpen}>
-                          <DialogTrigger asChild>
-                            <Button
-                              size="lg"
-                              className="h-11 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600
-                                hover:from-blue-600 hover:to-blue-700 text-white
-                                shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30
-                                transition-all duration-500 hover:scale-[1.02]"
-                            >
-                              <Plus className="h-5 w-5 mr-2" />
-                              Neue Leistung
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/40">
-                            <DialogHeader>
-                              <DialogTitle>Neue Leistung erfassen</DialogTitle>
-                            </DialogHeader>
-                            <BillingEditor
-                              patient={selectedPatient}
-                              onSave={handleSaveBilling}
-                            />
-                          </DialogContent>
-                        </Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            size="lg"
+                            className="h-11 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600
+                              hover:from-blue-600 hover:to-blue-700 text-white
+                              shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30
+                              transition-all duration-500 hover:scale-[1.02]"
+                          >
+                            <Plus className="h-5 w-5 mr-2" />
+                            Neue Leistung
+                          </Button>
+                        </DialogTrigger>
                       </div>
                     </CardHeader>
                   </Card>
 
-                  {/* Monthly view */}
+                  {/* Monthly view with status updates */}
                   <Card className="border border-white/40 backdrop-blur-sm">
                     <CardHeader>
                       <div className="flex items-center justify-between">
@@ -362,8 +307,18 @@ export default function BillingPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                           >
-                            {(groupedBillings[selectedMonth] || []).map((billing, index) => (
-                              <BillingCard key={billing.id} billing={billing} patient={selectedPatient} onSubmit={() => handleStatusUpdate(billing, billing.status === "draft" ? "pending" : "submitted")}/>
+                            {(groupedBillings[selectedMonth] || [])
+                              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                              .map((billing) => (
+                                <BillingCard
+                                  key={billing.id}
+                                  billing={billing}
+                                  patient={selectedPatient}
+                                  onSubmit={() => updateBillingStatus.mutate({
+                                    billingId: billing.id,
+                                    newStatus: billing.status === "draft" ? "pending" : "submitted"
+                                  })}
+                                />
                             ))}
                           </motion.div>
                         </AnimatePresence>
