@@ -48,29 +48,18 @@ const ShiftTypes = {
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
 } as const;
 
-function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: type,
-  });
-
+function ShiftTemplate({ type, isDragging = false }: { type: keyof typeof ShiftTypes; isDragging?: boolean }) {
   const info = ShiftTypes[type];
   const Icon = info.icon;
 
   return (
     <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       className={`
         flex items-center gap-2 p-3 rounded-lg
         ${info.bgColor} border-2 border-dashed
-        cursor-grab group
-        ${isDragging ? 'opacity-50' : 'hover:border-solid hover:shadow-sm'}
-        transition-all
+        ${!isDragging && 'cursor-grab hover:border-solid hover:shadow-sm'}
+        transition-all group
       `}
-      style={{
-        touchAction: 'none',
-      }}
     >
       <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
       <div>
@@ -81,8 +70,25 @@ function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   );
 }
 
+function DraggableTemplate({ type }: { type: keyof typeof ShiftTypes }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: type,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      style={{ touchAction: 'none' }}
+    >
+      <ShiftTemplate type={type} isDragging={isDragging} />
+    </div>
+  );
+}
+
 function DroppableCell({ date, employeeId, children }: { date: Date; employeeId: number; children: React.ReactNode }) {
-  const { setNodeRef, isOver, isActive } = useDroppable({
+  const { setNodeRef, isOver } = useDroppable({
     id: `${employeeId}_${format(date, 'yyyy-MM-dd')}`,
   });
 
@@ -92,7 +98,7 @@ function DroppableCell({ date, employeeId, children }: { date: Date; employeeId:
       className={`
         p-2 min-h-[120px] border-l relative
         ${isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
-        ${isActive ? 'bg-gray-50/50' : ''}
+        hover:bg-gray-50/50
         transition-all duration-200
       `}
     >
@@ -119,9 +125,7 @@ function ShiftCard({ shift }: { shift: Shift }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${info.color}`} />
-          <span className="text-sm font-medium">
-            {info.label}
-          </span>
+          <span className="text-sm font-medium">{info.label}</span>
         </div>
         {shift.aiOptimized && (
           <Tooltip>
@@ -238,7 +242,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
           <div className="flex items-center justify-between">
             <div className="grid grid-cols-3 gap-4">
               {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
-                <DraggableShiftTemplate key={type} type={type} />
+                <DraggableTemplate key={type} type={type} />
               ))}
             </div>
             <Button 
@@ -339,7 +343,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
 
       <DragOverlay>
         {activeId && Object.keys(ShiftTypes).includes(activeId) && (
-          <DraggableShiftTemplate type={activeId as keyof typeof ShiftTypes} />
+          <ShiftTemplate type={activeId as keyof typeof ShiftTypes} isDragging />
         )}
       </DragOverlay>
     </DndContext>
