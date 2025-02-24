@@ -30,22 +30,35 @@ export default function BillingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch data
-  const { data: patients = [] } = useQuery<Patient[]>({
+  // Fetch data with proper error handling
+  const { data: patients = [], isError: isPatientsError } = useQuery<Patient[]>({
     queryKey: ["/api/patients"],
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Patienten konnten nicht geladen werden",
+        variant: "destructive",
+      });
+    },
   });
 
-  const { data: billings = [], refetch: refetchBillings } = useQuery<InsuranceBilling[]>({
+  const { data: billings = [], isError: isBillingsError } = useQuery<InsuranceBilling[]>({
     queryKey: ["/api/billings", selectedPatient?.id],
     enabled: !!selectedPatient?.id,
+    onError: () => {
+      toast({
+        title: "Fehler",
+        description: "Abrechnungen konnten nicht geladen werden",
+        variant: "destructive",
+      });
+    },
   });
 
   // Add new query for documentation check
-  const { data: docCheckData, refetch: refetchDocCheck } = useQuery({
+  const { refetch: refetchDocCheck } = useQuery({
     queryKey: ["/api/documentation/check", selectedPatient?.id],
-    enabled: !!selectedPatient?.id,
+    enabled: false, // Only fetch when explicitly called
   });
-
 
   // Filter patients based on search
   const filteredPatients = searchQuery
@@ -101,7 +114,6 @@ export default function BillingPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] }),
         queryClient.invalidateQueries({ queryKey: ["/api/patients"] })
       ]).then(() => {
-        refetchBillings();
         setIsNewBillingOpen(false);
         toast({
           title: 'Gespeichert',
@@ -119,15 +131,10 @@ export default function BillingPage() {
     },
   });
 
-  // Handle save billing
-  const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
-    createBilling.mutate(billing);
-  };
-
   // Update billing status mutation
   const updateBillingStatus = useMutation({
     mutationFn: async ({ billingId, newStatus }: { billingId: number; newStatus: string }) => {
-      const response = await fetch(`/api/billings/${billingId}/status`, {
+      const response = await fetch(`/api/billings/${billingId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -138,7 +145,6 @@ export default function BillingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/billings", selectedPatient?.id] });
-      refetchBillings();
     },
     onError: () => {
       toast({
@@ -153,12 +159,20 @@ export default function BillingPage() {
   const checkMissingDocumentation = async () => {
     if (!selectedPatient) return;
 
-    const result = await refetchDocCheck();
-    if (result?.data?.missingDocs?.length > 0) {
-      setMissingDocs(result.data.missingDocs);
-      setShowDocCheck(true);
-    } else {
-      setIsNewBillingOpen(true);
+    try {
+      const result = await refetchDocCheck();
+      if (result.data?.missingDocs?.length > 0) {
+        setMissingDocs(result.data.missingDocs);
+        setShowDocCheck(true);
+      } else {
+        setIsNewBillingOpen(true);
+      }
+    } catch (error) {
+      toast({
+        title: "Fehler",
+        description: "Dokumentationen konnten nicht überprüft werden",
+        variant: "destructive",
+      });
     }
   };
 
@@ -167,6 +181,27 @@ export default function BillingPage() {
     // Navigate to documentation page with pre-filled data
     window.location.href = `/documentation?patientId=${selectedPatient?.id}&date=${item.date}&type=${item.type}&id=${item.id}`;
   };
+
+  // Handle save billing
+  const handleSaveBilling = async (billing: Partial<InsuranceBilling>) => {
+    createBilling.mutate(billing);
+  };
+
+  if (isPatientsError || isBillingsError) {
+    return (
+      <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
+        <Sidebar />
+        <div className="flex-1">
+          <Header />
+          <main className="p-8">
+            <div className="text-center text-red-600">
+              Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-white">
@@ -384,6 +419,7 @@ export default function BillingPage() {
               )}
             </div>
           </div>
+
           {/* Documentation Check Dialog */}
           <DocumentationCheckDialog
             open={showDocCheck}
