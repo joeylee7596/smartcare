@@ -51,22 +51,24 @@ function ShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
       onDragStart={handleDragStart}
       className={`
         flex items-center gap-3 p-4 rounded-xl
-        ${info.bgColor} bg-opacity-90
-        backdrop-blur-sm
-        border border-white/20
-        shadow-lg shadow-${info.color}/10
-        hover:shadow-xl hover:scale-[1.02]
+        bg-gradient-to-br from-white/80 to-white/40
+        backdrop-blur-[2px]
+        border border-white/30
+        shadow-[0_8px_16px_-6px_rgba(0,0,0,0.02),0_16px_24px_-8px_rgba(0,0,0,0.01)]
+        hover:shadow-[0_12px_20px_-8px_rgba(0,0,0,0.03),0_20px_32px_-12px_rgba(0,0,0,0.02)]
+        hover:scale-[1.02]
         cursor-grab group
-        transition-all duration-300 ease-out
-        transform perspective-1000
+        transition-all duration-500 ease-out
+        transform-gpu perspective-1000
         hover:rotate-1
+        before:absolute before:inset-0 before:z-[-1] before:bg-gradient-to-t before:from-white/5 before:to-white/20 before:rounded-xl before:backdrop-blur-sm
       `}
       style={{
-        background: `linear-gradient(135deg, ${info.bgColor}, rgba(255,255,255,0.9))`,
+        background: `linear-gradient(135deg, rgba(255,255,255,0.9), ${info.bgColor.replace('bg-', '')})`,
       }}
     >
-      <div className="p-2 rounded-lg bg-white/30 backdrop-blur-sm">
-        <Icon className={`h-6 w-6 ${info.color} group-hover:scale-110 transition-transform`} />
+      <div className="p-2.5 rounded-lg bg-gradient-to-br from-white/60 to-white/20 backdrop-blur-[4px] shadow-inner">
+        <Icon className={`h-6 w-6 ${info.color} group-hover:scale-110 transition-transform duration-500`} />
       </div>
       <div>
         <div className="font-semibold text-gray-800">{info.label}</div>
@@ -84,15 +86,17 @@ function ShiftCard({ shift }: { shift: Shift }) {
     <motion.div
       className={`
         p-3 mb-2 rounded-lg
-        ${shift.aiOptimized
-          ? 'bg-gradient-to-br from-green-50 to-emerald-50/90 border-l-2 border-green-500'
-          : `bg-gradient-to-br from-${info.bgColor} to-white/90 border border-white/20`
-        }
-        backdrop-blur-sm
-        shadow-sm hover:shadow-md
-        transform perspective-1000
+        ${shift.aiOptimized 
+          ? 'bg-gradient-to-br from-white/80 via-green-50/50 to-emerald-50/30 border-l-2 border-green-400/50' 
+          : 'bg-gradient-to-br from-white/80 via-white/60 to-transparent'}
+        backdrop-blur-[4px]
+        border border-white/30
+        shadow-[0_4px_12px_-4px_rgba(0,0,0,0.02)]
+        hover:shadow-[0_8px_16px_-6px_rgba(0,0,0,0.03)]
+        transform-gpu perspective-1000
         hover:-translate-y-0.5
-        transition-all duration-300
+        transition-all duration-500
+        before:absolute before:inset-0 before:z-[-1] before:bg-gradient-to-t before:from-white/5 before:to-white/20 before:rounded-lg before:backdrop-blur-sm
       `}
       initial={{ opacity: 0, y: 5, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -100,7 +104,7 @@ function ShiftCard({ shift }: { shift: Shift }) {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-md bg-white/50 backdrop-blur-sm">
+          <div className="p-1.5 rounded-md bg-gradient-to-br from-white/60 to-white/20 backdrop-blur-[4px] shadow-inner">
             <Icon className={`h-4 w-4 ${info.color}`} />
           </div>
           <span className="font-medium text-gray-800">{info.label}</span>
@@ -108,8 +112,8 @@ function ShiftCard({ shift }: { shift: Shift }) {
         {shift.aiOptimized && (
           <Tooltip>
             <TooltipTrigger>
-              <div className="p-1 rounded-full bg-green-100/50 backdrop-blur-sm">
-                <Sparkles className="h-4 w-4 text-green-600" />
+              <div className="p-1.5 rounded-full bg-gradient-to-br from-green-100/60 to-green-50/20 backdrop-blur-[4px] shadow-inner">
+                <Sparkles className="h-3.5 w-3.5 text-green-500" />
               </div>
             </TooltipTrigger>
             <TooltipContent>KI-optimierte Schicht</TooltipContent>
@@ -145,7 +149,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       });
       if (!res.ok) throw new Error("Failed to fetch shifts");
       const data = await res.json();
-      console.log('Fetched shifts:', data); // Debug log
+      console.log('Fetched shifts:', data);
       return data;
     },
   });
@@ -190,7 +194,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         status: "scheduled"
       };
 
-      console.log('Creating shift with data:', shiftData); // Debug log
+      console.log('Creating shift with data:', shiftData);
 
       const res = await apiRequest("POST", "/api/shifts", shiftData);
 
@@ -200,7 +204,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       }
 
       const newShift = await res.json();
-      console.log('Created shift:', newShift); // Debug log
+      console.log('Created shift:', newShift);
       return newShift;
     },
     onSuccess: (newShift) => {
@@ -255,12 +259,9 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }
   };
 
-  // Debug log for current shifts
-  console.log('Current shifts:', shifts);
-
   return (
-    <Card className="mt-6">
-      <CardHeader className="pb-4 border-b">
+    <Card className="border-none shadow-none bg-white/70 backdrop-blur-sm">
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="grid grid-cols-3 gap-4">
             {(Object.keys(ShiftTypes) as Array<keyof typeof ShiftTypes>).map((type) => (
@@ -277,92 +278,65 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[calc(100vh-280px)]">
-          <div className="min-w-[1200px]">
-            {/* Header row with dates */}
-            <div className="grid grid-cols-[250px_repeat(7,1fr)] border-b">
-              <div className="p-4 font-medium">Mitarbeiter</div>
-              {weekDays.map((day) => (
-                <div
-                  key={day.toISOString()}
-                  className={`p-4 text-center ${
-                    format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                      ? 'bg-blue-50'
-                      : ''
-                  }`}
-                >
-                  <div className="font-medium">
-                    {format(day, "EEEE", { locale: de })}
+        <ScrollArea className="h-[calc(100vh-280px)] pr-4">
+          <div className="space-y-6">
+            {employees.map((employee) => (
+              <Card key={employee.id} className="overflow-hidden border border-gray-100">
+                <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium">{employee.name}</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {format(day, "dd.MM.")}
-                  </div>
-                </div>
-              ))}
-            </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="grid grid-cols-7 gap-2">
+                    {weekDays.map((day) => {
+                      const dayShifts = shifts.filter(s => {
+                        const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
+                        const currentDate = format(day, 'yyyy-MM-dd');
+                        return s.employeeId === employee.id && shiftDate === currentDate;
+                      });
 
-            {/* Employee rows */}
-            <div>
-              {employees.map((employee) => (
-                <div
-                  key={employee.id}
-                  className="grid grid-cols-[250px_repeat(7,1fr)] border-b hover:bg-gray-50/50"
-                >
-                  {/* Employee info */}
-                  <div className="p-4">
-                    <div className="font-medium">{employee.name}</div>
-                  </div>
+                      const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
 
-                  {/* Shift cells for each day */}
-                  {weekDays.map((day) => {
-                    const dayShifts = shifts.filter(s => {
-                      const shiftDate = format(new Date(s.startTime), 'yyyy-MM-dd');
-                      const currentDate = format(day, 'yyyy-MM-dd');
-                      return s.employeeId === employee.id && shiftDate === currentDate;
-                    });
+                      return (
+                        <div
+                          key={day.toISOString()}
+                          className={`
+                            p-2 min-h-[120px] relative
+                            border-l 
+                            ${dragOverCell === cellId 
+                              ? 'bg-gradient-to-br from-blue-50/60 to-blue-50/20 border-2 border-dashed border-blue-200/70 backdrop-blur-[4px]' 
+                              : 'hover:bg-gradient-to-br hover:from-gray-50/40 hover:to-transparent'}
+                            transition-all duration-500
+                            rounded-lg
+                          `}
+                          onDragOver={(e) => handleDragOver(e, cellId)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, employee.id, day)}
+                        >
+                          <AnimatePresence>
+                            {dayShifts.map((shift) => (
+                              <ShiftCard key={shift.id} shift={shift} />
+                            ))}
+                          </AnimatePresence>
 
-                    const cellId = `${employee.id}_${format(day, 'yyyy-MM-dd')}`;
-
-                    // Debug log for shifts in this cell
-                    console.log(`Shifts for ${cellId}:`, dayShifts);
-
-                    return (
-                      <div
-                        key={day.toISOString()}
-                        className={`
-                          p-2 min-h-[120px] relative
-                          border-l 
-                          ${dragOverCell === cellId 
-                            ? 'bg-blue-50/80 border-2 border-dashed border-blue-300 backdrop-blur-sm' 
-                            : 'hover:bg-gray-50/50'
-                          }
-                          transition-all duration-300
-                          rounded-lg
-                        `}
-                        onDragOver={(e) => handleDragOver(e, cellId)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, employee.id, day)}
-                      >
-                        <AnimatePresence>
-                          {dayShifts.map((shift) => (
-                            <ShiftCard key={shift.id} shift={shift} />
-                          ))}
-                        </AnimatePresence>
-
-                        {dayShifts.length === 0 && (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
-                            <div className="p-2 rounded-full bg-gray-50/80 backdrop-blur-sm">
-                              <Plus className="h-5 w-5" />
+                          {dayShifts.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 group-hover:text-gray-500">
+                              <div className="p-2.5 rounded-full bg-gradient-to-br from-gray-50/60 to-white/20 backdrop-blur-[4px] shadow-inner">
+                                <Plus className="h-5 w-5" />
+                              </div>
+                              <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
                             </div>
-                            <span className="text-xs mt-2 font-medium">Schicht hinzufügen</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </ScrollArea>
       </CardContent>
