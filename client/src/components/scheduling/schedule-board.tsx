@@ -6,8 +6,8 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
-  useDroppable,
   useDraggable,
+  useDroppable,
   DragOverlay,
 } from "@dnd-kit/core";
 import { format, addDays, startOfWeek } from "date-fns";
@@ -23,11 +23,10 @@ import {
   Star,
   Sparkles,
   Plus,
-  Pencil,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -50,9 +49,10 @@ const ShiftTypes = {
   night: { icon: Moon, color: "text-blue-500", bgColor: "bg-blue-50", label: "Nacht", time: "22:00 - 06:00" },
 };
 
+// Draggable Shift Template Component
 function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: type,
+    id: `template_${type}`,
   });
 
   const info = ShiftTypes[type];
@@ -65,10 +65,11 @@ function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
       {...attributes}
       className={`
         flex items-center gap-2 p-3 rounded-lg
-        ${info.bgColor} border-2 border-dashed cursor-grab
-        hover:border-solid hover:shadow-sm transition-all
-        group relative
+        ${info.bgColor} border-2 border-dashed
+        cursor-grab group relative
         ${isDragging ? 'opacity-50' : ''}
+        hover:border-solid hover:shadow-sm
+        transition-all
       `}
     >
       <Icon className={`h-5 w-5 ${info.color} group-hover:scale-110 transition-transform`} />
@@ -80,9 +81,11 @@ function DraggableShiftTemplate({ type }: { type: keyof typeof ShiftTypes }) {
   );
 }
 
+// Droppable Cell Component
 function DroppableCell({ date, employeeId, children }: { date: Date; employeeId: number; children: React.ReactNode }) {
+  const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
-    id: `${employeeId}_${format(date, 'yyyy-MM-dd')}`,
+    id: `${employeeId}_${dateStr}`,
   });
 
   return (
@@ -92,7 +95,7 @@ function DroppableCell({ date, employeeId, children }: { date: Date; employeeId:
         p-2 min-h-[100px] border-l relative
         ${isOver ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''}
         hover:bg-gray-50/50
-        transition-all
+        transition-all duration-200
       `}
     >
       {children}
@@ -100,6 +103,7 @@ function DroppableCell({ date, employeeId, children }: { date: Date; employeeId:
   );
 }
 
+// Shift Card Component
 function ShiftCard({ shift }: { shift: Shift }) {
   const info = ShiftTypes[shift.type as keyof typeof ShiftTypes];
   const Icon = info.icon;
@@ -113,22 +117,19 @@ function ShiftCard({ shift }: { shift: Shift }) {
       `}
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Icon className={`h-4 w-4 ${info.color}`} />
-          <span className="text-sm font-medium">
-            {info.label}
-          </span>
+          <span className="text-sm font-medium">{info.label}</span>
         </div>
         {shift.aiOptimized && (
           <Tooltip>
             <TooltipTrigger>
               <Sparkles className="h-4 w-4 text-green-500" />
             </TooltipTrigger>
-            <TooltipContent>
-              KI-optimierte Schicht
-            </TooltipContent>
+            <TooltipContent>KI-optimierte Schicht</TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -141,6 +142,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Configure sensors for better touch/mouse handling
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -166,7 +168,7 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     }],
   });
 
-  // Create new shift
+  // Create new shift mutation
   const createShiftMutation = useMutation({
     mutationFn: async (data: { employeeId: number; type: string; date: Date }) => {
       let startTime = new Date(data.date);
@@ -219,9 +221,9 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
     if (!over) return;
 
     const [employeeId, date] = over.id.toString().split("_");
-    const type = active.id.toString();
+    const [source, type] = active.id.toString().split("_");
 
-    if (type && employeeId && date) {
+    if (source === "template" && type && employeeId && date) {
       createShiftMutation.mutate({
         employeeId: parseInt(employeeId),
         type,
@@ -341,8 +343,8 @@ export function ScheduleBoard({ selectedDate, department, onOptimize }: Schedule
       </Card>
 
       <DragOverlay>
-        {activeId && (
-          <DraggableShiftTemplate type={activeId as keyof typeof ShiftTypes} />
+        {activeId && activeId.startsWith('template_') && (
+          <DraggableShiftTemplate type={activeId.split('_')[1] as keyof typeof ShiftTypes} />
         )}
       </DragOverlay>
     </DndContext>
